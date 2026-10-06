@@ -5,54 +5,20 @@ Proves, against a live gateway_test database, that:
   * row-level security actually hides rows from gateway_app;
   * a cleared/stale session context returns ZERO rows (no error) — the
     NULLIF(..., '') guard required by the RLS policies;
-  * gateway_app cannot UPDATE or DELETE (append-only posture, SPEC 14.2).
+  * gateway_app cannot UPDATE (append-only posture, SPEC 14.2).
 
-A scratch probe table is created and dropped around the tests so no migration
-is required (migrations arrive in build step 3).
+A scratch probe table is created and dropped around the tests so these pass
+even before the real schema migration runs (the migrated schema itself is
+covered by test_schema.py).
 """
 
 import pytest
-from app.config import Settings
 from app.db import clear_rls_context
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import ProgrammingError
 
 PROBE_TABLE = "rls_guard_probe"
-
-
-def _engine(url: str) -> Engine:
-    # pool_size=1 so connection reuse across tests is deterministic.
-    return create_engine(url, connect_args={"connect_timeout": 3}, pool_size=1, max_overflow=0)
-
-
-def _connect_or_skip(engine: Engine) -> Engine:
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-    except Exception as exc:  # noqa: BLE001 — skip only when the stack is down
-        engine.dispose()
-        pytest.skip(f"database not running — start infra compose first ({type(exc).__name__})")
-    return engine
-
-
-@pytest.fixture(scope="module")
-def settings() -> Settings:
-    return Settings()
-
-
-@pytest.fixture(scope="module")
-def app_engine(settings: Settings) -> Engine:
-    engine = _connect_or_skip(_engine(settings.test_app_database_url))
-    yield engine
-    engine.dispose()
-
-
-@pytest.fixture(scope="module")
-def owner_engine(settings: Settings) -> Engine:
-    engine = _connect_or_skip(_engine(settings.test_owner_database_url))
-    yield engine
-    engine.dispose()
 
 
 @pytest.fixture()
@@ -90,7 +56,7 @@ def test_gateway_app_is_not_superuser_and_cannot_bypass_rls(app_engine: Engine) 
     assert row.rolcreaterole is False
 
 
-def test_rls_hides_unauthorized_rows(app_engine: Engine, probe: None) -> None:  # noqa: F811 — probe fixture
+def test_rls_hides_unauthorized_rows(app_engine: Engine, probe: None) -> None:
     with app_engine.connect() as conn:
         conn.execute(text("SELECT set_config('app.probe_marker', 'alpha', true)"))
         count = conn.execute(text(f"SELECT count(*) FROM {PROBE_TABLE}")).scalar()
@@ -104,7 +70,7 @@ def test_rls_hides_unauthorized_rows(app_engine: Engine, probe: None) -> None:  
 
 def test_stale_pooled_context_returns_zero_rows_not_an_error(
     app_engine: Engine, probe: None
-) -> None:  # noqa: F811 — probe fixture
+) -> None:
     """Reuse one pooled connection: set context for one 'user', then clear it
     (session-level '') and query in a fresh transaction. Must be zero rows —
     never a cast error — proving the NULLIF guard in the policy."""
@@ -116,7 +82,7 @@ def test_stale_pooled_context_returns_zero_rows_not_an_error(
         assert count == 0
 
 
-def test_gateway_app_cannot_update(app_engine: Engine, probe: None) -> None:  # noqa: F811
+def test_gateway_app_cannot_update(app_engine: Engine, probe: None) -> None:
     with app_engine.connect() as conn:
         with pytest.raises(ProgrammingError) as excinfo:
             conn.execute(text(f"UPDATE {PROBE_TABLE} SET marker = 'x'"))

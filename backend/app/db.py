@@ -16,9 +16,14 @@ from uuid import UUID
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
+
+
+class Base(DeclarativeBase):
+    """Declarative base for all gateway ORM models (migrations diff against it)."""
+
 
 RLS_KEYS: tuple[str, ...] = (
     "user_id",
