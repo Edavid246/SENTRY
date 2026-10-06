@@ -1,0 +1,91 @@
+name: defence-gateway
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: defence-gateway-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-dev-postgres-password}
+      POSTGRES_DB: gateway
+      GATEWAY_OWNER_PASSWORD: ${GATEWAY_OWNER_PASSWORD:-dev-owner-password}
+      GATEWAY_APP_PASSWORD: ${GATEWAY_APP_PASSWORD:-dev-app-password}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=512MB
+      - -c
+      - max_connections=25
+      - -c
+      - work_mem=4MB
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gateway"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    mem_limit: 1g
+    shm_size: 256mb
+
+  api:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: defence-gateway-api
+    environment:
+      OWNER_DATABASE_URL: postgresql+psycopg://gateway_owner:${GATEWAY_OWNER_PASSWORD:-dev-owner-password}@db:5432/gateway
+      APP_DATABASE_URL: postgresql+psycopg://gateway_app:${GATEWAY_APP_PASSWORD:-dev-app-password}@db:5432/gateway
+      TEST_OWNER_DATABASE_URL: postgresql+psycopg://gateway_owner:${GATEWAY_OWNER_PASSWORD:-dev-owner-password}@db:5432/gateway_test
+      TEST_APP_DATABASE_URL: postgresql+psycopg://gateway_app:${GATEWAY_APP_PASSWORD:-dev-app-password}@db:5432/gateway_test
+      DEV_JWT_SECRET: ${DEV_JWT_SECRET:-dev-only-secret-change-me}
+      DEV_JWT_TTL_SECONDS: ${DEV_JWT_TTL_SECONDS:-7200}
+      LLM_PROVIDER: ${LLM_PROVIDER:-hosted}
+      LLM_MODEL: ${LLM_MODEL:-}
+      HOSTED_API_KEY: ${HOSTED_API_KEY:-}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
+    command:
+      [
+        "/app/.venv/bin/uvicorn",
+        "app.main:app",
+        "--reload",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8001",
+      ]
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../backend:/app/backend
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/healthz', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+    mem_limit: 1g
+
+volumes:
+  pgdata:
+    name: defence-gateway-pgdata
+
+networks:
+  default:
+    name: defence-gateway-default

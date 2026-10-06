@@ -8,7 +8,7 @@ def test_dev_defaults() -> None:
     assert settings.llm_provider == "hosted"
     assert settings.owner_database_url.endswith("/gateway")
     assert settings.test_owner_database_url.endswith("/gateway_test")
-    assert "@localhost:5432/" in settings.app_database_url
+    assert "@localhost:5434/" in settings.app_database_url
 
 
 def test_provider_and_model_come_from_environment(monkeypatch) -> None:

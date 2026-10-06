@@ -26,16 +26,16 @@ class Settings(BaseSettings):
     # Database. OWNER URL runs migrations (table owner, bypasses RLS);
     # APP URL is the runtime role to which row-level security applies.
     owner_database_url: str = (
-        "postgresql+psycopg://gateway_owner:dev-owner-password@localhost:5432/gateway"
+        "postgresql+psycopg://gateway_owner:dev-owner-password@localhost:5434/gateway"
     )
     app_database_url: str = (
-        "postgresql+psycopg://gateway_app:dev-app-password@localhost:5432/gateway"
+        "postgresql+psycopg://gateway_app:dev-app-password@localhost:5434/gateway"
     )
     test_owner_database_url: str = (
-        "postgresql+psycopg://gateway_owner:dev-owner-password@localhost:5432/gateway_test"
+        "postgresql+psycopg://gateway_owner:dev-owner-password@localhost:5434/gateway_test"
     )
     test_app_database_url: str = (
-        "postgresql+psycopg://gateway_app:dev-app-password@localhost:5432/gateway_test"
+        "postgresql+psycopg://gateway_app:dev-app-password@localhost:5434/gateway_test"
     )
 
     # Stubbed identity (Keycloak is stubbed for the demo — docs/STUBS.md).
