@@ -53,3 +53,8 @@ Plan first, then build. Run tests after each step and show the output.
 Commit after each working step with a clear message.
 Authorization tests start immediately and grow every phase.
 Keep memory low: 16 GB dev machine, no GPU.
+
+## DEMO-ONLY TOOLING NOTE
+Demo build uses a free-tier coding model (Big Pickle) that may retain prompts. Accepted for
+the demo only. The production build must use zero-retention or on-prem tooling and keep the
+spec, client material, and keys out of any third-party model's reach.
