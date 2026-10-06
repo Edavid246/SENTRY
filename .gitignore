@@ -4,3 +4,7 @@ node_modules/
 __pycache__/
 .venv/
 *.log
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
