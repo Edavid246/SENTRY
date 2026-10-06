@@ -1,4 +1,4 @@
-"""Shared fixtures for integration tests.
+"""Shared fixtures for all integration-style tests (unit tests don't need them).
 
 Engines are session-scoped with pool_size=1 so connection reuse (and any RLS
 context left on a pooled connection) is deterministic across tests. Every
@@ -17,7 +17,7 @@ from app.config import Settings
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _engine(url: str) -> Engine:
