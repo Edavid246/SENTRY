@@ -52,6 +52,23 @@ in each step's report.
 | One planted correlation finding with its evidence panel | §18.6 |
 | Evaluation additions beyond the current authorization/retrieval/adversarial suite | §16 |
 
+## Not built (spec modules outside the Monday demo)
+
+> All module data is demo data standing in for the client's existing systems.
+
+| Spec module | Status in the demo |
+|---|---|
+| Module workspaces (Personnel, Logistics, Training) | Nav entries shown greyed out, marked "Not in demo". |
+| Map and connected-systems view | Not built; MapLibre + GeoJSON, no external tiles, when it lands. |
+| Workflows and approvals | Cut (AGENTS.md DEMO CUT). |
+| OCR / scanned-document ingestion | Cut. |
+| Reranker | Cut; fusion only. |
+| Keycloak (OIDC, real SSO) | Stubbed: seeded login behind `AccessContext`. |
+| OPA policy engine | Stubbed: `LocalPolicy` behind the `Policy` interface. |
+| Local vLLM provider | Interface only; fails closed. |
+| Observability (metrics, tracing) | Cut. |
+| Kubernetes and air-gapped profile | Cut; Docker Compose dev profile only, not sovereign. |
+
 ## Demo answer cache (prefill)
 
 The hosted model is slow and quota-limited, so the demo can replay answers recorded

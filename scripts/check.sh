@@ -13,13 +13,14 @@ uv run ruff format --check .
 echo "== pytest"
 uv run pytest -q "$@"
 
-echo "== web: eslint + tsc --noEmit"
+echo "== web: eslint + tsc --noEmit + next build"
 export NEXT_TELEMETRY_DISABLED=1
 (
   cd web
   [ -d node_modules ] || npm ci
   npm run lint
   npm run typecheck
+  npm run build
 )
 
 echo "== air-gap scan (no external CDNs, fonts, tiles, telemetry)"

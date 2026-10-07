@@ -153,6 +153,18 @@ export function Shell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          {["Personnel", "Logistics", "Training", "Map"].map((label) => (
+            <div
+              key={label}
+              aria-disabled="true"
+              title="Not in demo"
+              data-testid="nav-not-in-demo"
+              className="flex cursor-not-allowed items-center justify-between border-l-[3px] border-transparent px-5 py-3 text-[0.9rem] uppercase tracking-[0.12em] text-mute opacity-60"
+            >
+              {label}
+              <span className="text-[0.6rem] tracking-[0.08em]">Not in demo</span>
+            </div>
+          ))}
           <div className="mt-auto px-5 text-[0.75rem] leading-relaxed text-mute">
             Demo build
             <br />
