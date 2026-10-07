@@ -299,6 +299,17 @@ end-of-step report. Never silently log it.
 - **Production needs:** neither mode exists in a production profile; no stored prompt
   corpus, no replay of model output, and a real on-prem model behind `LLMProvider`.
 
+### 2026-10-07 — Dashboard placeholders and a second copy of the visibility rule
+- **Issue:** the dashboard tiles are hard-coded fixtures, not module data, and they are
+  authorized by `LocalPolicy.item_visible`, a Python re-statement of the SQL row filter
+  (two implementations of SPEC 7.1 that can drift).
+- **Why acceptable:** the fixtures are fictitious and tagged PLACEHOLDER DATA in the UI;
+  `tests/authz/test_item_visible.py` checks the Python rule against the SQL oracle for
+  every seeded record and demo user. Part D replaces the tiles with real tool results,
+  which use the SQL filter only.
+- **Production needs:** one policy decision point (OPA partial evaluation) for every
+  surface, and no fixture data in the dashboard.
+
 ### 2026-10-07 — DEMO_DATE pins the business date
 - **Issue:** `DEMO_DATE` (dev profile only, refused otherwise) replaces the live date in
   the seed offsets and in the data-tool cutoffs, so "overdue" and "due within 30 days"

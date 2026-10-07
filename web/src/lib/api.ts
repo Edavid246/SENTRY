@@ -6,6 +6,9 @@ export type Citation = Schemas["CitationOut"];
 export type ConversationSummary = Schemas["ConversationSummary"];
 export type ConversationDetail = Schemas["ConversationDetail"];
 export type ResultTable = Schemas["ResultTable"];
+export type DashboardSummary = Schemas["DashboardSummary"];
+export type DashboardTile = Schemas["DashboardTile"];
+export type DashboardItem = Schemas["DashboardItem"];
 
 // These endpoints return free-form dicts in OpenAPI, so their shapes are
 // declared here (kept in step with backend/app/api/endpoints.py).
@@ -127,5 +130,6 @@ export const api = {
     request<AuditEvent[]>(
       `/audit?limit=${limit}${eventId ? `&event_id=${encodeURIComponent(eventId)}` : ""}`,
     ),
+  dashboard: () => request<DashboardSummary>("/dashboard/summary"),
   verify: () => request<VerifyReport>("/audit/verify"),
 };

@@ -7,7 +7,7 @@ import { useSession } from "@/lib/session";
 import { Clock } from "./Clock";
 import { ClearanceBadge } from "./ClearanceBadge";
 import { Emblem } from "./Emblem";
-import { IconChat, IconLock, IconLog, IconLogout, IconOrg, IconShield } from "./Icons";
+import { IconChat, IconDashboard, IconLock, IconLog, IconLogout, IconOrg, IconShield } from "./Icons";
 
 export function Watermark() {
   return (
@@ -63,6 +63,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }
 
   const nav = [
+    { href: "/dashboard", label: "Dashboard", icon: <IconDashboard />, show: can("read") },
     { href: "/chat", label: "Assistant", icon: <IconChat />, show: true },
     { href: "/audit", label: "Audit log", icon: <IconLog />, show: can("read_audit") },
   ].filter((n) => n.show);
@@ -159,10 +160,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
               aria-disabled="true"
               title="Not in demo"
               data-testid="nav-not-in-demo"
-              className="flex cursor-not-allowed items-center justify-between border-l-[3px] border-transparent px-5 py-3 text-[0.9rem] uppercase tracking-[0.12em] text-mute opacity-60"
+              className="flex cursor-not-allowed flex-col items-start border-l-[3px] border-transparent px-5 py-3 text-[0.9rem] uppercase tracking-[0.12em] text-mute opacity-60"
             >
               {label}
-              <span className="text-[0.6rem] tracking-[0.08em]">Not in demo</span>
+              <span className="text-[0.6rem] tracking-[0.08em] whitespace-nowrap">Not in demo</span>
             </div>
           ))}
           <div className="mt-auto px-5 text-[0.75rem] leading-relaxed text-mute">

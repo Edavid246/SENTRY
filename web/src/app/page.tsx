@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
+import { homePath } from "@/lib/home";
 import { useSession } from "@/lib/session";
 import { Clock } from "@/components/Clock";
 import { Emblem } from "@/components/Emblem";
@@ -26,7 +27,7 @@ function Crosshair({ className }: { className: string }) {
 }
 
 export default function LoginPage() {
-  const { status, login } = useSession();
+  const { status, me, login } = useSession();
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -35,16 +36,16 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (status === "ready") router.replace("/chat");
-  }, [status, router]);
+    if (status === "ready" && me) router.replace(homePath(me));
+  }, [status, me, router]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      await login(username.trim(), password);
-      router.replace("/chat");
+      const signedIn = await login(username.trim(), password);
+      router.replace(homePath(signedIn));
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 401

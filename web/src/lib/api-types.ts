@@ -231,6 +231,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboard Summary */
+        get: operations["dashboard_summary_api_v1_dashboard_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -333,6 +350,73 @@ export interface components {
             created_at: string;
             /** Updated At */
             updated_at: string;
+        };
+        /** DashboardItem */
+        DashboardItem: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Value
+             * @description headline number, if the item has one
+             */
+            value: number | null;
+            /**
+             * Unit
+             * @description what value counts, e.g. '%' or 'items'
+             */
+            unit: string | null;
+            /** Detail */
+            detail: string;
+            /**
+             * Severity
+             * @description low | medium | high, where relevant
+             */
+            severity: string | null;
+            /**
+             * Trend
+             * @description oldest to newest, for a flat sparkline
+             */
+            trend: number[];
+            /** Classification */
+            classification: string;
+            /** Compartments */
+            compartments: string[];
+            /** Unit Path */
+            unit_path: string;
+            /**
+             * Unit Name
+             * @description readable name of the owning unit
+             */
+            unit_name: string;
+        };
+        /** DashboardSummary */
+        DashboardSummary: {
+            /** Generated At */
+            generated_at: string;
+            tiles: components["schemas"]["DashboardTiles"];
+        };
+        /** DashboardTile */
+        DashboardTile: {
+            /**
+             * Stub
+             * @description true while the tile's data is placeholder fixtures
+             */
+            stub: boolean;
+            /** Source */
+            source: string;
+            /** Title */
+            title: string;
+            /** Items */
+            items: components["schemas"]["DashboardItem"][];
+        };
+        /** DashboardTiles */
+        DashboardTiles: {
+            readiness: components["schemas"]["DashboardTile"];
+            maintenance_backlog: components["schemas"]["DashboardTile"];
+            expiring_certifications: components["schemas"]["DashboardTile"];
+            recent_findings: components["schemas"]["DashboardTile"];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -751,6 +835,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dashboard_summary_api_v1_dashboard_summary_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSummary"];
                 };
             };
             /** @description Validation Error */

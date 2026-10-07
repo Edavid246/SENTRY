@@ -8,7 +8,7 @@ type Status = "loading" | "anon" | "ready";
 interface Session {
   status: Status;
   me: Me | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<Me>;
   logout: () => void;
   can: (permission: string) => boolean;
 }
@@ -42,13 +42,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (username: string, password: string) => {
     const { access_token } = await api.login(username, password);
     storeToken(access_token);
+    let profile: Me;
     try {
-      setMe(await api.me(access_token));
+      profile = await api.me(access_token);
     } catch (err) {
       storeToken(null);
       throw err;
     }
+    setMe(profile);
     setStatus("ready");
+    return profile;
   }, []);
 
   const logout = useCallback(() => {

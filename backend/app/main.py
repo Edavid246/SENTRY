@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 
 from app.api.assistant import router as assistant_router
+from app.api.dashboard import router as dashboard_router
 from app.api.endpoints import router as api_router
 from app.config import get_settings
 
@@ -16,6 +17,7 @@ def create_app() -> FastAPI:
     )
     application.include_router(api_router)
     application.include_router(assistant_router)
+    application.include_router(dashboard_router)
 
     @application.get("/healthz", tags=["system"])
     def healthz() -> dict[str, str]:

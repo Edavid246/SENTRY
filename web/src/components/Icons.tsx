@@ -54,6 +54,11 @@ export const IconChat = (p: P) => (
     <path d="M4 5h16v11H9l-5 4V5Z" />
   </Svg>
 );
+export const IconDashboard = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 4h7v7H4V4ZM13 4h7v4h-7V4ZM13 11h7v9h-7v-9ZM4 14h7v6H4v-6Z" />
+  </Svg>
+);
 export const IconLog = (p: P) => (
   <Svg {...p}>
     <path d="M6 3h9l4 4v14H6V3Z" />

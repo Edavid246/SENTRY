@@ -63,11 +63,21 @@ try {
 
   // a.bello: policy question -> cited answer -> open citation
   await login("a.bello");
-  await page.waitForURL("**/chat");
+  await page.waitForURL("**/dashboard");
   await page.waitForSelector('[data-testid="user-name"]');
   check((await page.textContent('[data-testid="clearance-badge"]')).includes("SECRET"), "a.bello clearance badge is SECRET");
   check((await page.locator("text=UAS-OPS").count()) > 0, "compartment tags shown");
   check((await page.locator('a[href="/audit"]').count()) === 0, "audit nav hidden without read_audit");
+  check((await page.locator('[data-testid="nav-not-in-demo"]').count()) === 4, "four greyed 'Not in demo' nav items");
+
+  // dashboard: login lands here; every stub tile is tagged; the Secret finding is shown
+  await page.waitForSelector('[data-testid="tile-recent_findings"]');
+  check((await page.locator('[data-testid="placeholder-tag"]').count()) === 4, "all four tiles tagged PLACEHOLDER DATA");
+  check((await page.locator('[data-testid="item-FND-CORR"]').count()) === 1, "a.bello sees the Secret finding");
+  const belloItems = await page.locator('[data-testid^="item-"]').count();
+  await shot("13-dashboard-bello");
+  await page.click('a[href="/chat"]');
+  await page.waitForURL("**/chat");
   await shot("03-chat-empty");
   await ask(POLICY);
   const belloCites = await page.locator('[data-testid="citation-badge"]').count();
@@ -88,6 +98,13 @@ try {
 
   // t.adeyemi: same questions -> fewer results
   await login("t.adeyemi");
+  await page.waitForURL("**/dashboard");
+  await page.waitForSelector('[data-testid="tile-recent_findings"]');
+  check((await page.locator('[data-testid="item-FND-CORR"]').count()) === 0, "t.adeyemi does not see the Secret finding");
+  const adeyemiItems = await page.locator('[data-testid^="item-"]').count();
+  check(adeyemiItems < belloItems, `t.adeyemi dashboard is smaller (${adeyemiItems} < ${belloItems} items)`);
+  await shot("14-dashboard-adeyemi");
+  await page.click('a[href="/chat"]');
   await page.waitForURL("**/chat");
   await page.waitForSelector('[data-testid="user-name"]');
   await ask(POLICY);
@@ -102,8 +119,8 @@ try {
 
   // f.danjuma: audit -> verify chain
   await login("f.danjuma");
-  await page.waitForURL("**/chat");
-  await page.click('a[href="/audit"]');
+  await page.waitForURL("**/audit");
+  check((await page.locator('a[href="/dashboard"]').count()) === 0, "auditor has no dashboard nav");
   await page.waitForSelector('[data-testid="audit-row"]');
   check((await page.locator('[data-testid="audit-row"]').count()) > 0, "audit table lists events");
   await shot("08-audit-table");
