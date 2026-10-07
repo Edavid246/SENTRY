@@ -75,7 +75,16 @@ uv run python scripts/prefill_cache.py --verify   # cache-only check
 > does not fail quietly into wrong answers: a miss in cache-only mode is a 503. Ask each
 > demo question as the first message of a new chat; follow-ups carry history and have
 > their own keys. The prefill and verify runs add queries and audit events to the dev
-> database; they appear in the demo audit trail.
+> database; every one of those events is tagged `source: "prefill"` (or
+> `"prefill-verify"`) in its audit payload and shows as a badge in the audit viewer.
+> The tag never reaches a prompt or a cache key.
+>
+> **A cache miss never shows an error.** If the assistant answers 503 (nothing recorded for
+> that question in cache-only mode) or says nothing for 30 seconds, the chat shows a calm
+> panel: "This demonstration runs on recorded answers for its scripted questions. Live
+> model access is disabled in this environment." The wait ends at 30 s (the request is
+> abandoned in the browser; the server still logged it). `web/smoke/cache_miss.mjs`
+> checks both paths with Playwright against `STUB_MODE=unavailable web/smoke/stub_api.py`.
 >
 > **`DEMO_DATE=2026-10-07` for the demo.** One setting pins the business date for exactly
 > two things: the seed's date offsets and the data tools' cutoffs ("due within 30

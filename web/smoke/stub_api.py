@@ -6,8 +6,13 @@ a hosted-model key. Every answer is built from the chunks retrieval returned
 for the caller, so what the UI shows still differs per user.
 
     .venv/Scripts/python.exe web/smoke/stub_api.py   (from the repo root)
+
+With STUB_MODE=unavailable both model calls raise ProviderUnavailableError, which is
+exactly what a cache miss in cache-only mode does, so the real 503 mapping is exercised
+(web/smoke/cache_miss.mjs).
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -15,6 +20,7 @@ import uvicorn
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 
+from app.ai_gateway.base import ProviderUnavailableError  # noqa: E402
 from app.api import assistant  # noqa: E402
 from app.data_queries.explain import Explanation  # noqa: E402
 from app.knowledge.answer import CitedAnswer  # noqa: E402
@@ -55,8 +61,16 @@ def fake_explain_result(question, result, *, gateway=None):
     )
 
 
-assistant.generate_answer = fake_generate_answer
-assistant.explain_result = fake_explain_result
+def unavailable(*args, **kwargs):
+    raise ProviderUnavailableError("cache-only mode: no cached answer (smoke stub)")
+
+
+if os.environ.get("STUB_MODE") == "unavailable":
+    assistant.generate_answer = unavailable
+    assistant.explain_result = unavailable
+else:
+    assistant.generate_answer = fake_generate_answer
+    assistant.explain_result = fake_explain_result
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8001, log_level="warning")

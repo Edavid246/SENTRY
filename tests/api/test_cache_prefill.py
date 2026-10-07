@@ -130,3 +130,16 @@ def test_recorded_prompts_hold_only_what_the_user_may_see(client, pipeline) -> N
     for entry in recorded.values():
         prompt = entry["request"]["messages"][-1][1]
         assert "source: DOC-201" not in prompt and "source: DOC-203" not in prompt
+
+
+def test_prefill_script_tags_its_audit_events(monkeypatch) -> None:
+    import os
+
+    module = _load_prefill()
+    for name in ("AUDIT_SOURCE", "LLM_CACHE_ONLY", "LLM_CACHE_RECORD", "HOSTED_API_KEY"):
+        monkeypatch.setenv(name, "x")  # registers the variable so monkeypatch restores it
+    module._prepare_environment(True)
+    assert os.environ["AUDIT_SOURCE"] == "prefill-verify"
+    monkeypatch.setenv("HOSTED_API_KEY", "x")
+    module._prepare_environment(False)
+    assert os.environ["AUDIT_SOURCE"] == "prefill"

@@ -25,7 +25,17 @@ interface Message {
   citations: Citation[];
   meta?: Meta;
   error?: boolean;
+  /** Calm "recorded answers only" panel: model unavailable or no answer within the wait limit. */
+  notice?: boolean;
 }
+
+// The demonstration answers its scripted questions from recorded answers. When the
+// model is unreachable (503: nothing recorded for the question) or silent for too
+// long, say so calmly; never show a raw error or wait forever.
+const NOTICE_TEXT =
+  "This demonstration runs on recorded answers for its scripted questions. " +
+  "Live model access is disabled in this environment.";
+const ASK_TIMEOUT_MS = 30_000;
 
 const STARTERS = [
   "Find the documents relating to the vehicle maintenance policy and summarize the key requirements.",
@@ -125,7 +135,14 @@ function Thread({
                   Request refused — logged
                 </div>
               )}
-              {m.error ? (
+              {m.notice ? (
+                <div data-testid="demo-notice" role="status" className="border border-rule bg-raised px-4 py-3">
+                  <p className="leading-relaxed">{m.content}</p>
+                  <p className="mt-2 text-[0.8rem] text-mute">
+                    Try one of the scripted questions. Your request and its access decision were logged.
+                  </p>
+                </div>
+              ) : m.error ? (
                 <p role="alert" className="text-bad">
                   {m.content}
                 </p>
@@ -164,7 +181,7 @@ function Thread({
             <div className="px-4 py-4">
               <p>Searching approved sources and drafting a cited answer…</p>
               <p className="mt-1 text-[0.8rem] text-mute">
-                Answers are not streamed and can take a while. Elapsed {elapsed}s.
+                Answers are not streamed. Elapsed {elapsed}s.
               </p>
             </div>
           </div>
@@ -252,8 +269,10 @@ export default function ChatPage() {
     setInput("");
     setMessages((m) => [...m, { id: nextId(), role: "user", content: question, citations: [] }]);
     setPending(true);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ASK_TIMEOUT_MS);
     try {
-      const res = await api.ask(question, activeId);
+      const res = await api.ask(question, activeId, controller.signal);
       setActiveId(res.conversation_id);
       setMessages((m) => [
         ...m,
@@ -273,14 +292,19 @@ export default function ChatPage() {
       ]);
       void refreshList();
     } catch (err) {
-      const detail =
-        err instanceof ApiError && err.status === 503
-          ? "The assistant model is unavailable. The request and its access decision were still logged."
-          : err instanceof ApiError
-            ? `The request failed (${err.status}${err.message ? `: ${err.message}` : ""}).`
-            : "The request failed. Check that the API is running.";
-      setMessages((m) => [...m, { id: nextId(), role: "assistant", content: detail, citations: [], error: true }]);
+      const calm =
+        controller.signal.aborted || (err instanceof ApiError && err.status === 503);
+      const content = calm
+        ? NOTICE_TEXT
+        : err instanceof ApiError && err.status === 403
+          ? "Your role is not permitted to ask the assistant."
+          : "The request could not be completed. Please try again.";
+      setMessages((m) => [
+        ...m,
+        { id: nextId(), role: "assistant", content, citations: [], error: !calm, notice: calm },
+      ]);
     } finally {
+      clearTimeout(timer);
       setPending(false);
     }
   }

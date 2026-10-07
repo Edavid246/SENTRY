@@ -77,6 +77,8 @@ def append_events(engine: Engine, payloads: list[dict[str, Any]]) -> list[dict[s
     if not payloads:
         return []
     settings = get_settings()
+    if settings.audit_source:
+        payloads = [{**payload, "source": settings.audit_source} for payload in payloads]
     with engine.begin() as conn:
         conn.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": CHAIN_LOCK_KEY})
         conn.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": CHECKPOINT_LOCK_KEY})

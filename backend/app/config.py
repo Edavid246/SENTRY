@@ -7,6 +7,7 @@ always local. See AGENTS.md and docs/SPEC.md Section 8.
 
 from datetime import date
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -76,6 +77,10 @@ class Settings(BaseSettings):
     # Pins the business date for the seed offsets and the data-tool cutoffs only
     # (app/clock.py); unset = live clock. Dev profile only.
     demo_date: date | None = None
+    # Tags every audit event this process writes with a source (set only by
+    # scripts/prefill_cache.py) so auditors can tell prefill traffic from demo traffic.
+    # It lives in the audit payload only and never reaches a prompt or a cache key.
+    audit_source: Literal["", "prefill", "prefill-verify"] = ""
 
     # Knowledge pathway (SPEC §8.2, §9)
     retrieval_top_k: int = 8

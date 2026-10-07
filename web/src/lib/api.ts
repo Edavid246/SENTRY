@@ -115,10 +115,11 @@ export const api = {
   me: (token?: string) => request<Me>("/me", {}, token),
   conversations: () => request<ConversationSummary[]>("/assistant/conversations"),
   conversation: (id: string) => request<ConversationDetail>(`/assistant/conversations/${id}`),
-  ask: (question: string, conversationId: string | null) =>
+  ask: (question: string, conversationId: string | null, signal?: AbortSignal) =>
     request<QueryResponse>("/assistant/query", {
       method: "POST",
       body: JSON.stringify({ question, conversation_id: conversationId }),
+      signal,
     }),
   chunk: (documentRef: string, chunkId: string) =>
     request<Chunk>(`/documents/${encodeURIComponent(documentRef)}/chunks/${chunkId}`),

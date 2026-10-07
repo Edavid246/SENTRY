@@ -329,7 +329,18 @@ function FragmentRow({
         <td className="whitespace-nowrap px-4 py-2.5 text-sage">{e.seq}</td>
         <td className="whitespace-nowrap px-4 py-2.5">{e.created_at.slice(0, 19).replace("T", " ")}</td>
         <td className="whitespace-nowrap px-4 py-2.5">{str(e.payload.actor)}</td>
-        <td className="whitespace-nowrap px-4 py-2.5 uppercase tracking-[0.06em]">{str(e.payload.action)}</td>
+        <td className="whitespace-nowrap px-4 py-2.5 uppercase tracking-[0.06em]">
+          {str(e.payload.action)}
+          {typeof e.payload.source === "string" && e.payload.source && (
+            <span
+              data-testid="audit-source-tag"
+              title="Written by the demo cache prefill script, not by a live session"
+              className="ml-2 border border-amber px-1.5 py-0.5 text-[0.65rem] tracking-[0.1em] text-amber"
+            >
+              {e.payload.source}
+            </span>
+          )}
+        </td>
         <td className="whitespace-nowrap px-4 py-2.5">{str(e.payload.resource)}</td>
         <td className="px-4 py-2.5">
           <DecisionBadge value={decision} />

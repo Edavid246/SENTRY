@@ -80,6 +80,8 @@ class Outcome:
 
 
 def _prepare_environment(verify: bool) -> None:
+    # Every audit event this run writes is tagged, so auditors can tell it apart.
+    os.environ["AUDIT_SOURCE"] = "prefill-verify" if verify else "prefill"
     if verify:
         # Provider disabled: ignore any key in the environment and never record.
         for name in ("HOSTED_API_KEY", "GEMINI_API_KEY", "LLM_CACHE_RECORD"):
