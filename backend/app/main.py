@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI
 
+from app.api.assistant import router as assistant_router
 from app.api.endpoints import router as api_router
 from app.config import get_settings
 
@@ -14,6 +15,7 @@ def create_app() -> FastAPI:
         description="Defence Gateway AI MVP — all data is fictitious demo data.",
     )
     application.include_router(api_router)
+    application.include_router(assistant_router)
 
     @application.get("/healthz", tags=["system"])
     def healthz() -> dict[str, str]:

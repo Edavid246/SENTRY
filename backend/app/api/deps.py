@@ -31,11 +31,15 @@ def get_conn() -> Iterator[Connection]:
 ConnDep = Annotated[Connection, Depends(get_conn)]
 
 
-def audit_events(payloads: list[dict[str, Any]]) -> None:
-    """Append a batch of audit events; failure is blocking (500, no data served)."""
+def audit_events(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Append a batch of audit events; failure is blocking (500, no data served).
+
+    Returns the stored rows (seq/event_id/... in insertion order) so callers
+    that need to surface an audit id (the assistant answer event) can do so.
+    """
     if not payloads:
-        return
-    append_events(get_engine(), payloads)
+        return []
+    return append_events(get_engine(), payloads)
 
 
 def _unauthenticated() -> HTTPException:

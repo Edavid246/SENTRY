@@ -108,3 +108,36 @@ def seeded(migrated: None, settings: Settings) -> Iterator[None]:
 
     run_seed(settings.test_owner_database_url)
     yield
+
+
+DOCS_DIR = REPO_ROOT / "data" / "documents"
+
+
+@pytest.fixture
+def ingested(
+    migrated: None, seeded: None, owner_engine: Engine, monkeypatch
+) -> Iterator[dict[str, int]]:
+    """Ingest the demo document corpus (DOC-201..204) into the test DB.
+
+    Embeddings are stubbed to NULL so the fixture is fast and needs no model
+    weights: retrieval then exercises the full-text path, which is the honest
+    fallback the worker also documents. Vector behaviour is covered by a
+    dedicated test that seeds controlled vectors directly.
+
+    The corpus is removed again afterwards: the gold-set oracles
+    (tests/authz, tests/api/test_data_endpoints) assert exact document sets
+    against the seed corpus only, and they share this session-scoped database.
+    """
+    monkeypatch.setattr("app.knowledge.ingest._embed", lambda texts: [None] * len(texts))
+    from app.knowledge.ingest import ingest_documents
+
+    summary = ingest_documents(owner_engine, DOCS_DIR)
+    yield summary
+    with owner_engine.begin() as conn:
+        conn.execute(
+            text(
+                "DELETE FROM chunks WHERE document_id IN"
+                " (SELECT id FROM documents WHERE source_ref LIKE 'DOC-2%')"
+            )
+        )
+        conn.execute(text("DELETE FROM documents WHERE source_ref LIKE 'DOC-2%'"))

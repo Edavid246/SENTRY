@@ -12,21 +12,31 @@ component slots in. **Demo build only; never claim the dev profile is sovereign.
 | Policy engine | OPA with partial evaluation (SPEC §7.3) | `LocalPolicy`, Python ABAC behind the `Policy` protocol (`decide` + `row_filter`) | `OpaPolicy` implements same protocol |
 | Job queue | Procrastinate worker (SPEC §6, §5.2) | `scripts/` run manually (seed today; ingestion/sync later) | Worker service |
 | Live streams | SSE live feeds (SPEC §6, §10.5) | Timed replay of synthetic events (later slice) | Real adapter `stream()` |
-| LLM provider | `LocalVLLMProvider` for on-prem inference (SPEC §8.1) | Dev profile uses `HostedProvider` (Gemini over HTTPS, `LLM_PROVIDER=hosted`); `LocalVLLMProvider` occupies the interface and fails closed with `ProviderNotConfiguredError` | vLLM/OpenAI-compatible service behind the same `LLMProvider` protocol |
+| LLM provider | `LocalVLLMProvider` for on-prem inference (SPEC §8.1) | Dev profile uses `HostedProvider` (Gemini over HTTPS, `LLM_PROVIDER=hosted`, model `gemini-3.5-flash` — name deviation logged in docs/PRODUCTION_DEBT.md); `LocalVLLMProvider` occupies the interface and fails closed with `ProviderNotConfiguredError` | vLLM/OpenAI-compatible service behind the same `LLMProvider` protocol |
+| Retrieval fusion | Hybrid search with reranking (SPEC §8.1, §8.2) | Reciprocal rank fusion of vector similarity + full-text inside the retrieval SQL; **no reranker** (DEMO CUT); if the embedder is unavailable, retrieval degrades to full-text only (logged in docs/PRODUCTION_DEBT.md) | `LocalRerankerProvider` after fusion |
+| Knowledge provenance | `Answer` + `Evidence` entities per answer (SPEC §12, §13) | Citations are returned inline with the answer and stored in the answer audit event (full provenance chain); no separate answer/evidence tables yet | Dedicated Answer/Evidence tables with claim-level links |
 
 ## Deferred (not yet built; part of the demo build)
 
 | Item | Note |
 |---|---|
 | Web app (Next.js) | Deferred per build decision — steps 1–6 are API + database only; `web` service will be added to Compose later. Air-gap rules apply when it lands (system fonts, no CDNs). |
-| `assistant`, `knowledge`, `data_queries`, `connectors`, `modules`, `correlation`, `provenance` | Package scaffolds/interfaces as their slices arrive. |
-| FTS / hybrid search | Chunk search uses `ILIKE` for now; Postgres full-text + vector search arrive with the knowledge slice. |
-| Vector index | **No HNSW (or IVFFlat) index on `chunks.embedding`** — chunks use exact (sequential) search; corpus is tiny and memory is constrained. Add an index with the knowledge slice when data grows. |
+| `data_queries`, `connectors`, `modules`, `correlation`, `provenance` | Package scaffolds/interfaces as their slices arrive. (`assistant` and `knowledge` landed with step 9.) |
+| Vector index | **No HNSW (or IVFFlat) index on `chunks.embedding`** — chunks use exact (sequential) search; corpus is tiny and memory is constrained. Add an index when data grows. |
 | CI service | GitHub Actions skipped (no git remote). `scripts/check.sh` runs ruff, pytest and the air-gap grep locally. |
 | LLM response-cache prefill | No in-app or API prefill of `data/demo_llm_cache.json`; entries are recorded offline by `scripts/smoke_ai_gateway.py --record` (deferred to the demo script step, spec §18). |
 
 ## Cut entirely (AGENTS.md DEMO CUT)
 
-Workflows, OCR (Tesseract), reranker (`RerankerProvider`), observability
+Workflows, OCR (Tesseract), reranker (`RerankerProvider` — retrieval uses
+reciprocal rank fusion instead), observability
 (OpenTelemetry/Prometheus/Grafana/Loki), Kubernetes profile, air-gapped
 deployment profile, map tiles (map = MapLibre + GeoJSON only, no tiles).
+
+## Demo-only tooling
+
+`reportlab` and `python-docx` are used **only** by
+`scripts/generate_demo_documents.py` to write the fictitious DOC-201..204
+corpus (the generated files and manifest are committed). Runtime ingestion
+parses PDF/DOCX with `pypdf`/`python-docx` only; `reportlab` is not needed at
+runtime and should not ship in a production image.

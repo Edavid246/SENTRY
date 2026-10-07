@@ -22,14 +22,25 @@ EXPECTED_TABLES = {
     "chunks",
     "classification_levels",
     "compartments",
+    "conversations",
     "documents",
+    "messages",
     "source_systems",
     "units",
     "user_compartments",
     "users",
 }
 
-CLASSIFIED_TABLES = ("documents", "chunks", "canonical_records")
+CLASSIFIED_TABLES = (
+    "documents",
+    "chunks",
+    "canonical_records",
+    "conversations",
+    "messages",
+)
+# Tables the runtime role may add rows to (all with a SELECT policy); their
+# UPDATE/DELETE stay denied so turns are append-only like the audit log.
+APPEND_TABLES = ("conversations", "messages")
 
 
 def test_migration_created_all_tables(owner_engine: Engine, migrated: None) -> None:
@@ -69,18 +80,26 @@ def test_policies_are_scoped_to_gateway_app_with_literal_rule(
                 "FROM pg_policies WHERE schemaname = 'public'"
             )
         ).all()
-    by_table = {r.tablename: r for r in rows}
+    by_table: dict[str, dict[str, object]] = {}
+    for row in rows:
+        by_table.setdefault(row.tablename, {})[row.policyname] = row
     assert set(by_table) == set(CLASSIFIED_TABLES)
     for table in CLASSIFIED_TABLES:
-        row = by_table[table]
-        assert row.policyname == f"{table}_select"
-        assert row.applies_to_app is True, f"policy on {table} does not apply to gateway_app"
+        policies = by_table[table]
+        # Every classified table has a gateway_app SELECT policy.
+        select = policies[f"{table}_select"]
+        assert select.applies_to_app is True, f"policy on {table} does not apply to gateway_app"
         # Approved amendments, locked in as assertions:
-        assert "starts_with(" in row.qual
-        assert "LIKE" not in row.qual.replace("ILIKE", "")
-        assert "NULLIF(current_setting(" in row.qual
+        assert "starts_with(" in select.qual
+        assert "LIKE" not in select.qual.replace("ILIKE", "")
+        assert "NULLIF(current_setting(" in select.qual
         for guc in ("app.data_scope", "app.clearance_rank", "app.compartments", "app.unit_path"):
-            assert guc in row.qual
+            assert guc in select.qual
+        # Only the append-only conversation tables admit INSERT (as WITH CHECK).
+        if table in APPEND_TABLES:
+            assert f"{table}_insert" in policies
+        else:
+            assert not any(name.endswith("_insert") for name in policies)
 
 
 def test_grants_are_read_only_plus_append_only_audit(owner_engine: Engine, migrated: None) -> None:
@@ -108,6 +127,25 @@ def test_grants_are_read_only_plus_append_only_audit(owner_engine: Engine, migra
             ).scalar()
             is True
         )
+        for table in APPEND_TABLES:
+            assert (
+                conn.execute(
+                    text("SELECT has_table_privilege('gateway_app', :t, 'INSERT')"), {"t": table}
+                ).scalar()
+                is True
+            )
+            assert (
+                conn.execute(
+                    text("SELECT has_table_privilege('gateway_app', :t, 'UPDATE')"), {"t": table}
+                ).scalar()
+                is False
+            )
+            assert (
+                conn.execute(
+                    text("SELECT has_table_privilege('gateway_app', :t, 'DELETE')"), {"t": table}
+                ).scalar()
+                is False
+            )
 
 
 def test_embedding_column_is_vector_without_index(owner_engine: Engine, migrated: None) -> None:

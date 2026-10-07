@@ -88,7 +88,7 @@ def test_maintenance_keyword_hits_exactly_three_chunks(seeded: None, owner_engin
             text(
                 "SELECT d.source_ref, count(*) FROM chunks ch "
                 "JOIN documents d ON d.id = ch.document_id "
-                "WHERE ch.text ILIKE '%maintenance%' "
+                "WHERE ch.text ILIKE '%maintenance%' AND d.source_ref LIKE 'DOC-0%' "
                 "GROUP BY d.source_ref ORDER BY d.source_ref"
             )
         ).all()

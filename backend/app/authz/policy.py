@@ -23,9 +23,13 @@ RESOURCE_TABLES: dict[str, str] = {
     "document": "documents",
     "chunk": "chunks",
     "record": "canonical_records",
+    "conversation": "conversations",
+    "message": "messages",
 }
-KNOWN_RESOURCES: frozenset[str] = frozenset(RESOURCE_TABLES) | {"audit"}
-DATA_ACTIONS: frozenset[str] = frozenset({"read", "query", "retrieve", "answer", "view_record"})
+KNOWN_RESOURCES: frozenset[str] = frozenset(RESOURCE_TABLES) | {"audit", "assistant"}
+DATA_ACTIONS: frozenset[str] = frozenset(
+    {"read", "query", "retrieve", "answer", "view_record", "ask"}
+)
 
 
 @dataclass(frozen=True, slots=True)

@@ -28,7 +28,7 @@ from app.authz.models import (
 )
 from app.config import get_settings
 from app.connectors.models import CanonicalRecord, SourceSystem
-from app.knowledge.models import Chunk, Document
+from app.knowledge.models import Chunk, Conversation, Document, Message
 
 DEMO_PASSWORD = "Demo!Gateway2026"
 
@@ -427,8 +427,12 @@ def _rows() -> dict[type, list[dict]]:
     }
 
 
-# Children first, parents last (FK order). audit_events is never touched.
+# Children first, parents last (FK order). Conversation turns are user data
+# that reference users, so a reseed clears them too. audit_events is never
+# touched.
 _DELETE_ORDER = (
+    Message,
+    Conversation,
     Chunk,
     Document,
     CanonicalRecord,

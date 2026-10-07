@@ -67,6 +67,12 @@ class Settings(BaseSettings):
     embedding_cache_dir: str = "data/models"
     llm_response_cache_path: str = "data/demo_llm_cache.json"
 
+    # Knowledge pathway (SPEC §8.2, §9)
+    retrieval_top_k: int = 8
+    retrieval_min_similarity: float = 0.5
+    assistant_evidence_only: bool = True
+    assistant_insufficient_message: str = "not found in approved sources"
+
     # Audit tamper evidence (SPEC 14.2): checkpoint file (layer 1) and the
     # external git ledger repo (layer 2). A checkpoint line is written when
     # the event count crosses a multiple of this interval.

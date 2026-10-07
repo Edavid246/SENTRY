@@ -1,0 +1,38 @@
+[
+  {
+    "source_ref": "DOC-201",
+    "file": "DOC-201_vehicle_maintenance_policy.pdf",
+    "title": "Vehicle Maintenance Policy",
+    "classification": "confidential",
+    "compartments": [],
+    "unit_path": "/command-a/bde-2/",
+    "format": "pdf"
+  },
+  {
+    "source_ref": "DOC-202",
+    "file": "DOC-202_training_directive.docx",
+    "title": "Training Directive TD-2026-07",
+    "classification": "unclassified",
+    "compartments": [],
+    "unit_path": "/command-a/bde-2/bn-4/",
+    "format": "docx"
+  },
+  {
+    "source_ref": "DOC-203",
+    "file": "DOC-203_logistics_sop.docx",
+    "title": "Logistics Standard Operating Procedure",
+    "classification": "restricted",
+    "compartments": [],
+    "unit_path": "/command-a/bde-2/",
+    "format": "docx"
+  },
+  {
+    "source_ref": "DOC-204",
+    "file": "DOC-204_bn4_vehicle_servicing_orders.docx",
+    "title": "Battalion 4 Vehicle Servicing Standing Orders",
+    "classification": "restricted",
+    "compartments": [],
+    "unit_path": "/command-a/bde-2/bn-4/",
+    "format": "docx"
+  }
+]

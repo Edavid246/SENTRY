@@ -90,6 +90,61 @@ end-of-step report. Never silently log it.
 - **Why acceptable:** uvicorn runs from the repo/app directory in compose and dev.
 - **Production needs:** an absolute path from config/env, owned by the service user.
 
+## Knowledge pathway / retrieval
+
+### 2026-10-07 — Reciprocal rank fusion instead of a reranker
+- **Issue:** SPEC §8.1/§8.2 hybrid search ends with reranking
+  (`LocalRerankerProvider`); the demo fuses vector similarity and full-text with
+  reciprocal rank fusion (RRF, k=60) inside the retrieval SQL and stops there.
+- **Why acceptable:** the reranker is a DEMO CUT item; RRF keeps fusion inside the
+  same authorization-filtered query and needs no extra model or memory.
+- **Production needs:** a local cross-encoder reranker after fusion, scored by the
+  retrieval-quality evaluation suite, with the authorization filter still applied
+  inside the query (never after it).
+
+### 2026-10-07 — Retrieval silently degrades to full-text only
+- **Issue:** if the local embedder is unavailable, `_query_embedding()` returns
+  `None` and ingestion stores NULL embeddings; hybrid retrieval then runs as
+  keyword search only, with nothing on the answer or in the logs distinguishing
+  it from a full hybrid run. The API tests always take this path (no weights).
+- **Why acceptable:** the demo must run without network/model weights, and tests
+  must not depend on them.
+- **Production needs:** fail closed or label the answer as degraded, require
+  embeddings at ingestion time, and monitor embedder health so a missing vector
+  channel raises an alert instead of quietly lowering recall.
+
+### 2026-10-07 — Conversation/message RLS policies do not bind rows to the session user
+- **Issue:** the SELECT and INSERT (WITH CHECK) policies on `conversations` and
+  `messages` verify markings (data scope, clearance, compartments, unit) but not
+  `user_id`; ownership is enforced only by the `user_id = :user_id` predicate the
+  assistant endpoint writes into its SQL.
+- **Why acceptable:** one endpoint reads turns, always resolves ownership first
+  (404 otherwise), and the cross-user 404 is covered by a test.
+- **Production needs:** add `user_id = NULLIF(current_setting('app.user_id', true), '')::uuid`
+  to both policies so any future query path inherits row ownership in the database,
+  not only in application SQL.
+
+### 2026-10-07 — Conversation history ties on `created_at` within a turn
+- **Issue:** the user and assistant messages of one turn are inserted in a single
+  statement, so they share `now()`; `_load_history` orders by
+  `created_at DESC, id DESC` and the UUID tie-break is random — a turn's pair can
+  reach the model in reverse order.
+- **Why acceptable:** histories are ≤ 6 turns and the demo script does not probe
+  multi-turn ordering.
+- **Production needs:** a monotonic per-message sequence column (or a two-column
+  sort that cannot tie) so history order is deterministic.
+
+### 2026-10-07 — Hosted dev model name deviates from the approved name
+- **Issue:** `llm_model` is configured as `gemini-3.5-flash`, which is not the
+  model name originally approved for the demo; the spec leaves model choice to
+  configuration (§8.1) but the change was not re-approved through that route.
+- **Why acceptable:** recorded here rather than silently accepted; every answer
+  event already stores provider and model, so answers are traceable to the model
+  that produced them.
+- **Production needs:** pin an approved model and version per environment, re-approve
+  before any non-demo use, and keep model+version on the answer record (already done)
+  for provenance.
+
 ## AI gateway / data
 
 ### 2026-10-07 — Hosted LLM (Gemini) in dev profile
@@ -128,6 +183,9 @@ end-of-step report. Never silently log it.
 - **Issue:** the Gemini key is a plaintext env var (`HOSTED_API_KEY`/`GEMINI_API_KEY`)
   passed through compose; no secret manager, no rotation, no redaction beyond not
   logging it.
+- **Update 2026-10-07:** a `GEMINI_API_KEY` value was exposed in a debug transcript
+  during the demo build. **The owner must rotate it** — logged here so the rotation
+  is tracked and not assumed done.
 - **Why acceptable:** single demo machine, free-tier key, air-gapped demo narrative.
 - **Production needs:** vault/KMS-backed secrets with short-lived scoped credentials,
   rotation, and egress controls.
