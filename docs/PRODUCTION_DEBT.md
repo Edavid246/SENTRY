@@ -193,6 +193,10 @@ end-of-step report. Never silently log it.
 - **Update 2026-10-07:** a `GEMINI_API_KEY` value was exposed in a debug transcript
   during the demo build. **The owner must rotate it** — logged here so the rotation
   is tracked and not assumed done.
+- **Update 2026-10-07 (later):** rotation done — the exposed key was revoked and
+  replaced with a new key in `.env` (gitignored, never committed); a live
+  `scripts/smoke_ai_gateway.py` call with the new key returned OK. The rotation
+  incident note stays visible here rather than being deleted.
 - **Why acceptable:** single demo machine, free-tier key, air-gapped demo narrative.
 - **Production needs:** vault/KMS-backed secrets with short-lived scoped credentials,
   rotation, and egress controls.
@@ -202,8 +206,15 @@ end-of-step report. Never silently log it.
   streaming of tokens (`HostedProvider` does not implement the spec's streaming path).
 - **Why acceptable:** demo answers are short; SPEC's 25 s sync-response ceiling is
   respected via `hosted_timeout_seconds`.
+- **Update 2026-10-07:** a live call after the key rotation returned OK in
+  **~204 s** end-to-end (provider-reported), so `hosted_timeout_seconds: 25` did not
+  bound wall-clock time — httpx's connect/read timeouts bound individual wait
+  periods, not the whole call, and a slow provider can sit well inside them. Treat
+  the 25 s ceiling as *not* guaranteed: the demo script should stay on the response
+  cache, and the API must not present a slow answer as timely.
 - **Production needs:** server-sent streaming end to end, with cancellation and
-  per-token accounting.
+  per-token accounting; an overall deadline on the sync path if streaming is
+  deferred.
 
 ### 2026-10-07 — Embedding weights downloaded from HuggingFace, not an air-gapped build
 - **Issue:** the BGE-M3 int8 ONNX weights are fetched from the HuggingFace Hub on the
