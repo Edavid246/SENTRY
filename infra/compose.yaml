@@ -38,6 +38,9 @@ services:
       context: ..
       dockerfile: backend/Dockerfile
     container_name: defence-gateway-api
+    env_file:
+      - path: ../.env
+        required: false
     environment:
       OWNER_DATABASE_URL: postgresql+psycopg://gateway_owner:${GATEWAY_OWNER_PASSWORD:-dev-owner-password}@db:5432/gateway
       APP_DATABASE_URL: postgresql+psycopg://gateway_app:${GATEWAY_APP_PASSWORD:-dev-app-password}@db:5432/gateway
@@ -48,7 +51,6 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-hosted}
       LLM_MODEL: ${LLM_MODEL:-gemini-3.5-flash}
       HOSTED_API_KEY: ${HOSTED_API_KEY:-${GEMINI_API_KEY:-}}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
       EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}

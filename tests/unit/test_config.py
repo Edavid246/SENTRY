@@ -32,3 +32,11 @@ def test_api_key_accepts_compose_and_gemini_env_names(monkeypatch) -> None:
     assert settings.hosted_api_key == "compose-key"
     assert settings.llm_model == "gemini-3.5-flash"
     assert settings.hosted_base_url.startswith("https://")
+
+
+def test_empty_env_value_does_not_shadow_key_or_default(monkeypatch) -> None:
+    monkeypatch.setenv("HOSTED_API_KEY", "")
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-key")
+    assert Settings().hosted_api_key == "gemini-key"
+    monkeypatch.setenv("LLM_MODEL", "")
+    assert Settings().llm_model == "gemini-3.5-flash"

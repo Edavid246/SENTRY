@@ -23,6 +23,7 @@ component slots in. **Demo build only; never claim the dev profile is sovereign.
 | FTS / hybrid search | Chunk search uses `ILIKE` for now; Postgres full-text + vector search arrive with the knowledge slice. |
 | Vector index | **No HNSW (or IVFFlat) index on `chunks.embedding`** — chunks use exact (sequential) search; corpus is tiny and memory is constrained. Add an index with the knowledge slice when data grows. |
 | CI service | GitHub Actions skipped (no git remote). `scripts/check.sh` runs ruff, pytest and the air-gap grep locally. |
+| LLM response-cache prefill | No in-app or API prefill of `data/demo_llm_cache.json`; entries are recorded offline by `scripts/smoke_ai_gateway.py --record` (deferred to the demo script step, spec §18). |
 
 ## Cut entirely (AGENTS.md DEMO CUT)
 

@@ -17,9 +17,13 @@ class Settings(BaseSettings):
     The settings object deliberately does not read any .env file (AGENTS.md:
     never read secrets). Values come from process environment, Compose
     environment, or the defaults below (dev/demo defaults, not secrets).
+    `env_ignore_empty` keeps a set-but-empty variable (compose interpolation
+    with no value) from shadowing a later alias or the default.
     """
 
-    model_config = SettingsConfigDict(env_file=None, extra="ignore", populate_by_name=True)
+    model_config = SettingsConfigDict(
+        env_file=None, extra="ignore", populate_by_name=True, env_ignore_empty=True
+    )
 
     app_name: str = "Defence Gateway AI"
     app_version: str = "0.1.0"
