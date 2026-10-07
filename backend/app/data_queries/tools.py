@@ -11,12 +11,13 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Any
 
 from sqlalchemy.engine import Connection
 
 from app.authz.context import AccessContext
+from app.clock import demo_today
 from app.connectors.base import RecordFilter, SourceRecord
 from app.connectors.demo import DemoReferenceAdapter
 from app.data_queries.errors import ToolParamError
@@ -69,7 +70,7 @@ def equipment_due_for_maintenance(
     _check_names(params, frozenset({"unit_path", "within_days"}))
     unit_path = _resolve_unit_path(ctx, params.get("unit_path"))
     within_days = _resolve_within_days(params.get("within_days", 30))
-    cutoff = date.today() + timedelta(days=within_days)
+    cutoff = demo_today() + timedelta(days=within_days)
     records = ADAPTER.search(
         conn,
         ctx,
@@ -123,7 +124,7 @@ def expired_certifications(
             entity_type="Qualification",
             unit_path=unit_path,
             date_field="expires",
-            on_or_before=date.today() - timedelta(days=1),
+            on_or_before=demo_today() - timedelta(days=1),
         ),
     )
     records.sort(key=lambda record: (record.data["expires"], record.source_ref))

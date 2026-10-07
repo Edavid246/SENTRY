@@ -12,8 +12,7 @@ Tests: app.seed.run(test_owner_database_url)
 from __future__ import annotations
 
 import hashlib
-import os
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from argon2 import PasswordHasher
@@ -27,6 +26,7 @@ from app.authz.models import (
     User,
     UserCompartment,
 )
+from app.clock import demo_today
 from app.config import get_settings
 from app.connectors.models import CanonicalRecord, SourceSystem
 from app.knowledge.models import Chunk, Conversation, Document, Message
@@ -283,18 +283,9 @@ RECORDS = [
 ]
 
 
-def _anchor_date() -> date:
-    """Seed day for the date offsets: today, or SEED_DATE_ANCHOR (YYYY-MM-DD).
-
-    Pinning the anchor makes a re-seed reproduce the same dates on any day, so
-    the prefilled LLM cache (docs/DEMO_SCOPE.md) stays valid across a re-seed.
-    """
-    pinned = os.environ.get("SEED_DATE_ANCHOR", "").strip()
-    return date.fromisoformat(pinned) if pinned else date.today()
-
-
 def _days_from_today(offset: int) -> str:
-    return (_anchor_date() + timedelta(days=offset)).isoformat()
+    # DEMO_DATE (app.clock) pins this so a re-seed reproduces the same dates on any day.
+    return (demo_today() + timedelta(days=offset)).isoformat()
 
 
 # Data-pathway demo rows (Task 2). Dates are offsets from the seed date so

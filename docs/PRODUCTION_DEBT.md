@@ -298,3 +298,12 @@ end-of-step report. Never silently log it.
   cached evidence is only what each demo user was already cleared to see.
 - **Production needs:** neither mode exists in a production profile; no stored prompt
   corpus, no replay of model output, and a real on-prem model behind `LLMProvider`.
+
+### 2026-10-07 — DEMO_DATE pins the business date
+- **Issue:** `DEMO_DATE` (dev profile only, refused otherwise) replaces the live date in
+  the seed offsets and in the data-tool cutoffs, so "overdue" and "due within 30 days"
+  are evaluated against a fixed day. With it set, the demo reports a stale date as
+  today; audit, token and `created_at` times stay real.
+- **Why acceptable:** it keeps recorded model answers valid for the scripted demo; it is
+  off by default and cannot be enabled outside the dev profile.
+- **Production needs:** no date override at all; tools evaluate against the live clock.

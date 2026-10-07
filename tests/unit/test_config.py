@@ -55,15 +55,3 @@ def test_cache_record_is_refused_outside_the_dev_profile(monkeypatch) -> None:
     monkeypatch.setenv("LLM_CACHE_ONLY", "1")
     with pytest.raises(ValidationError):
         Settings()
-
-
-def test_seed_anchor_can_be_pinned(monkeypatch) -> None:
-    from datetime import date
-
-    from app import seed
-
-    monkeypatch.setenv("SEED_DATE_ANCHOR", "2026-10-07")
-    assert seed._days_from_today(0) == "2026-10-07"
-    assert seed._days_from_today(-5) == "2026-10-02"
-    monkeypatch.delenv("SEED_DATE_ANCHOR")
-    assert seed._days_from_today(0) == date.today().isoformat()

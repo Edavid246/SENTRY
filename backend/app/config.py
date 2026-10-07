@@ -5,6 +5,7 @@ call sites. The dev profile uses the hosted LLM provider; embeddings are
 always local. See AGENTS.md and docs/SPEC.md Section 8.
 """
 
+from datetime import date
 from functools import lru_cache
 
 from pydantic import AliasChoices, Field, model_validator
@@ -72,6 +73,9 @@ class Settings(BaseSettings):
     app_profile: str = "dev"
     llm_cache_record: bool = False
     llm_cache_only: bool = False
+    # Pins the business date for the seed offsets and the data-tool cutoffs only
+    # (app/clock.py); unset = live clock. Dev profile only.
+    demo_date: date | None = None
 
     # Knowledge pathway (SPEC §8.2, §9)
     retrieval_top_k: int = 8
@@ -92,6 +96,8 @@ class Settings(BaseSettings):
             raise ValueError("LLM_CACHE_RECORD is refused unless APP_PROFILE=dev")
         if self.llm_cache_record and self.llm_cache_only:
             raise ValueError("LLM_CACHE_RECORD and LLM_CACHE_ONLY are mutually exclusive")
+        if self.demo_date is not None and self.app_profile != "dev":
+            raise ValueError("DEMO_DATE is refused unless APP_PROFILE=dev")
         return self
 
 

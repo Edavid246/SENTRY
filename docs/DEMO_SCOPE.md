@@ -77,9 +77,19 @@ uv run python scripts/prefill_cache.py --verify   # cache-only check
 > their own keys. The prefill and verify runs add queries and audit events to the dev
 > database; they appear in the demo audit trail.
 >
-> **Pin the seed dates.** The dev database was seeded on 2026-10-07. If you must re-seed
-> after the prefill, run `SEED_DATE_ANCHOR=2026-10-07 python -m app.seed` (then the
-> ingest script) so the dates, and with them the cache keys, are unchanged.
+> **`DEMO_DATE=2026-10-07` for the demo.** One setting pins the business date for exactly
+> two things: the seed's date offsets and the data tools' cutoffs ("due within 30
+> days", "expired"). Those decide which records reach a model prompt, so with the pin
+> the cache keys do not move as the calendar does. Set it in `.env` for the prefill,
+> the verify run and the demo, and re-seed with it
+> (`DEMO_DATE=2026-10-07 python -m app.seed`, then the ingest script). Unset (the
+> default) means the live clock. It is dev-profile only (the API refuses to start
+> otherwise) and never touches audit timestamps, token times, `created_at` or
+> `retrieved_at`. The dev database was seeded on 2026-10-07, so it already matches.
+>
+> **Ingest.** A plain re-ingest is safe: chunk ids are uuid5 of document ref + chunk
+> index, and a test proves two from-scratch ingests give identical ids and text.
+> Regenerating the documents or changing the chunker invalidates the cache.
 >
 > **Verify in the way you demo.** If the demo runs in compose, start the API with
 > `LLM_CACHE_ONLY=1` and click through each question once as the real user before
