@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from app.api.deps import ConnDep, CurrentContext, audit_events
+from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
 from app.audit.chain import utc_now_iso
 from app.authz.policy import LocalPolicy
 from app.correlation.analysis import ANALYSIS, run_rising_faults
@@ -50,17 +50,7 @@ class RunResult(BaseModel):
 
 def _decide(ctx, action: str):
     decision = POLICY.decide(ctx, action, "finding")
-    event: dict[str, Any] = {
-        "actor": ctx.username,
-        "action": "decide",
-        "resource": "finding",
-        "requested": action,
-        "decision": "allow" if decision.allowed else "deny",
-        "timestamp": utc_now_iso(),
-    }
-    if not decision.allowed:
-        event["reasons"] = list(decision.reasons)
-    return decision, event
+    return decision, decide_event(ctx, decision, resource="finding", requested=action)
 
 
 def _unit_names(conn) -> dict[str, str]:
@@ -89,9 +79,9 @@ def finding_out(row: FindingRow, names: dict[str, str]) -> FindingOut:
 
 @router.post("/run", response_model=RunResult)
 def run_correlation(ctx: CurrentContext, conn: ConnDep) -> RunResult:
-    decision, decide_event = _decide(ctx, "run_correlation")
+    decision, decision_event = _decide(ctx, "run_correlation")
     if not decision.allowed:
-        audit_events([decide_event])
+        audit_events([decision_event])
         raise HTTPException(status_code=403, detail="forbidden")
     ranks = {
         str(r["code"]): int(r["rank"])
@@ -104,7 +94,7 @@ def run_correlation(ctx: CurrentContext, conn: ConnDep) -> RunResult:
     rows = list_findings(conn, ctx)
     audit_events(
         [
-            decide_event,
+            decision_event,
             {
                 "actor": ctx.username,
                 "action": "correlation_run",
@@ -129,23 +119,15 @@ def run_correlation(ctx: CurrentContext, conn: ConnDep) -> RunResult:
 
 @router.get("/findings", response_model=list[FindingOut])
 def findings(ctx: CurrentContext, conn: ConnDep) -> list[FindingOut]:
-    decision, decide_event = _decide(ctx, "read")
+    decision, decision_event = _decide(ctx, "read")
     if not decision.allowed:
-        audit_events([decide_event])
+        audit_events([decision_event])
         raise HTTPException(status_code=403, detail="forbidden")
     rows = list_findings(conn, ctx)
     audit_events(
         [
-            decide_event,
-            {
-                "actor": ctx.username,
-                "action": "query",
-                "resource": "finding",
-                "decision": "allow",
-                "rows": len(rows),
-                "item_ids": [r.key for r in rows],
-                "timestamp": utc_now_iso(),
-            },
+            decision_event,
+            query_event(ctx, "finding", len(rows), item_ids=[r.key for r in rows]),
         ]
     )
     names = _unit_names(conn)
@@ -154,23 +136,15 @@ def findings(ctx: CurrentContext, conn: ConnDep) -> list[FindingOut]:
 
 @router.get("/findings/{finding_id}", response_model=FindingOut)
 def finding(finding_id: str, ctx: CurrentContext, conn: ConnDep) -> FindingOut:
-    decision, decide_event = _decide(ctx, "read")
+    decision, decision_event = _decide(ctx, "read")
     if not decision.allowed:
-        audit_events([decide_event])
+        audit_events([decision_event])
         raise HTTPException(status_code=404, detail="not found")
     rows = list_findings(conn, ctx, key=finding_id)
     audit_events(
         [
-            decide_event,
-            {
-                "actor": ctx.username,
-                "action": "query",
-                "resource": "finding",
-                "decision": "allow",
-                "rows": len(rows),
-                "item_ids": [r.key for r in rows],
-                "timestamp": utc_now_iso(),
-            },
+            decision_event,
+            query_event(ctx, "finding", len(rows), item_ids=[r.key for r in rows]),
         ]
     )
     if not rows:

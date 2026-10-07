@@ -24,15 +24,13 @@ from argon2.exceptions import Argon2Error
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
-from sqlalchemy.engine import Connection
 
-from app.api.deps import ConnDep, CurrentContext, audit_events
+from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
 from app.audit.chain import recent_events, utc_now_iso, verify_report
-from app.authz.context import AccessContext
-from app.authz.policy import Decision, LocalPolicy
+from app.authz.policy import LocalPolicy
 from app.authz.tokens import DevTokenValidator
 from app.connectors.demo import DemoReferenceAdapter
-from app.db import get_engine, set_rls_context
+from app.db import get_engine, set_rls_context_for
 
 POLICY = LocalPolicy()
 _HASHER = PasswordHasher()
@@ -46,43 +44,6 @@ router = APIRouter(prefix="/api/v1")
 class LoginRequest(BaseModel):
     username: str
     password: str
-
-
-def _set_context(conn: Connection, ctx: AccessContext) -> None:
-    set_rls_context(
-        conn,
-        user_id=ctx.user_id,
-        clearance_rank=ctx.clearance_rank,
-        compartments=ctx.compartments,
-        unit_path=ctx.unit_path,
-        data_scope=ctx.data_scope,
-        session_id=ctx.session_id,
-    )
-
-
-def _decide_event(ctx: AccessContext, decision: Decision, action: str, resource: str) -> dict:
-    payload: dict[str, Any] = {
-        "actor": ctx.username,
-        "action": "decide",
-        "resource": resource,
-        "requested": action,
-        "decision": "allow" if decision.allowed else "deny",
-        "timestamp": utc_now_iso(),
-    }
-    if not decision.allowed:
-        payload["reasons"] = list(decision.reasons)
-    return payload
-
-
-def _query_event(ctx: AccessContext, resource: str, rows: int) -> dict[str, Any]:
-    return {
-        "actor": ctx.username,
-        "action": "query",
-        "resource": resource,
-        "decision": "allow",
-        "rows": int(rows),
-        "timestamp": utc_now_iso(),
-    }
 
 
 @router.post("/auth/login", tags=["auth"])
@@ -171,9 +132,9 @@ def me(ctx: CurrentContext, conn: ConnDep) -> dict[str, Any]:
 def list_documents(ctx: CurrentContext, conn: ConnDep) -> list[dict[str, str | None]]:
     decision = POLICY.decide(ctx, "read", "document")
     if not decision.allowed:
-        audit_events([_decide_event(ctx, decision, "read", "document")])
+        audit_events([decide_event(ctx, decision, resource="document", requested="read")])
         raise HTTPException(status_code=403, detail="forbidden")
-    _set_context(conn, ctx)
+    set_rls_context_for(conn, ctx)
     row_filter = POLICY.row_filter(ctx, "document")
     rows = conn.execute(
         text(
@@ -185,8 +146,8 @@ def list_documents(ctx: CurrentContext, conn: ConnDep) -> list[dict[str, str | N
     results = [dict(row) for row in rows]
     audit_events(
         [
-            _decide_event(ctx, decision, "read", "document"),
-            _query_event(ctx, "documents", len(results)),
+            decide_event(ctx, decision, resource="document", requested="read"),
+            query_event(ctx, "documents", len(results)),
         ]
     )
     return results
@@ -196,9 +157,9 @@ def list_documents(ctx: CurrentContext, conn: ConnDep) -> list[dict[str, str | N
 def list_records(ctx: CurrentContext, conn: ConnDep) -> list[dict[str, str]]:
     decision = POLICY.decide(ctx, "retrieve", "record")
     if not decision.allowed:
-        audit_events([_decide_event(ctx, decision, "retrieve", "record")])
+        audit_events([decide_event(ctx, decision, resource="record", requested="retrieve")])
         raise HTTPException(status_code=403, detail="forbidden")
-    _set_context(conn, ctx)
+    set_rls_context_for(conn, ctx)
     row_filter = POLICY.row_filter(ctx, "record")
     rows = conn.execute(
         text(
@@ -210,8 +171,8 @@ def list_records(ctx: CurrentContext, conn: ConnDep) -> list[dict[str, str]]:
     results = [dict(row) for row in rows]
     audit_events(
         [
-            _decide_event(ctx, decision, "retrieve", "record"),
-            _query_event(ctx, "canonical_records", len(results)),
+            decide_event(ctx, decision, resource="record", requested="retrieve"),
+            query_event(ctx, "canonical_records", len(results)),
         ]
     )
     return results
@@ -233,13 +194,13 @@ def get_record(source_ref: str, ctx: CurrentContext, conn: ConnDep) -> RecordDet
     """One record, through the adapter (policy row filter + RLS). 404 when not visible."""
     decision = POLICY.decide(ctx, "retrieve", "record")
     if not decision.allowed:
-        audit_events([_decide_event(ctx, decision, "retrieve", "record")])
+        audit_events([decide_event(ctx, decision, resource="record", requested="retrieve")])
         raise HTTPException(status_code=404, detail="not found")
     record = DemoReferenceAdapter().get(conn, ctx, source_ref)
     audit_events(
         [
-            _decide_event(ctx, decision, "retrieve", "record"),
-            _query_event(ctx, "canonical_records", 0 if record is None else 1),
+            decide_event(ctx, decision, resource="record", requested="retrieve"),
+            query_event(ctx, "canonical_records", 0 if record is None else 1),
         ]
     )
     if record is None:
@@ -262,9 +223,9 @@ def get_document(source_ref: str, ctx: CurrentContext, conn: ConnDep) -> dict[st
     # action: never confirm that a restricted document exists.
     decision = POLICY.decide(ctx, "read", "document")
     if not decision.allowed:
-        audit_events([_decide_event(ctx, decision, "read", "document")])
+        audit_events([decide_event(ctx, decision, resource="document", requested="read")])
         raise HTTPException(status_code=404, detail="not found")
-    _set_context(conn, ctx)
+    set_rls_context_for(conn, ctx)
     row_filter = POLICY.row_filter(ctx, "document")
     row = (
         conn.execute(
@@ -279,8 +240,8 @@ def get_document(source_ref: str, ctx: CurrentContext, conn: ConnDep) -> dict[st
     )
     audit_events(
         [
-            _decide_event(ctx, decision, "read", "document"),
-            _query_event(ctx, "documents", 0 if row is None else 1),
+            decide_event(ctx, decision, resource="document", requested="read"),
+            query_event(ctx, "documents", 0 if row is None else 1),
         ]
     )
     if row is None:
@@ -303,9 +264,9 @@ def get_document_chunk(
     """
     decision = POLICY.decide(ctx, "read", "chunk")
     if not decision.allowed:
-        audit_events([_decide_event(ctx, decision, "read", "chunk")])
+        audit_events([decide_event(ctx, decision, resource="chunk", requested="read")])
         raise HTTPException(status_code=404, detail="not found")
-    _set_context(conn, ctx)
+    set_rls_context_for(conn, ctx)
     row_filter = POLICY.row_filter(ctx, "chunk")
     try:
         chunk_key = str(UUID(chunk_id))
@@ -338,8 +299,8 @@ def get_document_chunk(
         )
     audit_events(
         [
-            _decide_event(ctx, decision, "read", "chunk"),
-            _query_event(ctx, "chunks", 0 if row is None else 1),
+            decide_event(ctx, decision, resource="chunk", requested="read"),
+            query_event(ctx, "chunks", 0 if row is None else 1),
         ]
     )
     if row is None:
@@ -370,7 +331,7 @@ def list_audit(
     here with `?event_id=`.
     """
     decision = POLICY.decide(ctx, "read_audit", "audit")
-    audit_events([_decide_event(ctx, decision, "read_audit", "audit")])
+    audit_events([decide_event(ctx, decision, resource="audit", requested="read_audit")])
     if not decision.allowed:
         raise HTTPException(status_code=403, detail="forbidden")
     # The viewer's own SELECT is not audited (no recursion); the decide event
@@ -382,7 +343,7 @@ def list_audit(
 def audit_verify(ctx: CurrentContext) -> dict[str, Any]:
     """Chain verification plus both tamper-evidence layers (SPEC 14.2)."""
     decision = POLICY.decide(ctx, "read_audit", "audit")
-    audit_events([_decide_event(ctx, decision, "read_audit", "audit")])
+    audit_events([decide_event(ctx, decision, resource="audit", requested="read_audit")])
     if not decision.allowed:
         raise HTTPException(status_code=403, detail="forbidden")
     return verify_report(get_engine())

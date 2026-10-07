@@ -18,7 +18,7 @@ from app.authz.context import AccessContext
 from app.authz.policy import LocalPolicy
 from app.clock import demo_now
 from app.connectors.base import AdapterDescription, RecordFilter, SourceRecord
-from app.db import get_engine, set_rls_context
+from app.db import get_engine, set_rls_context_for
 
 POLICY = LocalPolicy()
 
@@ -51,18 +51,6 @@ _TS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 _ISO_DATE = r"'^\d{4}-\d{2}-\d{2}$'"
 
 
-def _set_context(conn: Connection, ctx: AccessContext) -> None:
-    set_rls_context(
-        conn,
-        user_id=ctx.user_id,
-        clearance_rank=ctx.clearance_rank,
-        compartments=ctx.compartments,
-        unit_path=ctx.unit_path,
-        data_scope=ctx.data_scope,
-        session_id=ctx.session_id,
-    )
-
-
 def _record(row) -> SourceRecord:
     return SourceRecord(
         source_ref=str(row["source_ref"]),
@@ -89,7 +77,7 @@ class DemoReferenceAdapter:
     def search(
         self, conn: Connection, ctx: AccessContext, record_filter: RecordFilter
     ) -> list[SourceRecord]:
-        _set_context(conn, ctx)
+        set_rls_context_for(conn, ctx)
         row_filter = POLICY.row_filter(ctx, "record")
         clauses = [row_filter.where_sql, "canonical_records.entity_type = :entity_type"]
         params: dict[str, object] = {**row_filter.params, "entity_type": record_filter.entity_type}
@@ -125,7 +113,7 @@ class DemoReferenceAdapter:
         return [_record(row) for row in rows]
 
     def get(self, conn: Connection, ctx: AccessContext, source_ref: str) -> SourceRecord | None:
-        _set_context(conn, ctx)
+        set_rls_context_for(conn, ctx)
         row_filter = POLICY.row_filter(ctx, "record")
         row = (
             conn.execute(

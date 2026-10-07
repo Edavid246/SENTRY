@@ -11,7 +11,7 @@ from sqlalchemy.engine import Connection
 from app.authz.context import AccessContext
 from app.authz.policy import LocalPolicy
 from app.correlation.types import FindingDraft
-from app.db import set_rls_context
+from app.db import set_rls_context_for
 
 POLICY = LocalPolicy()
 
@@ -31,23 +31,11 @@ class FindingRow:
     created_at: str
 
 
-def _set_context(conn: Connection, ctx: AccessContext) -> None:
-    set_rls_context(
-        conn,
-        user_id=ctx.user_id,
-        clearance_rank=ctx.clearance_rank,
-        compartments=ctx.compartments,
-        unit_path=ctx.unit_path,
-        data_scope=ctx.data_scope,
-        session_id=ctx.session_id,
-    )
-
-
 def save_findings(conn: Connection, ctx: AccessContext, drafts: list[FindingDraft]) -> None:
     """Insert or update by key. RLS WITH CHECK refuses anything above the runner's label."""
     import json
 
-    _set_context(conn, ctx)
+    set_rls_context_for(conn, ctx)
     for draft in drafts:
         unit_id = conn.execute(
             text("SELECT id FROM units WHERE path = :path"), {"path": draft.unit_path}
@@ -84,7 +72,7 @@ def save_findings(conn: Connection, ctx: AccessContext, drafts: list[FindingDraf
 
 def list_findings(conn: Connection, ctx: AccessContext, key: str | None = None) -> list[FindingRow]:
     """The findings this caller may see; the row filter is inside the query."""
-    _set_context(conn, ctx)
+    set_rls_context_for(conn, ctx)
     row_filter = POLICY.row_filter(ctx, "finding")
     where = row_filter.where_sql
     params: dict[str, Any] = dict(row_filter.params)

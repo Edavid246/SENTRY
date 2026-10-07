@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from app.api.deps import ConnDep, CurrentContext, audit_events
+from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
 from app.audit.chain import utc_now_iso
 from app.authz.context import AccessContext
 from app.authz.policy import LocalPolicy
@@ -207,17 +207,9 @@ def _findings_tile(ctx: AccessContext, conn: Connection, names: dict[str, str]) 
 @router.get("/summary", response_model=DashboardSummary)
 def dashboard_summary(ctx: CurrentContext, conn: ConnDep) -> DashboardSummary:
     decision = POLICY.decide(ctx, "read", "dashboard")
-    decide_event = {
-        "actor": ctx.username,
-        "action": "decide",
-        "resource": "dashboard",
-        "requested": "read",
-        "decision": "allow" if decision.allowed else "deny",
-        "timestamp": utc_now_iso(),
-    }
+    decision_event = decide_event(ctx, decision, resource="dashboard", requested="read")
     if not decision.allowed:
-        decide_event["reasons"] = list(decision.reasons)
-        audit_events([decide_event])
+        audit_events([decision_event])
         raise HTTPException(status_code=403, detail="forbidden")
 
     ranks, names = _lookups(conn)
@@ -233,18 +225,5 @@ def dashboard_summary(ctx: CurrentContext, conn: ConnDep) -> DashboardSummary:
         for key in DashboardTiles.model_fields
     }
     item_ids = [item.id for tile in built.values() for item in tile.items]
-    audit_events(
-        [
-            decide_event,
-            {
-                "actor": ctx.username,
-                "action": "query",
-                "resource": "dashboard",
-                "decision": "allow",
-                "rows": len(item_ids),
-                "item_ids": item_ids,
-                "timestamp": utc_now_iso(),
-            },
-        ]
-    )
+    audit_events([decision_event, query_event(ctx, "dashboard", len(item_ids), item_ids=item_ids)])
     return DashboardSummary(generated_at=utc_now_iso(), tiles=DashboardTiles(**built))

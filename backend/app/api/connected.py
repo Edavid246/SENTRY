@@ -14,7 +14,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.api.deps import ConnDep, CurrentContext, audit_events
+from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
 from app.audit.chain import utc_now_iso
 from app.authz.policy import LocalPolicy
 from app.clock import demo_now, demo_today
@@ -92,22 +92,14 @@ def connected_replay(
     since = _parse_ts(after, "after") if after else window_start - timedelta(seconds=1)
     limit = min(_parse_ts(upto, "upto"), now) if upto else now
     decision = POLICY.decide(ctx, "retrieve", "record")
-    decide_event = {
-        "actor": ctx.username,
-        "action": "decide",
-        "resource": "connected_replay",
-        "requested": "retrieve",
-        "decision": "allow" if decision.allowed else "deny",
-        "timestamp": utc_now_iso(),
-    }
+    decision_event = decide_event(ctx, decision, resource="connected_replay", requested="retrieve")
     out: dict[str, Any] = {
         "window_start": window_start.strftime(_TS),
         "window_end": now.strftime(_TS),
         "events": [],
     }
     if not decision.allowed:
-        decide_event["reasons"] = list(decision.reasons)
-        audit_events([decide_event])
+        audit_events([decision_event])
         return out
     events = [
         r
@@ -118,16 +110,13 @@ def connected_replay(
     if events:
         audit_events(
             [
-                decide_event,
-                {
-                    "actor": ctx.username,
-                    "action": "query",
-                    "resource": "connected_replay",
-                    "decision": "allow",
-                    "rows": len(events),
-                    "record_ids": [r.source_ref for r in events],
-                    "timestamp": utc_now_iso(),
-                },
+                decision_event,
+                query_event(
+                    ctx,
+                    "connected_replay",
+                    len(events),
+                    record_ids=[r.source_ref for r in events],
+                ),
             ]
         )
     return out
@@ -142,23 +131,15 @@ def connected_map(
 ) -> dict[str, Any]:
     """Sensors, recent detections and mission tracks the caller may see (never more)."""
     decision = POLICY.decide(ctx, "retrieve", "record")
-    decide_event = {
-        "actor": ctx.username,
-        "action": "decide",
-        "resource": "connected_map",
-        "requested": "retrieve",
-        "decision": "allow" if decision.allowed else "deny",
-        "timestamp": utc_now_iso(),
-    }
+    decision_event = decide_event(ctx, decision, resource="connected_map", requested="retrieve")
     if not decision.allowed:
-        decide_event["reasons"] = list(decision.reasons)
-        audit_events([decide_event])
+        audit_events([decision_event])
         # Roles without data access get an empty map, not a hint about what exists.
         return {"type": "FeatureCollection", "features": [], "generated_at": utc_now_iso()}
 
     now = demo_now()
-    start = (now - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    end = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    start = (now - timedelta(hours=hours)).strftime(_TS)
+    end = now.strftime(_TS)
     mission_start = (demo_today() - timedelta(days=mission_days)).isoformat()
 
     features: list[dict[str, Any]] = []
@@ -209,18 +190,5 @@ def connected_map(
         )
         refs.append(msn.source_ref)
 
-    audit_events(
-        [
-            decide_event,
-            {
-                "actor": ctx.username,
-                "action": "query",
-                "resource": "connected_map",
-                "decision": "allow",
-                "rows": len(refs),
-                "record_ids": refs,
-                "timestamp": utc_now_iso(),
-            },
-        ]
-    )
+    audit_events([decision_event, query_event(ctx, "connected_map", len(refs), record_ids=refs)])
     return {"type": "FeatureCollection", "features": features, "generated_at": utc_now_iso()}

@@ -18,6 +18,7 @@ from sqlalchemy.engine import Connection
 
 from app.audit.chain import append_events, utc_now_iso
 from app.authz.context import AccessContext
+from app.authz.policy import Decision
 from app.authz.tokens import DevTokenValidator, TokenError
 from app.db import get_engine
 
@@ -40,6 +41,36 @@ def audit_events(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not payloads:
         return []
     return append_events(get_engine(), payloads)
+
+
+def decide_event(
+    ctx: AccessContext, decision: Decision, *, resource: str, requested: str
+) -> dict[str, Any]:
+    """Audit payload for a policy decision (allow or deny)."""
+    payload: dict[str, Any] = {
+        "actor": ctx.username,
+        "action": "decide",
+        "resource": resource,
+        "requested": requested,
+        "decision": "allow" if decision.allowed else "deny",
+        "timestamp": utc_now_iso(),
+    }
+    if not decision.allowed:
+        payload["reasons"] = list(decision.reasons)
+    return payload
+
+
+def query_event(ctx: AccessContext, resource: str, rows: int, **extra: Any) -> dict[str, Any]:
+    """Audit payload for rows actually read; `extra` carries ids (record_ids, item_ids)."""
+    return {
+        "actor": ctx.username,
+        "action": "query",
+        "resource": resource,
+        "decision": "allow",
+        "rows": int(rows),
+        **extra,
+        "timestamp": utc_now_iso(),
+    }
 
 
 def _unauthenticated() -> HTTPException:

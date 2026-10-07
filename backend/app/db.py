@@ -10,15 +10,19 @@ The RLS policies in the migrations read these variables via
 missing or cleared context returns zero rows — never an error.
 """
 
-from collections.abc import Iterator
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase
 
 from app.config import get_settings
+
+if TYPE_CHECKING:
+    from app.authz.context import AccessContext
 
 
 class Base(DeclarativeBase):
@@ -99,6 +103,19 @@ def set_rls_context(
         conn.execute(text(stmt), params)
 
 
+def set_rls_context_for(conn: Any, ctx: AccessContext) -> None:
+    """Apply an AccessContext to the connection's current transaction."""
+    set_rls_context(
+        conn,
+        user_id=ctx.user_id,
+        clearance_rank=ctx.clearance_rank,
+        compartments=ctx.compartments,
+        unit_path=ctx.unit_path,
+        data_scope=ctx.data_scope,
+        session_id=ctx.session_id,
+    )
+
+
 def clear_rls_context(conn: Any) -> None:
     """Clear the context at session level (used by tests to simulate pooled reuse)."""
     for stmt in rls_clear_statements():
@@ -125,10 +142,3 @@ def reset_engine() -> None:
     if _engine is not None:
         _engine.dispose()
     _engine = None
-
-
-def get_session() -> Iterator[Session]:
-    """FastAPI dependency: one session per request; RLS context set by the caller."""
-    factory = sessionmaker(bind=get_engine(), expire_on_commit=False, future=True)
-    with factory() as session:
-        yield session

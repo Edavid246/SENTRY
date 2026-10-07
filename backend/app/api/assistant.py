@@ -35,14 +35,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from app.ai_gateway.base import ChatMessage, ProviderError, ProviderNotConfiguredError
-from app.api.deps import ConnDep, CurrentContext, audit_events
+from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
 from app.audit.chain import utc_now_iso
 from app.authz.context import AccessContext
 from app.authz.policy import Decision, LocalPolicy
 from app.data_queries.explain import explain_result
 from app.data_queries.registry import ToolOutcome, execute_tool
 from app.data_queries.routing import RoutedReport, RoutedTool, route_question, route_report
-from app.db import format_array, set_rls_context
+from app.db import format_array, set_rls_context_for
 from app.knowledge.answer import CitedAnswer, generate_answer, parse_cited_chunk_ids
 from app.knowledge.retrieve import (
     RetrievedChunk,
@@ -142,37 +142,6 @@ class TurnOut(BaseModel):
 
 class ConversationDetail(ConversationSummary):
     turns: list[TurnOut]
-
-
-def _decide_event(
-    ctx: AccessContext,
-    decision: Decision,
-    *,
-    resource: str = "assistant",
-    requested: str = "answer",
-) -> dict[str, object]:
-    payload: dict[str, object] = {
-        "actor": ctx.username,
-        "action": "decide",
-        "resource": resource,
-        "requested": requested,
-        "decision": "allow" if decision.allowed else "deny",
-        "timestamp": utc_now_iso(),
-    }
-    if not decision.allowed:
-        payload["reasons"] = list(decision.reasons)
-    return payload
-
-
-def _query_event(ctx: AccessContext, resource: str, rows: int) -> dict[str, object]:
-    return {
-        "actor": ctx.username,
-        "action": "query",
-        "resource": resource,
-        "decision": "allow",
-        "rows": int(rows),
-        "timestamp": utc_now_iso(),
-    }
 
 
 def _retrieval_event(ctx: AccessContext, question: str, chunks: list[RetrievedChunk]) -> dict:
@@ -281,18 +250,6 @@ def _report_answer_event(
     }
 
 
-def _set_context(conn, ctx: AccessContext) -> None:
-    set_rls_context(
-        conn,
-        user_id=ctx.user_id,
-        clearance_rank=ctx.clearance_rank,
-        compartments=ctx.compartments,
-        unit_path=ctx.unit_path,
-        data_scope=ctx.data_scope,
-        session_id=ctx.session_id,
-    )
-
-
 def _rank_map(conn) -> dict[str, int]:
     rows = conn.execute(text("SELECT code, rank FROM classification_levels")).all()
     return {str(row.code): int(row.rank) for row in rows}
@@ -329,6 +286,23 @@ def _resolve_conversation(conn, ctx: AccessContext, requested: UUID) -> str:
     if row is None:
         raise HTTPException(status_code=404, detail="not found")
     return str(row.id)
+
+
+def _provider_unavailable(exc: ProviderError) -> HTTPException:
+    if isinstance(exc, ProviderNotConfiguredError):
+        detail = "the answer model is not configured on this server"
+    else:
+        detail = "the answer model is currently unavailable; retry later"
+    return HTTPException(status_code=503, detail=detail)
+
+
+def _open_conversation(conn, ctx: AccessContext, requested: UUID | None) -> tuple[UUID, bool]:
+    """Return (conversation id, is_new); an id owned by anyone else answers 404."""
+    if requested is None:
+        return uuid4(), True
+    set_rls_context_for(conn, ctx)
+    _resolve_conversation(conn, ctx, requested)
+    return requested, False
 
 
 def _load_history(conn, conversation_id: UUID) -> tuple[ChatMessage, ...]:
@@ -411,20 +385,14 @@ def _query_data(
     """
     record_decision = POLICY.decide(ctx, "query", "record")
     decisions = [
-        _decide_event(ctx, answer_decision),
-        _decide_event(ctx, record_decision, resource="record", requested="query"),
+        decide_event(ctx, answer_decision, resource="assistant", requested="answer"),
+        decide_event(ctx, record_decision, resource="record", requested="query"),
     ]
     if not record_decision.allowed:
         audit_events(decisions)
         raise HTTPException(status_code=403, detail="forbidden")
 
-    new_conversation = body.conversation_id is None
-    if new_conversation:
-        conversation_id = uuid4()
-    else:
-        conversation_id = body.conversation_id
-        _set_context(conn, ctx)
-        _resolve_conversation(conn, ctx, conversation_id)
+    conversation_id, new_conversation = _open_conversation(conn, ctx, body.conversation_id)
 
     audit_events(decisions)
     outcome = execute_tool(ctx, conn, routed.tool, routed.params)
@@ -439,17 +407,13 @@ def _query_data(
             explanation = explain_result(body.question, result)
         except ProviderError as exc:
             # The tool ran and was audited; only the explanation is unavailable.
-            if isinstance(exc, ProviderNotConfiguredError):
-                detail = "the answer model is not configured on this server"
-            else:
-                detail = "the answer model is currently unavailable; retry later"
-            raise HTTPException(status_code=503, detail=detail) from exc
+            raise _provider_unavailable(exc) from exc
         answer = explanation.text
         provider, model, cached = explanation.provider, explanation.model, explanation.cached
 
     # Derived turn inherits the highest classification and union of compartments
     # of the records behind it (AGENTS.md); a refusal retrieved nothing.
-    _set_context(conn, ctx)
+    set_rls_context_for(conn, ctx)
     _store_turn(
         conn,
         ctx,
@@ -504,20 +468,14 @@ def _query_report(
     """
     record_decision = POLICY.decide(ctx, "query", "record")
     decisions = [
-        _decide_event(ctx, answer_decision),
-        _decide_event(ctx, record_decision, resource="record", requested="query"),
+        decide_event(ctx, answer_decision, resource="assistant", requested="answer"),
+        decide_event(ctx, record_decision, resource="record", requested="query"),
     ]
     if not record_decision.allowed:
         audit_events(decisions)
         raise HTTPException(status_code=403, detail="forbidden")
 
-    new_conversation = body.conversation_id is None
-    if new_conversation:
-        conversation_id = uuid4()
-    else:
-        conversation_id = body.conversation_id
-        _set_context(conn, ctx)
-        _resolve_conversation(conn, ctx, conversation_id)
+    conversation_id, new_conversation = _open_conversation(conn, ctx, body.conversation_id)
 
     audit_events(decisions)
     outcome = execute_tool(ctx, conn, "training_activity", routed.params)
@@ -527,21 +485,17 @@ def _query_report(
     if result is None:
         answer = f"That request was refused: {outcome.refusal}. No data was retrieved."
     else:
-        _set_context(conn, ctx)
+        set_rls_context_for(conn, ctx)
         chunks = retrieve_chunks(conn, ctx, DOCUMENT_QUERY)
         ranks = _rank_map(conn)
         try:
             report = generate_training_report(body.question, result, chunks, ranks)
         except ProviderError as exc:
             audit_events([_retrieval_event(ctx, DOCUMENT_QUERY, chunks)])
-            if isinstance(exc, ProviderNotConfiguredError):
-                detail = "the answer model is not configured on this server"
-            else:
-                detail = "the answer model is currently unavailable; retry later"
-            raise HTTPException(status_code=503, detail=detail) from exc
+            raise _provider_unavailable(exc) from exc
         answer = report.text
 
-    _set_context(conn, ctx)
+    set_rls_context_for(conn, ctx)
     inputs = [*(result.records if result else ()), *chunks]
     _store_turn(
         conn,
@@ -569,17 +523,7 @@ def _query_report(
     )
     return AssistantQueryResponse(
         answer=answer,
-        citations=[
-            CitationOut(
-                chunk_id=c.chunk_id,
-                document_title=c.document_title,
-                document_ref=c.document_ref,
-                page=c.page,
-                section=c.section,
-                classification_code=c.classification_code,
-            )
-            for c in (report.citations if report else ())
-        ],
+        citations=[_citation_from_chunk(c) for c in (report.citations if report else ())],
         found=bool(report and report.found),
         degraded=False,
         refused=outcome.refused or bool(report and report.blocked),
@@ -609,7 +553,7 @@ def query_assistant(
 ) -> AssistantQueryResponse:
     decision = POLICY.decide(ctx, "answer", "assistant")
     if not decision.allowed:
-        audit_events([_decide_event(ctx, decision)])
+        audit_events([decide_event(ctx, decision, resource="assistant", requested="answer")])
         raise HTTPException(status_code=403, detail="forbidden")
 
     manipulation = bool(_MANIPULATION_RE.search(body.question))
@@ -622,7 +566,7 @@ def query_assistant(
     if routed is not None:
         return _query_data(body, ctx, conn, decision, routed)
 
-    _set_context(conn, ctx)
+    set_rls_context_for(conn, ctx)
     new_conversation = body.conversation_id is None
     if new_conversation:
         conversation_id = uuid4()
@@ -640,17 +584,13 @@ def query_assistant(
     except ProviderError as exc:
         # Retrieval already happened: audit the decision and retrieval, then fail cleanly.
         failed: list[dict] = [
-            _decide_event(ctx, decision),
+            decide_event(ctx, decision, resource="assistant", requested="answer"),
             _retrieval_event(ctx, body.question, chunks),
         ]
         if manipulation:
             failed.append(_notable_event(ctx, body.question))
         audit_events(failed)
-        if isinstance(exc, ProviderNotConfiguredError):
-            detail = "the answer model is not configured on this server"
-        else:
-            detail = "the answer model is currently unavailable; retry later"
-        raise HTTPException(status_code=503, detail=detail) from exc
+        raise _provider_unavailable(exc) from exc
     ranks = _rank_map(conn)
     _store_turn(
         conn,
@@ -665,7 +605,7 @@ def query_assistant(
     conn.commit()
 
     events: list[dict] = [
-        _decide_event(ctx, decision),
+        decide_event(ctx, decision, resource="assistant", requested="answer"),
         _retrieval_event(ctx, body.question, chunks),
     ]
     if manipulation:
@@ -675,23 +615,24 @@ def query_assistant(
 
     return AssistantQueryResponse(
         answer=cited.answer,
-        citations=[
-            CitationOut(
-                chunk_id=chunk.chunk_id,
-                document_title=chunk.document_title,
-                document_ref=chunk.document_ref,
-                page=chunk.page,
-                section=chunk.section,
-                classification_code=chunk.classification_code,
-            )
-            for chunk in cited.citations
-        ],
+        citations=[_citation_from_chunk(chunk) for chunk in cited.citations],
         found=cited.found,
         degraded=degraded,
         refused=manipulation or cited.blocked,
         result_table=None,
         conversation_id=str(conversation_id),
         audit_event_id=str(written[-1]["event_id"]),
+    )
+
+
+def _citation_from_chunk(chunk: RetrievedChunk) -> CitationOut:
+    return CitationOut(
+        chunk_id=chunk.chunk_id,
+        document_title=chunk.document_title,
+        document_ref=chunk.document_ref,
+        page=chunk.page,
+        section=chunk.section,
+        classification_code=chunk.classification_code,
     )
 
 
@@ -746,9 +687,9 @@ def list_conversations(
     """
     decision = POLICY.decide(ctx, "read", "conversation")
     if not decision.allowed:
-        audit_events([_decide_event(ctx, decision, resource="conversation", requested="read")])
+        audit_events([decide_event(ctx, decision, resource="conversation", requested="read")])
         raise HTTPException(status_code=403, detail="forbidden")
-    _set_context(conn, ctx)
+    set_rls_context_for(conn, ctx)
     row_filter = POLICY.row_filter(ctx, "conversation")
     rows = (
         conn.execute(
@@ -777,8 +718,8 @@ def list_conversations(
     ]
     audit_events(
         [
-            _decide_event(ctx, decision, resource="conversation", requested="read"),
-            _query_event(ctx, "conversations", len(results)),
+            decide_event(ctx, decision, resource="conversation", requested="read"),
+            query_event(ctx, "conversations", len(results)),
         ]
     )
     return results
@@ -796,9 +737,9 @@ def get_conversation(
     """
     decision = POLICY.decide(ctx, "read", "conversation")
     if not decision.allowed:
-        audit_events([_decide_event(ctx, decision, resource="conversation", requested="read")])
+        audit_events([decide_event(ctx, decision, resource="conversation", requested="read")])
         raise HTTPException(status_code=404, detail="not found")
-    _set_context(conn, ctx)
+    set_rls_context_for(conn, ctx)
     conversation_filter = POLICY.row_filter(ctx, "conversation")
     row = (
         conn.execute(
@@ -816,8 +757,8 @@ def get_conversation(
     if row is None:
         audit_events(
             [
-                _decide_event(ctx, decision, resource="conversation", requested="read"),
-                _query_event(ctx, "conversations", 0),
+                decide_event(ctx, decision, resource="conversation", requested="read"),
+                query_event(ctx, "conversations", 0),
             ]
         )
         raise HTTPException(status_code=404, detail="not found")
@@ -858,8 +799,8 @@ def get_conversation(
     ]
     audit_events(
         [
-            _decide_event(ctx, decision, resource="conversation", requested="read"),
-            _query_event(ctx, "messages", len(turns)),
+            decide_event(ctx, decision, resource="conversation", requested="read"),
+            query_event(ctx, "messages", len(turns)),
         ]
     )
     return ConversationDetail(

@@ -781,17 +781,16 @@ def _chunk_texts(doc_ref: str, title: str, unit_path: str) -> list[tuple[str, st
 
 
 def _rows() -> dict[type, list[dict]]:
-    unit_rows = []
-    for u in UNITS:
-        unit_rows.append(
-            {
-                "id": _unit_id(u["path"]),
-                "name": u["name"],
-                "parent_id": _unit_id(u["parent"]) if u["parent"] else None,
-                "path": u["path"],
-                "depth": u["depth"],
-            }
-        )
+    unit_rows = [
+        {
+            "id": _unit_id(u["path"]),
+            "name": u["name"],
+            "parent_id": _unit_id(u["parent"]) if u["parent"] else None,
+            "path": u["path"],
+            "depth": u["depth"],
+        }
+        for u in UNITS
+    ]
 
     hasher = PasswordHasher()
     user_rows = []
@@ -812,8 +811,9 @@ def _rows() -> dict[type, list[dict]]:
                 "password_hash": hasher.hash(DEMO_PASSWORD),
             }
         )
-        for code in sorted(u["compartments"]):
-            user_compartment_rows.append({"user_id": user_id, "compartment_code": code})
+        user_compartment_rows.extend(
+            {"user_id": user_id, "compartment_code": code} for code in sorted(u["compartments"])
+        )
 
     source_rows = [
         {
