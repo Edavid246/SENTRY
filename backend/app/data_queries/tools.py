@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.engine import Connection
@@ -24,6 +24,7 @@ from app.correlation.store import list_findings
 from app.data_queries.errors import ToolParamError
 
 MAX_WITHIN_DAYS = 365
+DEFAULT_PERIOD_DAYS = 90  # one quarter
 _DEPOT_RE = re.compile(r"^DEP-[A-Z0-9]{1,8}(?:-[A-Z0-9]{1,8})?$")
 _UNIT_PATH_RE = re.compile(r"^/(?:[a-z0-9-]+/)+$")
 ADAPTER = DemoReferenceAdapter()
@@ -242,4 +243,49 @@ def correlation_findings(
     ]
     return ToolResult(
         tool="correlation_findings", params={}, columns=columns, rows=rows, records=records
+    )
+
+
+def training_activity(
+    ctx: AccessContext, params: Mapping[str, Any], conn: Connection
+) -> ToolResult:
+    """Training events that started in the last `period_days` (default one quarter)."""
+    _check_names(params, frozenset({"unit_path", "period_days"}))
+    unit_path = _resolve_unit_path(ctx, params.get("unit_path"))
+    period_days = params.get("period_days", DEFAULT_PERIOD_DAYS)
+    if isinstance(period_days, bool) or not isinstance(period_days, int):
+        raise ToolParamError("period_days must be an integer")
+    if not 1 <= period_days <= MAX_WITHIN_DAYS:
+        raise ToolParamError(f"period_days must be between 1 and {MAX_WITHIN_DAYS}")
+    today = demo_today()
+    start = today - timedelta(days=period_days)
+    found = ADAPTER.search(
+        conn, ctx, RecordFilter(entity_type="TrainingEvent", unit_path=unit_path)
+    )
+
+    def started(record: SourceRecord) -> date | None:
+        try:
+            return date.fromisoformat(str(record.data.get("start_date")))
+        except ValueError:
+            return None
+
+    records = [r for r in found if (d := started(r)) is not None and start <= d <= today]
+    records.sort(key=lambda r: (r.data["start_date"], r.source_ref), reverse=True)
+    columns = ("id", "course", "start_date", "attendees", "unit_path")
+    rows = [
+        {
+            "id": r.source_ref,
+            "course": r.data.get("course"),
+            "start_date": r.data["start_date"],
+            "attendees": r.data.get("attendees"),
+            "unit_path": r.unit_path,
+        }
+        for r in records
+    ]
+    return ToolResult(
+        tool="training_activity",
+        params={"unit_path": unit_path, "period_days": period_days},
+        columns=columns,
+        rows=rows,
+        records=tuple(records),
     )

@@ -113,6 +113,15 @@
       "question": "Show me the stock below threshold",
       "expected": "Typed tool stock_below_threshold: a.bello sees REC-010 and REC-026, t.adeyemi sees only REC-026; result table with shortfall column and row links.",
       "status": "built"
+    },
+    {
+      "id": "data-training-activity",
+      "spec_step": "18.4",
+      "pathway": "data",
+      "asked_by": "a.bello",
+      "question": "Prepare a summary of training activity for this command over the last quarter",
+      "expected": "Typed tool training_activity (last 90 days): a.bello sees REC-002, REC-043 and REC-044; t.adeyemi sees only REC-002; a result table with row links plus a short explanation. This is the data half of SPEC 18.4; the drafted report document is not built.",
+      "status": "built"
     }
   ]
 }

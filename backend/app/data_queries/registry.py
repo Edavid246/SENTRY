@@ -23,6 +23,7 @@ from app.data_queries.tools import (
     equipment_due_for_maintenance,
     expired_certifications,
     stock_below_threshold,
+    training_activity,
 )
 from app.db import get_engine
 
@@ -33,6 +34,7 @@ REGISTRY: dict[str, ToolFn] = {
     "expired_certifications": expired_certifications,
     "stock_below_threshold": stock_below_threshold,
     "correlation_findings": correlation_findings,
+    "training_activity": training_activity,
 }
 
 _AUDIT_VALUE_LIMIT = 120

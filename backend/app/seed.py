@@ -314,6 +314,16 @@ def _fault(ref, classification, unit_path, offset, equipment, description):
     return (ref, "FaultReport", "logistics-ref", classification, [], unit_path, data)
 
 
+def _training(ref, classification, compartments, unit_path, offset, course, attendees, unit):
+    data = {
+        "course": course,
+        "start_date": _days_from_today(offset),
+        "attendees": attendees,
+        "unit": unit,
+    }
+    return (ref, "TrainingEvent", "training-ref", classification, compartments, unit_path, data)
+
+
 _BN4 = "/command-a/bde-2/bn-4/"
 _BDE2 = "/command-a/bde-2/"
 RECORDS += [
@@ -540,6 +550,20 @@ RECORDS += [
         rank="Corporal",
         certification="Vehicle Maintainer",
     ),
+    # training_activity data: REC-002 (fixed date) is the Bn 4 baseline; these add a Bde 2
+    # event, a UAS Wing event (Confidential, UAS-OPS) and one old Bn 4 event outside a quarter.
+    _training("REC-043", "restricted", [], _BDE2, -35, "Vehicle Recovery", 18, "Brigade 2"),
+    _training(
+        "REC-044",
+        "confidential",
+        ["UAS-OPS"],
+        "/command-a/uas-wing/",
+        -20,
+        "UAS Flight Qualification",
+        6,
+        "UAS Wing",
+    ),
+    _training("REC-045", "restricted", [], _BN4, -200, "Cold Weather Drills", 30, "Battalion 4"),
     _qualification(
         "REC-042",
         "restricted",

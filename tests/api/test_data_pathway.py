@@ -510,3 +510,81 @@ def test_stock_tool_out_of_scope_unit_and_no_scope_users(client, app_engine, exp
         outcome = execute_tool(ctx, conn, "stock_below_threshold", {"unit_path": "/command-a/"})
     assert outcome.refused
     assert _ask(client, "s.eze", STOCK_QUESTION).status_code == 403
+
+
+# --- training_activity ------------------------------------------------------
+
+TRAINING_QUESTION = "Prepare a summary of training activity for this command over the last quarter"
+TRAINING_COLUMNS = ["id", "course", "start_date", "attendees", "unit_path"]
+
+
+def test_training_activity_bello_sees_more_than_adeyemi(client, explain_calls) -> None:
+    bello = _ask(client, "a.bello", TRAINING_QUESTION).json()
+    adeyemi = _ask(client, "t.adeyemi", TRAINING_QUESTION).json()
+    assert bello["result_table"]["columns"] == TRAINING_COLUMNS
+    # last quarter: REC-002 (Bn 4, Aug), REC-043 (Bde 2), REC-044 (UAS, Confidential/UAS-OPS);
+    # REC-045 started 200 days ago and is outside the window.
+    assert _ids(bello) == {"REC-002", "REC-043", "REC-044"}
+    assert _ids(adeyemi) == {"REC-002"}
+    assert explain_calls[-2:] == ["training_activity"] * 2
+
+
+def test_training_period_is_extracted_and_applied(client, explain_calls) -> None:
+    body = _ask(client, "a.bello", "Show training events in the last 30 days").json()
+    assert _ids(body) == {"REC-044"}  # REC-043 is 35 days old, REC-002 is 57
+    event = _data_queries(client, "a.bello")[-1]["payload"]
+    assert event["tool"] == "training_activity" and event["params"]["period_days"] == 30
+    year = _ask(client, "a.bello", "Show training activity over the last year").json()
+    assert _ids(year) == {"REC-002", "REC-043", "REC-044", "REC-045"}
+
+
+def test_training_compartment_rows_need_the_compartment(client, explain_calls) -> None:
+    musa = _ask(client, "k.musa", TRAINING_QUESTION).json()
+    assert _ids(musa) == {"REC-044"}  # UAS-OPS Confidential, his own unit
+    okafor = _ask(client, "a.okafor", TRAINING_QUESTION).json()
+    assert _ids(okafor) == {"REC-002", "REC-043"}
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"period_days": 0},
+        {"period_days": -5},
+        {"period_days": 100000},
+        {"period_days": "90; DROP TABLE units"},
+        {"period_days": True},
+        {"period_days": 3.5},
+        {"unit_path": "/command-a/bde-2/bn-4/../../.."},
+        {"unit_path": ["/command-a/"]},
+        {"within_days": 30},
+        {"sql": "1=1"},
+    ],
+)
+def test_training_bad_params_are_refused_before_any_sql(
+    client, app_engine, monkeypatch, params
+) -> None:
+    def no_sql(self, *args, **kwargs):
+        raise AssertionError("the adapter must not be reached for a refused call")
+
+    monkeypatch.setattr(DemoReferenceAdapter, "search", no_sql)
+    ctx = _ctx(client, app_engine, "a.bello")
+    with app_engine.connect() as conn:
+        outcome = execute_tool(ctx, conn, "training_activity", params)
+    assert outcome.refused
+    assert _event_payload(app_engine, outcome.audit_event_id)["decision"] == "deny"
+
+
+def test_training_out_of_scope_unit_and_no_scope_users(client, app_engine, explain_calls) -> None:
+    ctx = _ctx(client, app_engine, "t.adeyemi")
+    with app_engine.connect() as conn:
+        assert execute_tool(ctx, conn, "training_activity", {"unit_path": "/command-a/"}).refused
+    assert _ask(client, "s.eze", TRAINING_QUESTION).status_code == 403
+    assert _ask(client, "f.danjuma", TRAINING_QUESTION).status_code == 403
+
+
+def test_training_document_questions_stay_on_the_knowledge_pathway() -> None:
+    assert route_question("Summarize the training directive") is None
+    assert route_question("What does the training policy say about courses?") is None
+    routed = route_question(TRAINING_QUESTION)
+    assert routed is not None and routed.tool == "training_activity"
+    assert routed.params == {"period_days": 90}

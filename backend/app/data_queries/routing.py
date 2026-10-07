@@ -23,7 +23,9 @@ _KNOWLEDGE_RE = re.compile(
     r"regulations?|guidelines?)\b",
     re.IGNORECASE,
 )
-_REQUEST_RE = re.compile(r"\b(show|list|display|which|give me|how many|what)\b", re.IGNORECASE)
+_REQUEST_RE = re.compile(
+    r"\b(show|list|display|which|give me|how many|what|prepare|summar\w+)\b", re.IGNORECASE
+)
 _EQUIPMENT_RE = re.compile(r"\bequipment\b", re.IGNORECASE)
 _MAINTENANCE_RE = re.compile(r"\b(maintenance|servicing|service)\b", re.IGNORECASE)
 _CERT_RE = re.compile(r"\b(certifications?|certificates?|qualifications?)\b", re.IGNORECASE)
@@ -38,6 +40,12 @@ _FAULT_RE = re.compile(r"\bfaults?\b", re.IGNORECASE)
 _RISING_RE = re.compile(
     r"\b(rising|rise|rose|increas\w+|spiking|growing|trend\w*)\b", re.IGNORECASE
 )
+_TRAINING_RE = re.compile(r"\b(training|courses?)\b", re.IGNORECASE)
+_ACTIVITY_RE = re.compile(r"\b(activity|activities|events?|sessions?|summary)\b", re.IGNORECASE)
+_PERIOD_RE = re.compile(
+    r"\b(?:last|past)\s+(?:(\d{1,6})\s+days?|(quarter|month|week|year))\b", re.IGNORECASE
+)
+_PERIOD_DAYS = {"week": 7, "month": 30, "quarter": 90, "year": 365}
 _WITHIN_RE = re.compile(
     r"\b(?:within|in|over)\s+(?:the\s+)?(?:next\s+)?(\d{1,6})\s+days?\b|"
     r"\bnext\s+(\d{1,6})\s+days?\b",
@@ -71,6 +79,13 @@ def route_question(question: str) -> RoutedTool | None:
         return RoutedTool("equipment_due_for_maintenance", params)
     if _CERT_RE.search(question) and _EXPIRED_RE.search(question):
         return RoutedTool("expired_certifications", params)
+    if _TRAINING_RE.search(question) and _ACTIVITY_RE.search(question):
+        period = _PERIOD_RE.search(question)
+        if period:
+            params["period_days"] = (
+                int(period.group(1)) if period.group(1) else _PERIOD_DAYS[period.group(2).lower()]
+            )
+        return RoutedTool("training_activity", params)
     if _STOCK_RE.search(question) and _LOW_RE.search(question):
         depot = _DEPOT_RE.search(question)
         if depot:
