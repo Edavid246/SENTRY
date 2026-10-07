@@ -427,13 +427,11 @@ def test_stored_turn_inherits_classification_and_compartments(client, explain_ca
 # --- adapter layer ----------------------------------------------------------
 
 
-def test_adapter_is_read_only_and_stubs_streams() -> None:
+def test_adapter_is_read_only() -> None:
     adapter = DemoReferenceAdapter()
     description = adapter.describe()
     assert description.read_only and "Equipment" in description.entity_types
     assert not hasattr(adapter, "write")
-    with pytest.raises(NotImplementedError):
-        adapter.stream(None, None)  # type: ignore[arg-type]
     assert adapter.sync(None) == 0  # type: ignore[arg-type]
 
 

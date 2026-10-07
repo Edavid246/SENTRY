@@ -9,10 +9,10 @@ event and a query event listing the record ids returned.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app.api.deps import ConnDep, CurrentContext, audit_events
 from app.audit.chain import utc_now_iso
@@ -47,6 +47,90 @@ def _point(record: SourceRecord, kind: str, label: str, **extra: Any) -> dict[st
         "geometry": {"type": "Point", "coordinates": [data["lon"], data["lat"]]},
         "properties": _properties(record, kind, label, **extra),
     }
+
+
+def _detection_feature(det: SourceRecord) -> dict[str, Any]:
+    return _point(
+        det,
+        "detection",
+        f"{det.data['object_type']} at {det.data['site']}",
+        observed_at=det.data["observed_at"],
+        object_type=det.data["object_type"],
+        confidence=det.data["confidence"],
+        site=det.data["site"],
+    )
+
+
+_TS = "%Y-%m-%dT%H:%M:%SZ"
+
+
+def _parse_ts(value: str, name: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"{name} must be an ISO timestamp") from None
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+
+
+@router.get("/replay")
+def connected_replay(
+    ctx: CurrentContext,
+    after: Annotated[str | None, Query()] = None,
+    upto: Annotated[str | None, Query()] = None,
+    hours: Annotated[int, Query(ge=1, le=720)] = 48,
+) -> dict[str, Any]:
+    """STUB live feed: detections the caller may see, replayed in time order.
+
+    The synthetic detections are the "stream"; the client drives a replay clock and polls
+    with `after` (the last observed_at it has) and `upto` (the clock). Stateless: the
+    server holds no cursor. Stream and policy row filter + RLS come from the adapter, so
+    an event the caller may not see is never read. Only non-empty batches are audited,
+    with the ids delivered.
+    """
+    now = demo_now()
+    window_start = now - timedelta(hours=hours)
+    since = _parse_ts(after, "after") if after else window_start - timedelta(seconds=1)
+    limit = min(_parse_ts(upto, "upto"), now) if upto else now
+    decision = POLICY.decide(ctx, "retrieve", "record")
+    decide_event = {
+        "actor": ctx.username,
+        "action": "decide",
+        "resource": "connected_replay",
+        "requested": "retrieve",
+        "decision": "allow" if decision.allowed else "deny",
+        "timestamp": utc_now_iso(),
+    }
+    out: dict[str, Any] = {
+        "window_start": window_start.strftime(_TS),
+        "window_end": now.strftime(_TS),
+        "events": [],
+    }
+    if not decision.allowed:
+        decide_event["reasons"] = list(decision.reasons)
+        audit_events([decide_event])
+        return out
+    events = [
+        r
+        for r in ADAPTER.stream(ctx, max(since, window_start - timedelta(seconds=1)))
+        if r.data["observed_at"] <= limit.strftime(_TS)
+    ]
+    out["events"] = [_detection_feature(r) for r in events]
+    if events:
+        audit_events(
+            [
+                decide_event,
+                {
+                    "actor": ctx.username,
+                    "action": "query",
+                    "resource": "connected_replay",
+                    "decision": "allow",
+                    "rows": len(events),
+                    "record_ids": [r.source_ref for r in events],
+                    "timestamp": utc_now_iso(),
+                },
+            ]
+        )
+    return out
 
 
 @router.get("/map")
@@ -93,17 +177,7 @@ def connected_map(
     for det in sorted(detections, key=lambda r: r.data["observed_at"]):
         if not start <= det.data["observed_at"] <= end:
             continue
-        features.append(
-            _point(
-                det,
-                "detection",
-                f"{det.data['object_type']} at {det.data['site']}",
-                observed_at=det.data["observed_at"],
-                object_type=det.data["object_type"],
-                confidence=det.data["confidence"],
-                site=det.data["site"],
-            )
-        )
+        features.append(_detection_feature(det))
         refs.append(det.source_ref)
     missions = ADAPTER.search(
         conn,

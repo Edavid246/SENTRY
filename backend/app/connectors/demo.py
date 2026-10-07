@@ -9,15 +9,16 @@ called without one. Read-only: no statement here writes.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from app.authz.context import AccessContext
 from app.authz.policy import LocalPolicy
+from app.clock import demo_now
 from app.connectors.base import AdapterDescription, RecordFilter, SourceRecord
-from app.db import set_rls_context
+from app.db import get_engine, set_rls_context
 
 POLICY = LocalPolicy()
 
@@ -46,6 +47,7 @@ _SELECT = (
     " JOIN source_systems ON source_systems.id = canonical_records.source_system_id"
     " JOIN units ON units.id = canonical_records.unit_id"
 )
+_TS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 _ISO_DATE = r"'^\d{4}-\d{2}-\d{2}$'"
 
 
@@ -140,7 +142,18 @@ class DemoReferenceAdapter:
         return None if row is None else _record(row)
 
     def stream(self, ctx: AccessContext, since: datetime) -> Iterator[SourceRecord]:
-        raise NotImplementedError("live streams are stubbed (docs/STUBS.md)")
+        """STUB live feed (docs/STUBS.md): replay the seeded detections in time order.
+
+        Yields the Detection records the caller may see (same policy row filter + RLS as
+        search) with observed_at after `since` and not after the demo "now". Timing is
+        the caller's job: the replay endpoint decides how fast the clock advances.
+        """
+        cutoff = since.astimezone(UTC).strftime(_TS_FORMAT)
+        end = demo_now().strftime(_TS_FORMAT)
+        with get_engine().connect() as conn:
+            records = self.search(conn, ctx, RecordFilter(entity_type="Detection"))
+        fresh = [r for r in records if cutoff < str(r.data["observed_at"]) <= end]
+        yield from sorted(fresh, key=lambda r: (r.data["observed_at"], r.source_ref))
 
     def sync(self, ctx: AccessContext) -> int:
         return 0  # nothing to refresh: the demo data is the source of truth

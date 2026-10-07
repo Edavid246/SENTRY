@@ -123,6 +123,14 @@ try {
   await page.waitForSelector('[data-testid="map-detail"]');
   check((await page.textContent('[data-testid="map-detail"]')).includes("SECRET"), "Secret mission detail carries its classification badge");
   await shot("17-map-bello");
+  // replay: detections arrive over time as the replay clock advances (stub live feed)
+  await page.click('[data-testid="replay-toggle"]');
+  await page.waitForSelector('[data-testid="replay-clock"]');
+  await page.waitForFunction(() => /· [1-9]/.test(document.querySelector('[data-testid="replay-clock"]')?.textContent ?? ""));
+  check(true, "replay delivers detections as the clock advances");
+  await shot("19-map-replay");
+  await page.click('[data-testid="replay-toggle"]');
+  check((await page.locator('[data-testid="replay-clock"]').count()) === 0, "stopping the replay clears the clock");
   await page.click('[data-testid="map-record-link"]');
   await page.waitForSelector('[data-testid="record-detail"]');
   check(true, "map detail links to the record page");

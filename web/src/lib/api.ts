@@ -99,6 +99,12 @@ export interface ConnectedMap {
   generated_at: string;
 }
 
+export interface ReplayBatch {
+  window_start: string;
+  window_end: string;
+  events: MapFeature[];
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -174,5 +180,9 @@ export const api = {
     request<RecordDetail>(`/records/${encodeURIComponent(sourceRef)}`),
   dashboard: () => request<DashboardSummary>("/dashboard/summary"),
   connectedMap: () => request<ConnectedMap>("/connected/map"),
+  replay: (after: string | null, upto: string) =>
+    request<ReplayBatch>(
+      `/connected/replay?upto=${encodeURIComponent(upto)}${after ? `&after=${encodeURIComponent(after)}` : ""}`,
+    ),
   verify: () => request<VerifyReport>("/audit/verify"),
 };

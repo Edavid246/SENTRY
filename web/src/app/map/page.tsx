@@ -14,6 +14,9 @@ const COLOURS: Record<MapKind, string> = {
   detection: "#efa93a",
   mission: "#5fae86",
 };
+// One replay tick advances the clock by 30 simulated minutes (the 48 h window takes ~1.5 min).
+const REPLAY_STEP_MS = 30 * 60 * 1000;
+const REPLAY_TICK_MS = 1000;
 const KIND_LABEL: Record<MapKind, string> = {
   sensor: "Sensors",
   detection: "Detections",
@@ -73,10 +76,57 @@ export default function MapPage() {
       .catch(() => setError("The map data could not be loaded."));
   }, [me]);
 
-  const visible = useMemo(
-    () => (data?.features ?? []).filter((f) => !hidden.has(f.properties.kind)),
-    [data, hidden],
-  );
+  // Replay (STUB live feed, docs/STUBS.md): detections arrive one batch at a time as a
+  // replay clock advances through the window; sensors and missions stay as loaded.
+  const [replay, setReplay] = useState<{ events: MapFeature[]; clock: string } | null>(null);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopReplay = () => {
+    if (timer.current) clearInterval(timer.current);
+    timer.current = null;
+    setReplay(null);
+  };
+  useEffect(() => () => {
+    if (timer.current) clearInterval(timer.current);
+  }, []);
+  const startReplay = async () => {
+    try {
+      const head = await api.replay(null, "1970-01-01T00:00:00Z");
+      const end = Date.parse(head.window_end);
+      let clock = Date.parse(head.window_start);
+      let last: string | null = null;
+      let busy = false;
+      setReplay({ events: [], clock: head.window_start });
+      timer.current = setInterval(async () => {
+        if (busy) return;
+        busy = true;
+        try {
+          clock = Math.min(clock + REPLAY_STEP_MS, end);
+          const upto = new Date(clock).toISOString().replace(".000Z", "Z");
+          const batch = await api.replay(last, upto);
+          if (batch.events.length) last = batch.events[batch.events.length - 1].properties.observed_at ?? last;
+          setReplay((r) => (r ? { events: [...r.events, ...batch.events], clock: upto } : r));
+          if (clock >= end && timer.current) {
+            clearInterval(timer.current);
+            timer.current = null;
+          }
+        } catch {
+          setError("The replay feed could not be loaded.");
+          stopReplay();
+        } finally {
+          busy = false;
+        }
+      }, REPLAY_TICK_MS);
+    } catch {
+      setError("The replay feed could not be loaded.");
+    }
+  };
+
+  const visible = useMemo(() => {
+    const base = (data?.features ?? []).filter(
+      (f) => !(replay && f.properties.kind === "detection"),
+    );
+    return [...base, ...(replay?.events ?? [])].filter((f) => !hidden.has(f.properties.kind));
+  }, [data, hidden, replay]);
   const counts = useMemo(() => {
     const c: Record<MapKind, number> = { sensor: 0, detection: 0, mission: 0 };
     for (const f of data?.features ?? []) c[f.properties.kind] += 1;
@@ -190,6 +240,26 @@ export default function MapPage() {
           <p className="mt-1 text-[0.75rem] text-mute">
             Only what your clearance and compartments allow is returned by the API.
           </p>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="replay-toggle"
+              className="btn"
+              onClick={() => (replay ? stopReplay() : void startReplay())}
+            >
+              {replay ? "Stop replay" : "Replay detections"}
+            </button>
+            {replay && (
+              <span data-testid="replay-clock" className="font-mono text-[0.75rem] text-amber">
+                {replay.clock.replace("T", " ").replace("Z", " UTC")} · {replay.events.length}
+              </span>
+            )}
+          </div>
+          {replay && (
+            <p className="mt-1 text-[0.7rem] text-mute">
+              Simulated live feed: synthetic detections replayed on a timer.
+            </p>
+          )}
           <div className="mt-3 flex flex-col gap-1.5" data-testid="map-legend">
             {(Object.keys(KIND_LABEL) as MapKind[]).map((k) => (
               <label key={k} className="flex cursor-pointer items-center gap-2 text-[0.85rem]">

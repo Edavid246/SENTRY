@@ -257,3 +257,71 @@ def test_map_read_is_audited_with_the_returned_ids_only(client) -> None:
     assert set(query["record_ids"]) == {"REC-046", "REC-048", "REC-049"}
     assert query["rows"] == 3
     assert "REC-053" not in str(query)  # the UAS-OPS detection never appears, even in the audit
+
+
+REPLAY_PATH = "/api/v1/connected/replay"
+
+
+def _replay(client, username: str, **params):
+    return client.get(REPLAY_PATH, params=params, headers=auth_header(client, username))
+
+
+def _replay_refs(response) -> list[str]:
+    return [f["properties"]["ref"] for f in response.json()["events"]]
+
+
+def test_replay_streams_visible_detections_in_time_order(client) -> None:
+    bello = _replay(client, "a.bello")
+    times = [f["properties"]["observed_at"] for f in bello.json()["events"]]
+    assert times == sorted(times)
+    assert set(_replay_refs(bello)) == {
+        "REC-048",
+        "REC-049",
+        "REC-051",
+        "REC-052",
+        "REC-053",
+        "REC-054",
+    }
+    assert set(_replay_refs(_replay(client, "t.adeyemi"))) == {"REC-048", "REC-049"}
+    assert _replay_refs(_replay(client, "k.musa")) == ["REC-053"]  # the UAS-OPS detection
+
+
+def test_replay_advances_with_the_clock_without_repeating(client) -> None:
+    full = _replay(client, "a.bello").json()["events"]
+    first, second = full[0]["properties"], full[1]["properties"]
+    early = _replay(client, "a.bello", upto=first["observed_at"])
+    assert _replay_refs(early) == [first["ref"]]
+    nxt = _replay(client, "a.bello", after=first["observed_at"], upto=second["observed_at"])
+    assert first["ref"] not in _replay_refs(nxt)
+    assert second["ref"] in _replay_refs(nxt)
+    rest = _replay(client, "a.bello", after=full[-1]["properties"]["observed_at"])
+    assert _replay_refs(rest) == []
+
+
+@pytest.mark.parametrize("username", ["s.eze", "f.danjuma"])
+def test_replay_is_empty_for_roles_without_data_access(client, username) -> None:
+    response = _replay(client, username)
+    assert response.status_code == 200
+    assert response.json()["events"] == []
+
+
+def test_replay_requires_authentication_and_valid_timestamps(client) -> None:
+    assert client.get(REPLAY_PATH).status_code == 401
+    assert _replay(client, "a.bello", after="not-a-time").status_code == 422
+    assert _replay(client, "a.bello", upto="yesterday-ish").status_code == 422
+
+
+def test_replay_audit_lists_only_delivered_ids(client) -> None:
+    from test_assistant_endpoints import _audit
+
+    _replay(client, "t.adeyemi")
+    events = [
+        e
+        for e in sorted(_audit(client), key=lambda e: e["seq"])
+        if e["payload"].get("resource") == "connected_replay"
+        and e["payload"]["actor"] == "t.adeyemi"
+        and e["payload"]["action"] == "query"
+    ]
+    query = events[-1]["payload"]
+    assert set(query["record_ids"]) == {"REC-048", "REC-049"}
+    assert "REC-053" not in str(query)
