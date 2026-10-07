@@ -26,7 +26,7 @@ from app.authz.models import (
     User,
     UserCompartment,
 )
-from app.clock import demo_now, demo_today
+from app.clock import UTC_TS_FORMAT, demo_now, demo_today
 from app.config import get_settings
 from app.connectors.models import CanonicalRecord, SourceSystem
 from app.correlation.models import Finding
@@ -593,7 +593,7 @@ _UAS_WING = "/command-a/uas-wing/"
 
 
 def _hours_from_now(offset: int) -> str:
-    return (demo_now() + timedelta(hours=offset)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return (demo_now() + timedelta(hours=offset)).strftime(UTC_TS_FORMAT)
 
 
 def _sensor(ref, classification, compartments, unit_path, sensor_id, site, status="online"):

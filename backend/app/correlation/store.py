@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -33,8 +34,6 @@ class FindingRow:
 
 def save_findings(conn: Connection, ctx: AccessContext, drafts: list[FindingDraft]) -> None:
     """Insert or update by key. RLS WITH CHECK refuses anything above the runner's label."""
-    import json
-
     set_rls_context_for(conn, ctx)
     for draft in drafts:
         unit_id = conn.execute(

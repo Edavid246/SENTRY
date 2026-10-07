@@ -66,6 +66,18 @@ _DRAFT_RE = re.compile(r"\b(prepare|draft|write|compile|produce|generate)\b", re
 _REPORT_RE = re.compile(r"\b(report|summary)\b", re.IGNORECASE)
 
 
+def _unit_path_params(question: str) -> dict[str, Any]:
+    path = _PATH_RE.search(question)
+    return {"unit_path": path.group(0).rstrip(".,;:)")} if path else {}
+
+
+def _period_days(question: str) -> int | None:
+    period = _PERIOD_RE.search(question)
+    if period is None:
+        return None
+    return int(period.group(1)) if period.group(1) else _PERIOD_DAYS[period.group(2).lower()]
+
+
 @dataclass(frozen=True, slots=True)
 class RoutedTool:
     tool: str
@@ -88,15 +100,10 @@ def route_report(question: str) -> RoutedReport | None:
         return None
     if not (_TRAINING_RE.search(question) and _ACTIVITY_RE.search(question)):
         return None
-    params: dict[str, Any] = {}
-    path = _PATH_RE.search(question)
-    if path:
-        params["unit_path"] = path.group(0).rstrip(".,;:)")
-    period = _PERIOD_RE.search(question)
-    if period:
-        params["period_days"] = (
-            int(period.group(1)) if period.group(1) else _PERIOD_DAYS[period.group(2).lower()]
-        )
+    params = _unit_path_params(question)
+    period_days = _period_days(question)
+    if period_days is not None:
+        params["period_days"] = period_days
     return RoutedReport("training_summary", params)
 
 
@@ -108,10 +115,7 @@ def route_question(question: str) -> RoutedTool | None:
         return RoutedTool("correlation_findings", {})
     if not _REQUEST_RE.search(question):
         return None
-    params: dict[str, Any] = {}
-    path = _PATH_RE.search(question)
-    if path:
-        params["unit_path"] = path.group(0).rstrip(".,;:)")
+    params = _unit_path_params(question)
     if _EQUIPMENT_RE.search(question) and _MAINTENANCE_RE.search(question):
         within = _WITHIN_RE.search(question)
         if within:
@@ -120,11 +124,9 @@ def route_question(question: str) -> RoutedTool | None:
     if _CERT_RE.search(question) and _EXPIRED_RE.search(question):
         return RoutedTool("expired_certifications", params)
     if _TRAINING_RE.search(question) and _ACTIVITY_RE.search(question):
-        period = _PERIOD_RE.search(question)
-        if period:
-            params["period_days"] = (
-                int(period.group(1)) if period.group(1) else _PERIOD_DAYS[period.group(2).lower()]
-            )
+        period_days = _period_days(question)
+        if period_days is not None:
+            params["period_days"] = period_days
         return RoutedTool("training_activity", params)
     if _STOCK_RE.search(question) and _LOW_RE.search(question):
         depot = _DEPOT_RE.search(question)
@@ -145,12 +147,10 @@ def route_question(question: str) -> RoutedTool | None:
     if _UAS_RE.search(prose):
         if _CANCELLED_RE.search(question):
             params["status"] = "cancelled"
-        period = _PERIOD_RE.search(question)
+        period_days = _period_days(question)
         this = _THIS_PERIOD_RE.search(question)
-        if period:
-            params["period_days"] = (
-                int(period.group(1)) if period.group(1) else _PERIOD_DAYS[period.group(2).lower()]
-            )
+        if period_days is not None:
+            params["period_days"] = period_days
         elif this:
             params["period_days"] = _PERIOD_DAYS[this.group(1).lower()]
         return RoutedTool("uas_missions", params)

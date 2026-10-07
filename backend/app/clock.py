@@ -14,6 +14,9 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, time
 
+UTC_TS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+"""Fixed-width UTC timestamp; such strings order correctly as text."""
+
 
 def real_today() -> date:
     """The real calendar date; tests replace this to inject a clock."""

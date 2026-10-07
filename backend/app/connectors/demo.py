@@ -16,7 +16,7 @@ from sqlalchemy.engine import Connection
 
 from app.authz.context import AccessContext
 from app.authz.policy import LocalPolicy
-from app.clock import demo_now
+from app.clock import UTC_TS_FORMAT, demo_now
 from app.connectors.base import AdapterDescription, RecordFilter, SourceRecord
 from app.db import get_engine, set_rls_context_for
 
@@ -47,7 +47,6 @@ _SELECT = (
     " JOIN source_systems ON source_systems.id = canonical_records.source_system_id"
     " JOIN units ON units.id = canonical_records.unit_id"
 )
-_TS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 _ISO_DATE = r"'^\d{4}-\d{2}-\d{2}$'"
 
 
@@ -136,8 +135,8 @@ class DemoReferenceAdapter:
         search) with observed_at after `since` and not after the demo "now". Timing is
         the caller's job: the replay endpoint decides how fast the clock advances.
         """
-        cutoff = since.astimezone(UTC).strftime(_TS_FORMAT)
-        end = demo_now().strftime(_TS_FORMAT)
+        cutoff = since.astimezone(UTC).strftime(UTC_TS_FORMAT)
+        end = demo_now().strftime(UTC_TS_FORMAT)
         with get_engine().connect() as conn:
             records = self.search(conn, ctx, RecordFilter(entity_type="Detection"))
         fresh = [r for r in records if cutoff < str(r.data["observed_at"]) <= end]

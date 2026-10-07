@@ -17,7 +17,7 @@ from typing import Any
 from sqlalchemy.engine import Connection
 
 from app.authz.context import AccessContext
-from app.clock import demo_now, demo_today
+from app.clock import UTC_TS_FORMAT, demo_now, demo_today
 from app.connectors.base import RecordFilter, SourceRecord
 from app.connectors.demo import DemoReferenceAdapter
 from app.correlation.store import list_findings
@@ -64,11 +64,11 @@ def _resolve_unit_path(ctx: AccessContext, value: Any) -> str:
     return candidate
 
 
-def _resolve_within_days(value: Any) -> int:
+def _bounded_int(value: Any, name: str, low: int, high: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ToolParamError("within_days must be an integer")
-    if not 0 <= value <= MAX_WITHIN_DAYS:
-        raise ToolParamError(f"within_days must be between 0 and {MAX_WITHIN_DAYS}")
+        raise ToolParamError(f"{name} must be an integer")
+    if not low <= value <= high:
+        raise ToolParamError(f"{name} must be between {low} and {high}")
     return value
 
 
@@ -77,7 +77,7 @@ def equipment_due_for_maintenance(
 ) -> ToolResult:
     _check_names(params, frozenset({"unit_path", "within_days"}))
     unit_path = _resolve_unit_path(ctx, params.get("unit_path"))
-    within_days = _resolve_within_days(params.get("within_days", 30))
+    within_days = _bounded_int(params.get("within_days", 30), "within_days", 0, MAX_WITHIN_DAYS)
     cutoff = demo_today() + timedelta(days=within_days)
     records = ADAPTER.search(
         conn,
@@ -257,11 +257,9 @@ def training_activity(
     """Training events that started in the last `period_days` (default one quarter)."""
     _check_names(params, frozenset({"unit_path", "period_days"}))
     unit_path = _resolve_unit_path(ctx, params.get("unit_path"))
-    period_days = params.get("period_days", DEFAULT_PERIOD_DAYS)
-    if isinstance(period_days, bool) or not isinstance(period_days, int):
-        raise ToolParamError("period_days must be an integer")
-    if not 1 <= period_days <= MAX_WITHIN_DAYS:
-        raise ToolParamError(f"period_days must be between 1 and {MAX_WITHIN_DAYS}")
+    period_days = _bounded_int(
+        params.get("period_days", DEFAULT_PERIOD_DAYS), "period_days", 1, MAX_WITHIN_DAYS
+    )
     today = demo_today()
     start = today - timedelta(days=period_days)
     found = ADAPTER.search(
@@ -303,11 +301,9 @@ def uas_missions(ctx: AccessContext, params: Mapping[str, Any], conn: Connection
     status = params.get("status")
     if status is not None and status not in MISSION_STATUSES:
         raise ToolParamError("status must be 'completed' or 'cancelled'")
-    period_days = params.get("period_days", DEFAULT_MISSION_DAYS)
-    if isinstance(period_days, bool) or not isinstance(period_days, int):
-        raise ToolParamError("period_days must be an integer")
-    if not 1 <= period_days <= MAX_WITHIN_DAYS:
-        raise ToolParamError(f"period_days must be between 1 and {MAX_WITHIN_DAYS}")
+    period_days = _bounded_int(
+        params.get("period_days", DEFAULT_MISSION_DAYS), "period_days", 1, MAX_WITHIN_DAYS
+    )
     today = demo_today()
     start = (today - timedelta(days=period_days)).isoformat()
     records = ADAPTER.search(
@@ -362,14 +358,12 @@ def detections_near_site(
     site = params.get("site")
     if site is not None and (not isinstance(site, str) or not _SITE_RE.match(site)):
         raise ToolParamError("site must look like DEP-B4 or UAS-HANGAR")
-    period_hours = params.get("period_hours", DEFAULT_DETECTION_HOURS)
-    if isinstance(period_hours, bool) or not isinstance(period_hours, int):
-        raise ToolParamError("period_hours must be an integer")
-    if not 1 <= period_hours <= MAX_PERIOD_HOURS:
-        raise ToolParamError(f"period_hours must be between 1 and {MAX_PERIOD_HOURS}")
+    period_hours = _bounded_int(
+        params.get("period_hours", DEFAULT_DETECTION_HOURS), "period_hours", 1, MAX_PERIOD_HOURS
+    )
     now = demo_now()
-    start = (now - timedelta(hours=period_hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    end = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    start = (now - timedelta(hours=period_hours)).strftime(UTC_TS_FORMAT)
+    end = now.strftime(UTC_TS_FORMAT)
     found = ADAPTER.search(conn, ctx, RecordFilter(entity_type="Detection", unit_path=unit_path))
     # Fixed-width UTC timestamps order correctly as text; compared on authorized rows only.
     records = [

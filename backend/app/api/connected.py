@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
 from app.audit.chain import utc_now_iso
 from app.authz.policy import LocalPolicy
-from app.clock import demo_now, demo_today
+from app.clock import UTC_TS_FORMAT, demo_now, demo_today
 from app.connectors.base import RecordFilter, SourceRecord
 from app.connectors.demo import DemoReferenceAdapter
 
@@ -61,9 +61,6 @@ def _detection_feature(det: SourceRecord) -> dict[str, Any]:
     )
 
 
-_TS = "%Y-%m-%dT%H:%M:%SZ"
-
-
 def _parse_ts(value: str, name: str) -> datetime:
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -94,8 +91,8 @@ def connected_replay(
     decision = POLICY.decide(ctx, "retrieve", "record")
     decision_event = decide_event(ctx, decision, resource="connected_replay", requested="retrieve")
     out: dict[str, Any] = {
-        "window_start": window_start.strftime(_TS),
-        "window_end": now.strftime(_TS),
+        "window_start": window_start.strftime(UTC_TS_FORMAT),
+        "window_end": now.strftime(UTC_TS_FORMAT),
         "events": [],
     }
     if not decision.allowed:
@@ -104,7 +101,7 @@ def connected_replay(
     events = [
         r
         for r in ADAPTER.stream(ctx, max(since, window_start - timedelta(seconds=1)))
-        if r.data["observed_at"] <= limit.strftime(_TS)
+        if r.data["observed_at"] <= limit.strftime(UTC_TS_FORMAT)
     ]
     out["events"] = [_detection_feature(r) for r in events]
     if events:
@@ -138,8 +135,8 @@ def connected_map(
         return {"type": "FeatureCollection", "features": [], "generated_at": utc_now_iso()}
 
     now = demo_now()
-    start = (now - timedelta(hours=hours)).strftime(_TS)
-    end = now.strftime(_TS)
+    start = (now - timedelta(hours=hours)).strftime(UTC_TS_FORMAT)
+    end = now.strftime(UTC_TS_FORMAT)
     mission_start = (demo_today() - timedelta(days=mission_days)).isoformat()
 
     features: list[dict[str, Any]] = []
