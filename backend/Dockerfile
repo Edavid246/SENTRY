@@ -20,5 +20,12 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY backend ./backend
 RUN uv sync --frozen --no-dev
 
+# git powers the layer-2 audit ledger; the ledger bind mount is owned by the
+# host user while the container runs as root, hence the safe.directory entry.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/* \
+    && git config --global --add safe.directory /ledger
+
 EXPOSE 8001
 CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]

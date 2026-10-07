@@ -52,6 +52,13 @@ class Settings(BaseSettings):
     embedding_model: str = "bge-m3"
     embedding_dim: int = 1024
 
+    # Audit tamper evidence (SPEC 14.2): checkpoint file (layer 1) and the
+    # external git ledger repo (layer 2). A checkpoint line is written when
+    # the event count crosses a multiple of this interval.
+    audit_checkpoint_path: str = "data/audit_checkpoints.log"
+    audit_ledger_path: str = "~/projects/gateway-audit-ledger"
+    audit_checkpoint_interval: int = 10
+
 
 @lru_cache
 def get_settings() -> Settings:

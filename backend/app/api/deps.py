@@ -4,14 +4,19 @@ One gateway_app database connection per request: the token validator reads the
 identity tables through it first, then the endpoint sets the RLS context in
 the same transaction and runs its query — authorization before retrieval
 (AGENTS.md Principle Zero), never the other way around.
+
+`audit_events` is the single wiring point from HTTP into the hash-chained
+audit log (SPEC 14): endpoints batch their events through it, and a token
+that fails validation is audited here before the generic 401.
 """
 
 from collections.abc import Iterator
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, Header, HTTPException
 from sqlalchemy.engine import Connection
 
+from app.audit.chain import append_events, utc_now_iso
 from app.authz.context import AccessContext
 from app.authz.tokens import DevTokenValidator, TokenError
 from app.db import get_engine
@@ -24,6 +29,13 @@ def get_conn() -> Iterator[Connection]:
 
 
 ConnDep = Annotated[Connection, Depends(get_conn)]
+
+
+def audit_events(payloads: list[dict[str, Any]]) -> None:
+    """Append a batch of audit events; failure is blocking (500, no data served)."""
+    if not payloads:
+        return
+    append_events(get_engine(), payloads)
 
 
 def _unauthenticated() -> HTTPException:
@@ -41,7 +53,8 @@ def current_context(
 
     Missing header, malformed header, bad/expired/forged token, unknown or
     inactive user — all produce the same generic 401, never a 500 and never
-    a hint about which part failed.
+    a hint about which part failed. Rejected tokens are audited (the audit
+    trail records attempted access); bare/absent credentials are not.
     """
     if not authorization:
         raise _unauthenticated()
@@ -51,6 +64,18 @@ def current_context(
     try:
         return DevTokenValidator().validate(token.strip(), conn=conn)
     except TokenError as exc:
+        audit_events(
+            [
+                {
+                    "actor": "anonymous",
+                    "action": "authenticate",
+                    "resource": "auth",
+                    "decision": "deny",
+                    "reasons": [str(exc)],
+                    "timestamp": utc_now_iso(),
+                }
+            ]
+        )
         raise _unauthenticated() from exc
 
 

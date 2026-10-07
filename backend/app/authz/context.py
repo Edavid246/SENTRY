@@ -14,7 +14,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "logistics": frozenset({"read", "query", "retrieve", "answer"}),
     "training": frozenset({"read", "query", "retrieve", "answer"}),
     "uas_ops": frozenset({"read", "query", "retrieve", "answer"}),
-    "sysadmin": frozenset({"manage"}),
+    "sysadmin": frozenset({"manage", "read_audit"}),
     "auditor": frozenset({"read_audit"}),
 }
 

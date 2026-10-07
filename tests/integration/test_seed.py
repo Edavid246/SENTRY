@@ -43,11 +43,17 @@ def _counts(engine: Engine) -> dict[str, int]:
         }
 
 
-def test_seed_corpus_counts(seeded: None, owner_engine: Engine) -> None:
+def test_seed_corpus_counts(seeded: None, owner_engine: Engine, settings) -> None:
+    from app.seed import run as run_seed
+
+    audit_before = _counts(owner_engine)["AuditEvent"]
+    run_seed(settings.test_owner_database_url)
     counts = _counts(owner_engine)
     for table, expected in EXPECTED_COUNTS.items():
         assert counts[table.__name__] == expected, table.__name__
-    assert counts["AuditEvent"] == 0  # seed never writes audit (append-only)
+    # Seed never writes audit (append-only). The API tests write real audit
+    # events earlier in the session, so prove it by count delta, not by 0.
+    assert counts["AuditEvent"] == audit_before
 
 
 def test_seed_is_idempotent(seeded: None, owner_engine: Engine, settings) -> None:

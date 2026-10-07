@@ -51,6 +51,8 @@ services:
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
       EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
+      AUDIT_CHECKPOINT_PATH: /app/data/audit_checkpoints.log
+      AUDIT_LEDGER_PATH: /ledger
     command:
       [
         "/app/.venv/bin/uvicorn",
@@ -65,6 +67,8 @@ services:
       - "8001:8001"
     volumes:
       - ../backend:/app/backend
+      - ../data:/app/data
+      - ${HOME}/projects/gateway-audit-ledger:/ledger
     depends_on:
       db:
         condition: service_healthy

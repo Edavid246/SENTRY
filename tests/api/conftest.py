@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture(scope="session")
-def client(settings, seeded):
+def client(settings, seeded, audit_test_env):
     from app.config import get_settings
     from app.db import reset_engine
 

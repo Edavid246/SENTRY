@@ -53,6 +53,9 @@ Plan first, then build. Run tests after each step and show the output.
 Commit after each working step with a clear message.
 Authorization tests start immediately and grow every phase.
 Keep memory low: 16 GB dev machine, no GPU.
+Any production shortcut accepted for the demo (identified by the client or by the build)
+gets a dated entry in docs/PRODUCTION_DEBT.md AND an explicit callout in the end-of-step
+report. Never silently log it.
 
 ## DEMO-ONLY TOOLING NOTE
 Demo build uses a free-tier coding model (Big Pickle) that may retain prompts. Accepted for

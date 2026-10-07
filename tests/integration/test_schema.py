@@ -138,10 +138,10 @@ def test_gateway_app_can_insert_into_audit_events(
         with app_engine.connect() as conn:
             conn.execute(
                 text(
-                    "INSERT INTO audit_events (event_id, payload, hash) "
-                    "VALUES (:eid, '{}'::jsonb, 'probe')"
+                    "INSERT INTO audit_events (event_id, payload, prev_hash, hash) "
+                    "VALUES (:eid, '{}'::jsonb, :prev, 'probe')"
                 ),
-                {"eid": "test-schema-probe-event"},
+                {"eid": "test-schema-probe-event", "prev": "0" * 64},
             )
             conn.commit()
             for stmt in ("UPDATE audit_events SET hash = 'x'", "DELETE FROM audit_events"):

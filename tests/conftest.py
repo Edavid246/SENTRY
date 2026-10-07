@@ -7,6 +7,8 @@ fixture skips with a visible message when the infra stack is not running.
 
 from __future__ import annotations
 
+import os
+import subprocess
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -34,8 +36,43 @@ def _connect_or_skip(engine: Engine) -> Engine:
     return engine
 
 
+@pytest.fixture(scope="session", autouse=True)
+def audit_test_env(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
+    """Point the audit checkpoint file and git ledger at per-session temp paths.
+
+    The dev checkpoint/ledger must never be touched by tests (gateway_test is
+    a separate database), and the layer-2 ledger needs a real `git init`-ed
+    repository so commit paths are exercised for real. Runs before anything
+    calls get_settings(), because the settings cache is cleared here.
+    """
+    from app.config import get_settings
+
+    tmp = tmp_path_factory.mktemp("audit-env")
+    ledger = tmp / "ledger"
+    ledger.mkdir()
+    for args in (
+        ["git", "init", "-b", "main"],
+        ["git", "config", "user.name", "audit-tests"],
+        ["git", "config", "user.email", "audit-tests@localhost"],
+    ):
+        subprocess.run(args, cwd=ledger, check=True, capture_output=True)
+    previous = {
+        name: os.environ.get(name) for name in ("AUDIT_CHECKPOINT_PATH", "AUDIT_LEDGER_PATH")
+    }
+    os.environ["AUDIT_CHECKPOINT_PATH"] = str(tmp / "checkpoints.log")
+    os.environ["AUDIT_LEDGER_PATH"] = str(ledger)
+    get_settings.cache_clear()
+    yield
+    for name, value in previous.items():
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = value
+    get_settings.cache_clear()
+
+
 @pytest.fixture(scope="session")
-def settings() -> Settings:
+def settings(audit_test_env: None) -> Settings:
     return Settings()
 
 
