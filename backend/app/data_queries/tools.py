@@ -23,6 +23,7 @@ from app.connectors.demo import DemoReferenceAdapter
 from app.data_queries.errors import ToolParamError
 
 MAX_WITHIN_DAYS = 365
+_DEPOT_RE = re.compile(r"^DEP-[A-Z0-9]{1,8}(?:-[A-Z0-9]{1,8})?$")
 _UNIT_PATH_RE = re.compile(r"^/(?:[a-z0-9-]+/)+$")
 ADAPTER = DemoReferenceAdapter()
 
@@ -143,6 +144,59 @@ def expired_certifications(
     return ToolResult(
         tool="expired_certifications",
         params={"unit_path": unit_path},
+        columns=columns,
+        rows=rows,
+        records=tuple(records),
+    )
+
+
+def _resolve_depot(value: Any) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not _DEPOT_RE.match(value):
+        raise ToolParamError("depot must look like DEP-B2")
+    return value
+
+
+def _number(value: Any) -> float | None:
+    return None if isinstance(value, bool) or not isinstance(value, int | float) else value
+
+
+def stock_below_threshold(
+    ctx: AccessContext, params: Mapping[str, Any], conn: Connection
+) -> ToolResult:
+    _check_names(params, frozenset({"unit_path", "depot"}))
+    unit_path = _resolve_unit_path(ctx, params.get("unit_path"))
+    depot = _resolve_depot(params.get("depot"))
+    found = ADAPTER.search(conn, ctx, RecordFilter(entity_type="StockItem", unit_path=unit_path))
+    # Quantities are compared here, on rows the adapter already authorized.
+    records = [
+        record
+        for record in found
+        if (qty := _number(record.data.get("quantity"))) is not None
+        and (thr := _number(record.data.get("threshold"))) is not None
+        and qty < thr
+        and (depot is None or record.data.get("depot") == depot)
+    ]
+    records.sort(
+        key=lambda r: (r.data["quantity"] - r.data["threshold"], r.source_ref),
+    )
+    columns = ("id", "item", "depot", "quantity", "threshold", "shortfall", "unit_path")
+    rows = [
+        {
+            "id": record.source_ref,
+            "item": record.data.get("item"),
+            "depot": record.data.get("depot"),
+            "quantity": record.data["quantity"],
+            "threshold": record.data["threshold"],
+            "shortfall": record.data["threshold"] - record.data["quantity"],
+            "unit_path": record.unit_path,
+        }
+        for record in records
+    ]
+    return ToolResult(
+        tool="stock_below_threshold",
+        params={"unit_path": unit_path, **({"depot": depot} if depot else {})},
         columns=columns,
         rows=rows,
         records=tuple(records),

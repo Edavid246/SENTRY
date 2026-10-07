@@ -21,6 +21,7 @@ from app.data_queries.tools import (
     ToolResult,
     equipment_due_for_maintenance,
     expired_certifications,
+    stock_below_threshold,
 )
 from app.db import get_engine
 
@@ -29,6 +30,7 @@ ToolFn = Callable[[AccessContext, Mapping[str, Any], Connection], ToolResult]
 REGISTRY: dict[str, ToolFn] = {
     "equipment_due_for_maintenance": equipment_due_for_maintenance,
     "expired_certifications": expired_certifications,
+    "stock_below_threshold": stock_below_threshold,
 }
 
 _AUDIT_VALUE_LIMIT = 120

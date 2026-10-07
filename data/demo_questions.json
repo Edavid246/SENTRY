@@ -104,6 +104,15 @@
       "question": "Why are maintenance faults rising in one battalion?",
       "expected": "Planted finding linking rising faults to lapsed maintainer certifications and a spare-part shortage, with an evidence panel; the finding inherits Secret and must stay hidden from t.adeyemi.",
       "status": "not-built"
+    },
+    {
+      "id": "data-stock-below-threshold",
+      "spec_step": "18.3",
+      "pathway": "data",
+      "asked_by": "a.bello",
+      "question": "Show me the stock below threshold",
+      "expected": "Typed tool stock_below_threshold: a.bello sees REC-010 and REC-026, t.adeyemi sees only REC-026; result table with shortfall column and row links.",
+      "status": "built"
     }
   ]
 }

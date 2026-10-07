@@ -34,6 +34,7 @@ from test_auth_endpoints import auth_header
 
 EQUIPMENT_QUESTION = "Show me the equipment currently awaiting maintenance"
 CERT_QUESTION = "List the expired certifications"
+STOCK_QUESTION = "Show me the stock below threshold"
 POLICY_QUESTION = (
     "Find the documents relating to the vehicle maintenance policy and summarize"
     " the key requirements."
@@ -336,6 +337,8 @@ def test_document_questions_never_route_to_a_tool(question: str) -> None:
         (CERT_QUESTION, "expired_certifications"),
         ("Which certifications have expired?", "expired_certifications"),
         ("Show me expired qualifications", "expired_certifications"),
+        (STOCK_QUESTION, "stock_below_threshold"),
+        ("List spare parts running low", "stock_below_threshold"),
     ],
 )
 def test_record_style_requests_route_to_a_tool(question: str, tool: str) -> None:
@@ -450,3 +453,60 @@ def test_the_demo_manipulation_question_is_flagged_and_refused(client, monkeypat
         " secret ones.",
     ).json()
     assert body["refused"] is True and body["result_table"] is None
+
+
+# --- stock_below_threshold --------------------------------------------------
+
+STOCK_COLUMNS = ["id", "item", "depot", "quantity", "threshold", "shortfall", "unit_path"]
+
+
+def test_stock_below_threshold_bello_sees_more_than_adeyemi(client, explain_calls) -> None:
+    bello = _ask(client, "a.bello", STOCK_QUESTION).json()
+    adeyemi = _ask(client, "t.adeyemi", STOCK_QUESTION).json()
+    assert bello["result_table"]["columns"] == STOCK_COLUMNS
+    # REC-005 and REC-027 are above their thresholds; REC-010 (brigade level) is below.
+    assert _ids(bello) == {"REC-010", "REC-026"}
+    assert _ids(adeyemi) == {"REC-026"}
+    row = adeyemi["result_table"]["rows"][0]
+    assert row["shortfall"] == row["threshold"] - row["quantity"] == 12
+
+
+def test_stock_depot_filter_and_routing(client, explain_calls) -> None:
+    body = _ask(client, "a.bello", "Which stock is low at DEP-B2?").json()
+    assert _ids(body) == {"REC-010"}
+    event = _data_queries(client, "a.bello")[-1]["payload"]
+    assert event["tool"] == "stock_below_threshold" and event["params"]["depot"] == "DEP-B2"
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"depot": "DEP-B2'; DROP TABLE units;--"},
+        {"depot": "dep-b2"},
+        {"depot": 7},
+        {"depot": ["DEP-B2"]},
+        {"unit_path": "/command-a/bde-2/bn-4/../.."},
+        {"within_days": 30},
+        {"sql": "1=1"},
+    ],
+)
+def test_stock_bad_params_are_refused_before_any_sql(
+    client, app_engine, monkeypatch, params
+) -> None:
+    def no_sql(self, *args, **kwargs):
+        raise AssertionError("the adapter must not be reached for a refused call")
+
+    monkeypatch.setattr(DemoReferenceAdapter, "search", no_sql)
+    ctx = _ctx(client, app_engine, "a.bello")
+    with app_engine.connect() as conn:
+        outcome = execute_tool(ctx, conn, "stock_below_threshold", params)
+    assert outcome.refused
+    assert _event_payload(app_engine, outcome.audit_event_id)["decision"] == "deny"
+
+
+def test_stock_tool_out_of_scope_unit_and_no_scope_users(client, app_engine, explain_calls):
+    ctx = _ctx(client, app_engine, "t.adeyemi")
+    with app_engine.connect() as conn:
+        outcome = execute_tool(ctx, conn, "stock_below_threshold", {"unit_path": "/command-a/"})
+    assert outcome.refused
+    assert _ask(client, "s.eze", STOCK_QUESTION).status_code == 403

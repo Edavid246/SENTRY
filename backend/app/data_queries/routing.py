@@ -28,6 +28,11 @@ _EQUIPMENT_RE = re.compile(r"\bequipment\b", re.IGNORECASE)
 _MAINTENANCE_RE = re.compile(r"\b(maintenance|servicing|service)\b", re.IGNORECASE)
 _CERT_RE = re.compile(r"\b(certifications?|certificates?|qualifications?)\b", re.IGNORECASE)
 _EXPIRED_RE = re.compile(r"\b(expired|expire|expires|lapsed)\b", re.IGNORECASE)
+_STOCK_RE = re.compile(
+    r"\b(stock|inventory|supplies|spares?|spare parts?|shortages?)\b", re.IGNORECASE
+)
+_LOW_RE = re.compile(r"\b(below|low|short|shortages?|under|depleted|running out)\b", re.IGNORECASE)
+_DEPOT_RE = re.compile(r"\bDEP-[A-Za-z0-9-]+\b", re.IGNORECASE)
 _WITHIN_RE = re.compile(
     r"\b(?:within|in|over)\s+(?:the\s+)?(?:next\s+)?(\d{1,6})\s+days?\b|"
     r"\bnext\s+(\d{1,6})\s+days?\b",
@@ -57,4 +62,9 @@ def route_question(question: str) -> RoutedTool | None:
         return RoutedTool("equipment_due_for_maintenance", params)
     if _CERT_RE.search(question) and _EXPIRED_RE.search(question):
         return RoutedTool("expired_certifications", params)
+    if _STOCK_RE.search(question) and _LOW_RE.search(question):
+        depot = _DEPOT_RE.search(question)
+        if depot:
+            params["depot"] = depot.group(0).upper()
+        return RoutedTool("stock_below_threshold", params)
     return None

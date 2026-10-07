@@ -481,6 +481,25 @@ RECORDS += [
         rank="Sergeant",
         certification="First Aid",
     ),
+    # Stock rows for stock_below_threshold: one short and one healthy at Battalion 4.
+    (
+        "REC-026",
+        "StockItem",
+        "logistics-ref",
+        "restricted",
+        [],
+        _BN4,
+        {"item": "Water purifier filter", "depot": "DEP-B4", "quantity": 8, "threshold": 20},
+    ),
+    (
+        "REC-027",
+        "StockItem",
+        "logistics-ref",
+        "restricted",
+        [],
+        _BN4,
+        {"item": "Ration pack 24h", "depot": "DEP-B4", "quantity": 400, "threshold": 250},
+    ),
 ]
 
 
