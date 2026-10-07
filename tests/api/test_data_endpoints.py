@@ -83,3 +83,38 @@ def test_documents_without_token_uses_generic_401(client) -> None:
     response = client.get("/api/v1/documents", headers={"Authorization": "Bearer bogus.token.here"})
     assert response.status_code == 401
     assert response.json() == {"detail": "not authenticated"}
+
+
+# --- GET /api/v1/records/{source_ref} ---------------------------------------
+
+
+def test_record_detail_visible_and_hidden(client) -> None:
+    from test_auth_endpoints import auth_header
+
+    bello = client.get("/api/v1/records/REC-023", headers=auth_header(client, "a.bello"))
+    assert bello.status_code == 200
+    body = bello.json()
+    assert body["classification_code"] == "secret" and body["compartments"] == ["UAS-OPS"]
+    assert body["data"]["certification"] == "UAS Pilot"
+    # Not visible to a lower-cleared user: 404, same as a record that does not exist.
+    hidden = client.get("/api/v1/records/REC-023", headers=auth_header(client, "t.adeyemi"))
+    missing = client.get("/api/v1/records/REC-999", headers=auth_header(client, "t.adeyemi"))
+    assert hidden.status_code == missing.status_code == 404
+    assert hidden.json() == missing.json()
+    assert (
+        client.get("/api/v1/records/REC-011", headers=auth_header(client, "t.adeyemi")).status_code
+        == 200
+    )
+
+
+def test_record_detail_no_data_roles_and_audit(client) -> None:
+    from test_assistant_endpoints import _audit, _latest
+    from test_auth_endpoints import auth_header
+
+    assert (
+        client.get("/api/v1/records/REC-011", headers=auth_header(client, "s.eze")).status_code
+        == 404
+    )
+    client.get("/api/v1/records/REC-011", headers=auth_header(client, "a.okafor"))
+    event = _latest(_audit(client), actor="a.okafor", action="query", resource="canonical_records")
+    assert event["payload"]["rows"] == 1

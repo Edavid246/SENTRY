@@ -31,6 +31,7 @@ from app.audit.chain import recent_events, utc_now_iso, verify_report
 from app.authz.context import AccessContext
 from app.authz.policy import Decision, LocalPolicy
 from app.authz.tokens import DevTokenValidator
+from app.connectors.demo import DemoReferenceAdapter
 from app.db import get_engine, set_rls_context
 
 POLICY = LocalPolicy()
@@ -214,6 +215,45 @@ def list_records(ctx: CurrentContext, conn: ConnDep) -> list[dict[str, str]]:
         ]
     )
     return results
+
+
+class RecordDetail(BaseModel):
+    source_ref: str
+    entity_type: str
+    source_system: str
+    classification_code: str
+    compartments: list[str]
+    unit_path: str
+    retrieved_at: str
+    data: dict[str, Any]
+
+
+@router.get("/records/{source_ref}", tags=["data"], response_model=RecordDetail)
+def get_record(source_ref: str, ctx: CurrentContext, conn: ConnDep) -> RecordDetail:
+    """One record, through the adapter (policy row filter + RLS). 404 when not visible."""
+    decision = POLICY.decide(ctx, "retrieve", "record")
+    if not decision.allowed:
+        audit_events([_decide_event(ctx, decision, "retrieve", "record")])
+        raise HTTPException(status_code=404, detail="not found")
+    record = DemoReferenceAdapter().get(conn, ctx, source_ref)
+    audit_events(
+        [
+            _decide_event(ctx, decision, "retrieve", "record"),
+            _query_event(ctx, "canonical_records", 0 if record is None else 1),
+        ]
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="not found")
+    return RecordDetail(
+        source_ref=record.source_ref,
+        entity_type=record.entity_type,
+        source_system=record.source_system,
+        classification_code=record.classification_code,
+        compartments=list(record.compartments),
+        unit_path=record.unit_path,
+        retrieved_at=record.retrieved_at.isoformat(),
+        data=record.data,
+    )
 
 
 @router.get("/documents/{source_ref}", tags=["data"])

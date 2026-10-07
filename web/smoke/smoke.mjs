@@ -72,7 +72,7 @@ try {
 
   // dashboard: login lands here; every stub tile is tagged; the Secret finding is shown
   await page.waitForSelector('[data-testid="tile-recent_findings"]');
-  check((await page.locator('[data-testid="placeholder-tag"]').count()) === 4, "all four tiles tagged PLACEHOLDER DATA");
+  check((await page.locator('[data-testid="placeholder-tag"]').count()) === 2, "the two fixture tiles are tagged PLACEHOLDER DATA (the two real tiles are not)");
   check((await page.locator('[data-testid="item-FND-CORR"]').count()) === 1, "a.bello sees the Secret finding");
   const belloItems = await page.locator('[data-testid^="item-"]').count();
   await shot("13-dashboard-bello");
@@ -94,6 +94,10 @@ try {
   const belloRows = await page.locator('[data-testid="result-table"] tbody tr').count();
   check(belloRows > 0, `equipment answer renders a result table (${belloRows} rows)`);
   await shot("06-bello-equipment-table");
+  await page.locator('[data-testid="record-link"]').first().click();
+  await page.waitForSelector('[data-testid="record-detail"]');
+  check(true, "a result-table row link opens the record detail");
+  await shot("15-record-detail");
   await logout();
 
   // t.adeyemi: same questions -> fewer results
@@ -115,6 +119,10 @@ try {
   check(adeyemiRows < belloRows, `t.adeyemi sees fewer equipment rows (${adeyemiRows} < ${belloRows})`);
   check(adeyemiCites <= belloCites, `t.adeyemi citations ${adeyemiCites} <= a.bello ${belloCites}`);
   await shot("07-adeyemi-fewer-results");
+  await page.goto(BASE + "/records/REC-023");
+  await page.waitForSelector('[data-testid="record-error"]');
+  check(true, "t.adeyemi gets 'not found' for a Secret UAS record, same as a missing one");
+  await shot("16-record-hidden-adeyemi");
   await logout();
 
   // f.danjuma: audit -> verify chain

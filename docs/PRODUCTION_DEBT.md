@@ -300,8 +300,8 @@ end-of-step report. Never silently log it.
   corpus, no replay of model output, and a real on-prem model behind `LLMProvider`.
 
 ### 2026-10-07 — Dashboard placeholders and a second copy of the visibility rule
-- **Issue:** the dashboard tiles are hard-coded fixtures, not module data, and they are
-  authorized by `LocalPolicy.item_visible`, a Python re-statement of the SQL row filter
+- **Issue:** the readiness and recent-findings dashboard tiles are hard-coded fixtures, not
+  module data, and they are authorized by `LocalPolicy.item_visible`, a Python re-statement of the SQL row filter
   (two implementations of SPEC 7.1 that can drift).
 - **Why acceptable:** the fixtures are fictitious and tagged PLACEHOLDER DATA in the UI;
   `tests/authz/test_item_visible.py` checks the Python rule against the SQL oracle for

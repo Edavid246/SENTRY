@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ResultTable } from "@/lib/api";
 
 function cell(value: unknown): string {
@@ -25,7 +26,17 @@ export function ResultTableView({ table }: { table: ResultTable }) {
             <tr key={i} className="border-b border-rule/60 last:border-0">
               {table.columns.map((c) => (
                 <td key={c} className="whitespace-nowrap px-3 py-2">
-                  {cell(row[c])}
+                  {c === "id" && typeof row[c] === "string" ? (
+                    <Link
+                      href={`/records/${encodeURIComponent(row[c] as string)}`}
+                      data-testid="record-link"
+                      className="font-mono text-amber hover:underline"
+                    >
+                      {row[c] as string}
+                    </Link>
+                  ) : (
+                    cell(row[c])
+                  )}
                 </td>
               ))}
             </tr>

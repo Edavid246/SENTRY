@@ -6,7 +6,8 @@ export type Citation = Schemas["CitationOut"];
 export type ConversationSummary = Schemas["ConversationSummary"];
 export type ConversationDetail = Schemas["ConversationDetail"];
 export type ResultTable = Schemas["ResultTable"];
-export type DashboardSummary = Schemas["DashboardSummary"];
+export type RecordDetail = Schemas["RecordDetail"];
+export type DashboardSummary =Schemas["DashboardSummary"];
 export type DashboardTile = Schemas["DashboardTile"];
 export type DashboardItem = Schemas["DashboardItem"];
 
@@ -130,6 +131,8 @@ export const api = {
     request<AuditEvent[]>(
       `/audit?limit=${limit}${eventId ? `&event_id=${encodeURIComponent(eventId)}` : ""}`,
     ),
+  record: (sourceRef: string) =>
+    request<RecordDetail>(`/records/${encodeURIComponent(sourceRef)}`),
   dashboard: () => request<DashboardSummary>("/dashboard/summary"),
   verify: () => request<VerifyReport>("/audit/verify"),
 };

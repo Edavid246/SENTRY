@@ -80,6 +80,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/records/{source_ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Record
+         * @description One record, through the adapter (policy row filter + RLS). 404 when not visible.
+         */
+        get: operations["get_record_api_v1_records__source_ref__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{source_ref}": {
         parameters: {
             query?: never;
@@ -430,6 +450,27 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** RecordDetail */
+        RecordDetail: {
+            /** Source Ref */
+            source_ref: string;
+            /** Entity Type */
+            entity_type: string;
+            /** Source System */
+            source_system: string;
+            /** Classification Code */
+            classification_code: string;
+            /** Compartments */
+            compartments: string[];
+            /** Unit Path */
+            unit_path: string;
+            /** Retrieved At */
+            retrieved_at: string;
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+        };
         /** ResultTable */
         ResultTable: {
             /** Columns */
@@ -593,6 +634,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_record_api_v1_records__source_ref__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                source_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordDetail"];
                 };
             };
             /** @description Validation Error */

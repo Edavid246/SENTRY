@@ -44,7 +44,7 @@ def test_shape_is_the_contract_for_every_tile(client) -> None:
     assert set(body["tiles"]) == TILE_KEYS
     for tile in body["tiles"].values():
         assert set(tile) == {"stub", "source", "title", "items"}
-        assert tile["stub"] is True and tile["source"]
+        assert tile["source"]
         for item in tile["items"]:
             assert set(item) == ITEM_KEYS
 
@@ -54,9 +54,16 @@ def test_bello_and_adeyemi_get_different_dashboards(client) -> None:
     adeyemi = _summary(client, "t.adeyemi").json()
     assert _ids(bello, "readiness") == {"RDY-CMD", "RDY-BDE2", "RDY-BN4", "RDY-UAS"}
     assert _ids(adeyemi, "readiness") == {"RDY-BN4"}
-    assert _ids(bello, "maintenance_backlog") == {"MNT-BN4", "MNT-BDE2", "MNT-UAS"}
-    assert _ids(adeyemi, "maintenance_backlog") == {"MNT-BN4"}
-    assert _ids(adeyemi, "expiring_certifications") == {"CRT-BN4"}
+    # real tiles: overdue equipment REC-011 (Bn 4) and REC-014 (Bde 2)
+    assert _ids(bello, "maintenance_backlog") == {"MNT-BN-4", "MNT-BDE-2"}
+    assert _ids(adeyemi, "maintenance_backlog") == {"MNT-BN-4"}
+    assert _ids(bello, "expiring_certifications") == {
+        "CRT-BN-4",
+        "CRT-BDE-2",
+        "CRT-UAS-WING",
+        "CRT-COMMAND-A",
+    }
+    assert _ids(adeyemi, "expiring_certifications") == {"CRT-BN-4"}
     assert _all_ids(adeyemi) < _all_ids(bello)
 
 
@@ -70,6 +77,41 @@ def test_secret_finding_is_visible_to_bello_and_absent_for_adeyemi(client) -> No
     assert "spare-part shortage" not in _summary(client, "t.adeyemi").text
 
 
+def test_tiles_are_real_exactly_where_the_data_is_real(client) -> None:
+    tiles = _summary(client, "a.bello").json()["tiles"]
+    assert {k: t["stub"] for k, t in tiles.items()} == {
+        "readiness": True,
+        "maintenance_backlog": False,
+        "expiring_certifications": False,
+        "recent_findings": True,
+    }
+    assert "typed tool" in tiles["maintenance_backlog"]["source"]
+
+
+def test_real_tile_items_are_derived_and_inherit_classification(client) -> None:
+    items = {
+        i["id"]: i
+        for i in _summary(client, "a.bello").json()["tiles"]["expiring_certifications"]["items"]
+    }
+    # one Secret/UAS-OPS record in the UAS Wing group: the count inherits both
+    assert items["CRT-UAS-WING"]["classification"] == "secret"
+    assert items["CRT-UAS-WING"]["compartments"] == ["UAS-OPS"]
+    # Bde 2 group mixes Restricted and Confidential records: highest wins
+    assert items["CRT-BDE-2"]["classification"] == "confidential"
+    assert items["CRT-BDE-2"]["value"] == 2
+    assert items["CRT-BN-4"]["detail"] == "REC-019, REC-020"
+
+
+def test_real_tiles_call_the_audited_typed_tools(client) -> None:
+    _summary(client, "t.adeyemi")
+    tools = {
+        e["payload"]["tool"]
+        for e in _audit(client)
+        if e["payload"].get("action") == "data_query" and e["payload"]["actor"] == "t.adeyemi"
+    }
+    assert {"equipment_due_for_maintenance", "expired_certifications"} <= tools
+
+
 def test_confidential_user_sees_confidential_but_not_secret(client) -> None:
     okafor = _summary(client, "a.okafor").json()
     assert _ids(okafor, "recent_findings") == {"FND-ATT", "FND-AMM"}
@@ -80,7 +122,8 @@ def test_confidential_user_sees_confidential_but_not_secret(client) -> None:
 def test_compartment_item_needs_the_compartment(client) -> None:
     musa = _summary(client, "k.musa").json()
     # Musa holds UAS-OPS and is in the UAS Wing: sees only that unit's items.
-    assert _all_ids(musa) == {"RDY-UAS", "MNT-UAS"}
+    # (the Secret expired UAS certification is above Musa's clearance)
+    assert _all_ids(musa) == {"RDY-UAS"}
 
 
 def test_no_data_roles_get_403(client) -> None:

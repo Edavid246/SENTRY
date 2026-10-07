@@ -25,6 +25,7 @@ from app.audit.chain import utc_now_iso
 from app.authz.context import AccessContext
 from app.authz.policy import LocalPolicy
 from app.dashboard.fixtures import TILES, FixtureTile
+from app.data_queries.registry import execute_tool
 
 POLICY = LocalPolicy()
 
@@ -106,6 +107,76 @@ def _build_tile(
     return DashboardTile(stub=True, source=tile.source, title=tile.title, items=items)
 
 
+# Tiles whose data now comes from the typed tools (stub=false). The rest stay fixtures.
+_REAL_TILES: dict[str, dict[str, str]] = {
+    "maintenance_backlog": {
+        "tool": "equipment_due_for_maintenance",
+        "params_within_days": "0",
+        "prefix": "MNT",
+        "label": "equipment overdue",
+        "unit": "items",
+        "title": "Maintenance backlog",
+    },
+    "expiring_certifications": {
+        "tool": "expired_certifications",
+        "prefix": "CRT",
+        "label": "certifications expired",
+        "unit": "people",
+        "title": "Certifications expired",
+    },
+}
+
+
+def _real_tile(
+    ctx: AccessContext,
+    conn: Connection,
+    key: str,
+    ranks: dict[str, int],
+    names: dict[str, str],
+) -> DashboardTile:
+    """Group a typed tool's rows by owning unit, one item per unit.
+
+    The tool is audited (data_query) and already filtered by the adapter. Each
+    item is a derived count, so it takes the highest classification and the
+    union of compartments of the records behind it (AGENTS.md).
+    """
+    spec = _REAL_TILES[key]
+    params = (
+        {"within_days": int(spec["params_within_days"])} if "params_within_days" in spec else {}
+    )
+    outcome = execute_tool(ctx, conn, spec["tool"], params)
+    records = outcome.result.records if outcome.result else ()
+    groups: dict[str, list] = {}
+    for record in records:
+        groups.setdefault(record.unit_path, []).append(record)
+    items = []
+    for unit_path in sorted(groups):
+        members = groups[unit_path]
+        top = max(members, key=lambda r: ranks.get(r.classification_code, 99))
+        slug = unit_path.strip("/").split("/")[-1].upper()
+        items.append(
+            DashboardItem(
+                id=f"{spec['prefix']}-{slug}",
+                label=f"{names.get(unit_path, unit_path)}: {spec['label']}",
+                value=len(members),
+                unit=spec["unit"],
+                detail=", ".join(sorted(r.source_ref for r in members)),
+                severity=None,
+                trend=[],
+                classification=top.classification_code,
+                compartments=sorted({c for r in members for c in r.compartments}),
+                unit_path=unit_path,
+                unit_name=names.get(unit_path, unit_path),
+            )
+        )
+    return DashboardTile(
+        stub=False,
+        source=f"typed tool {spec['tool']} via the demo reference adapter",
+        title=spec["title"],
+        items=items,
+    )
+
+
 @router.get("/summary", response_model=DashboardSummary)
 def dashboard_summary(ctx: CurrentContext, conn: ConnDep) -> DashboardSummary:
     decision = POLICY.decide(ctx, "read", "dashboard")
@@ -123,7 +194,15 @@ def dashboard_summary(ctx: CurrentContext, conn: ConnDep) -> DashboardSummary:
         raise HTTPException(status_code=403, detail="forbidden")
 
     ranks, names = _lookups(conn)
-    built = {tile.key: _build_tile(ctx, tile, ranks, names) for tile in TILES}
+    fixtures = {tile.key: tile for tile in TILES}
+    built = {
+        key: (
+            _real_tile(ctx, conn, key, ranks, names)
+            if key in _REAL_TILES
+            else _build_tile(ctx, fixtures[key], ranks, names)
+        )
+        for key in DashboardTiles.model_fields
+    }
     item_ids = [item.id for tile in built.values() for item in tile.items]
     audit_events(
         [

@@ -5,9 +5,10 @@ summary service can run it through the same SPEC 7.1 rule as database rows
 (`LocalPolicy.item_visible`). The fixtures are NOT an authorization shortcut:
 they are filtered per caller before anything is returned.
 
-Part D1/D2 replace tiles with real tool results one by one; each tile's
-`stub` flag flips to false only when its data is real, and the response shape
-stays identical (`app.api.dashboard` documents it in the OpenAPI schema).
+Part D1 replaced the maintenance and certification tiles with typed-tool
+results (`app.api.dashboard._real_tile`); only readiness and recent findings
+remain fixtures (Part D2 replaces findings). A tile's `stub` flag is false
+only when its data is real; the response shape never changes.
 """
 
 from __future__ import annotations
@@ -86,76 +87,6 @@ TILES: tuple[FixtureTile, ...] = (
                 unit="%",
                 compartments=("UAS-OPS",),
                 trend=(86, 87, 87, 88, 88, 88),
-            ),
-        ),
-    ),
-    FixtureTile(
-        key="maintenance_backlog",
-        title="Maintenance backlog",
-        source=_SOURCE,
-        items=(
-            FixtureItem(
-                "MNT-BN4",
-                "Battalion 4: equipment overdue",
-                "restricted",
-                _BN4,
-                value=4,
-                unit="items",
-                severity="medium",
-                trend=(1, 1, 2, 2, 3, 4),
-            ),
-            FixtureItem(
-                "MNT-BDE2",
-                "Brigade 2: equipment overdue",
-                "restricted",
-                _BDE2,
-                value=7,
-                unit="items",
-                trend=(5, 5, 6, 6, 7, 7),
-            ),
-            FixtureItem(
-                "MNT-UAS",
-                "UAS Wing: airframes overdue",
-                "confidential",
-                _UAS,
-                value=2,
-                unit="items",
-                compartments=("UAS-OPS",),
-                trend=(1, 1, 1, 2, 2, 2),
-            ),
-        ),
-    ),
-    FixtureTile(
-        key="expiring_certifications",
-        title="Certifications expiring (30 days)",
-        source=_SOURCE,
-        items=(
-            FixtureItem(
-                "CRT-BN4",
-                "Battalion 4",
-                "restricted",
-                _BN4,
-                value=3,
-                unit="people",
-                trend=(1, 1, 2, 2, 3, 3),
-            ),
-            FixtureItem(
-                "CRT-BDE2",
-                "Brigade 2",
-                "restricted",
-                _BDE2,
-                value=5,
-                unit="people",
-                trend=(3, 4, 4, 4, 5, 5),
-            ),
-            FixtureItem(
-                "CRT-CMD",
-                "Command A",
-                "restricted",
-                _CMD,
-                value=9,
-                unit="people",
-                trend=(6, 7, 7, 8, 8, 9),
             ),
         ),
     ),
