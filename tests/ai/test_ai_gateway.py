@@ -313,3 +313,50 @@ def test_factory_hosted_requires_key(monkeypatch) -> None:
             build_llm()
     finally:
         get_settings.cache_clear()
+
+
+def other_request(text: str) -> LLMRequest:
+    return make_request(messages=(ChatMessage("user", text),))
+
+
+def test_record_mode_writes_only_successful_live_results(tmp_path) -> None:
+    cache = LLMResponseCache(tmp_path / "cache.json")
+    request = make_request()
+    gateway = AIGateway(FakeLLM(ok_result("fresh answer")), cache=cache, record=True)
+    result = gateway.complete(request)
+    assert not result.cached
+    assert gateway.recorded_count == 1
+    entry = cache.get(cache.key(request))
+    assert entry is not None and entry["response"]["text"] == "fresh answer"
+
+    empty = AIGateway(FakeLLM(ok_result("  ")), cache=cache, record=True)
+    empty.complete(other_request("another question"))
+    assert empty.recorded_count == 0
+    failing = AIGateway(
+        FakeLLM(ProviderTimeoutError("down")), cache=cache, record=True, max_retries=0
+    )
+    with pytest.raises(ProviderTimeoutError):
+        failing.complete(other_request("a third question"))
+    assert len(json.loads((tmp_path / "cache.json").read_text(encoding="utf-8"))) == 1
+
+
+def test_cache_only_mode_never_calls_the_provider(tmp_path) -> None:
+    cache = LLMResponseCache(tmp_path / "cache.json")
+    hit = make_request()
+    cache.record(hit, text="canned")
+    fake = FakeLLM(ok_result("must not be used"))
+    gateway = AIGateway(fake, cache=cache, cache_only=True, sleep=lambda d: None)
+    result = gateway.complete(hit)
+    assert result.cached and result.text == "canned"
+    assert gateway.replayed_count == 1
+    with pytest.raises(ProviderUnavailableError):
+        gateway.complete(other_request("never recorded"))
+    assert fake.calls == []
+
+
+def test_gateway_rejects_conflicting_or_cacheless_modes(tmp_path) -> None:
+    cache = LLMResponseCache(tmp_path / "cache.json")
+    with pytest.raises(ValueError):
+        AIGateway(FakeLLM(ok_result()), cache=cache, record=True, cache_only=True)
+    with pytest.raises(ValueError):
+        AIGateway(FakeLLM(ok_result()), record=True)

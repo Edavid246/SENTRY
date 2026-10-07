@@ -3,9 +3,11 @@
 Resolves the configured model, retries retryable provider failures with a
 bounded delay, and falls back to the pre-canned demo response cache only
 after retries are exhausted. Configuration failures
-(ProviderNotConfiguredError) are never masked by the cache, and the cache
-is only ever *read* here — prefilling is an explicit offline action
-(scripts/smoke_ai_gateway.py --record).
+(ProviderNotConfiguredError) are never masked by the cache. The cache is
+read-only unless the dev-only record mode is on (LLM_CACHE_RECORD=1, see
+scripts/prefill_cache.py). In cache-only mode (LLM_CACHE_ONLY=1) the hosted
+provider is never called: a hit is replayed, a miss raises
+ProviderUnavailableError.
 
 Every completed call carries provider, model, model version, token counts
 and latency for the audit event (SPEC 8.1); audit attachment happens when
@@ -39,6 +41,8 @@ class AIGateway:
         *,
         cache: LLMResponseCache | None = None,
         max_retries: int = 2,
+        record: bool = False,
+        cache_only: bool = False,
         retry_after_cap: float = 5.0,
         sleep=time.sleep,
         clock=time.perf_counter,
@@ -46,6 +50,14 @@ class AIGateway:
         self._llm = llm
         self._cache = cache
         self._max_retries = max(0, max_retries)
+        if (record or cache_only) and cache is None:
+            raise ValueError("record and cache-only modes need a cache")
+        if record and cache_only:
+            raise ValueError("record and cache-only modes are mutually exclusive")
+        self._record = record
+        self.recorded_count = 0
+        self.replayed_count = 0
+        self._cache_only = cache_only
         self._retry_after_cap = retry_after_cap
         self._sleep = sleep
         self._clock = clock
@@ -64,6 +76,11 @@ class AIGateway:
         resolved = request if request.model else replace(request, model=get_settings().llm_model)
         key = self._cache.key(resolved) if self._cache else ""
         started = self._clock()
+        if self._cache_only:
+            miss = ProviderUnavailableError(
+                f"cache-only mode: no cached answer for request {key[:12]}"
+            )
+            return self._replay(resolved, key, started, miss)
         attempt = 0
         while True:
             try:
@@ -76,6 +93,14 @@ class AIGateway:
                     return self._replay(resolved, key, started, exc)
                 self._sleep(self._delay(exc, attempt))
                 continue
+            if self._record and result.text.strip():
+                self._cache.record(
+                    resolved,
+                    text=result.text,
+                    model_version=result.model_version,
+                    usage=result.usage,
+                )
+                self.recorded_count += 1
             return replace(result, latency_ms=(self._clock() - started) * 1000.0)
 
     def _delay(self, exc: Exception, attempt: int) -> float:
@@ -87,6 +112,7 @@ class AIGateway:
         entry = self._cache.get(key) if self._cache and key else None
         if entry is None:
             raise exc
+        self.replayed_count += 1
         response = entry.get("response") or {}
         usage = response.get("usage") or {}
         return LLMResult(
@@ -103,6 +129,20 @@ class AIGateway:
             cached=True,
             notice=_CACHE_NOTICE,
         )
+
+
+class _DisabledProvider:
+    """Stands in for the hosted provider in cache-only mode; never reached.
+
+    It keeps the configured provider name so replayed answers are still
+    labelled with the provider that originally produced them (cached=true).
+    """
+
+    def __init__(self, provider_name: str) -> None:
+        self.provider_name = provider_name
+
+    def complete(self, request: LLMRequest) -> LLMResult:
+        raise ProviderUnavailableError("hosted provider disabled (LLM_CACHE_ONLY)")
 
 
 def build_llm() -> LLMProvider:
@@ -131,9 +171,11 @@ def get_gateway() -> AIGateway:
 
     settings = get_settings()
     return AIGateway(
-        build_llm(),
+        _DisabledProvider(settings.llm_provider) if settings.llm_cache_only else build_llm(),
         cache=LLMResponseCache(settings.llm_response_cache_path),
         max_retries=settings.hosted_max_retries,
+        record=settings.llm_cache_record,
+        cache_only=settings.llm_cache_only,
     )
 
 

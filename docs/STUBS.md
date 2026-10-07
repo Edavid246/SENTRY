@@ -26,7 +26,7 @@ component slots in. **Demo build only; never claim the dev profile is sovereign.
 | `modules`, `correlation`, `provenance` | Package scaffolds/interfaces as their slices arrive. (`assistant` and `knowledge` landed with step 9; `connectors` and `data_queries` with Task 2.) |
 | Vector index | **No HNSW (or IVFFlat) index on `chunks.embedding`** — chunks use exact (sequential) search; corpus is tiny and memory is constrained. Add an index when data grows. |
 | CI service | GitHub Actions skipped (no git remote). `scripts/check.sh` runs ruff, pytest and the air-gap grep locally. |
-| LLM response-cache prefill | No in-app or API prefill of `data/demo_llm_cache.json`; entries are recorded offline by `scripts/smoke_ai_gateway.py --record` (deferred to the demo script step, spec §18). |
+| LLM response-cache prefill | Offline only: `scripts/prefill_cache.py` drives the real pipeline as each demo user with `LLM_CACHE_RECORD=1` (dev profile only) to write `data/demo_llm_cache.json`; `LLM_CACHE_ONLY=1` replays it with the hosted provider disabled. No in-app or API prefill. |
 
 ## Cut entirely (AGENTS.md DEMO CUT)
 

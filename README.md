@@ -58,9 +58,10 @@ docker compose -f infra/compose.yaml up -d --build   # db on :5434, api on :8001
 ```
 
 > **AI key (optional):** set `GEMINI_API_KEY` (or `HOSTED_API_KEY`) in `.env` for
-> live answers — copy `.env.example` to `.env` first. Without it, answers fall
-> back to the committed response cache and retrieval still runs keyword-only
-> (`degraded: true`). Never commit `.env`.
+> live answers — copy `.env.example` to `.env` first. Without it the assistant
+> answers 503 (a missing key is never masked). To run the demo from the
+> prefilled response cache instead, set `LLM_CACHE_ONLY=1`; record that cache
+> with `scripts/prefill_cache.py` (see `docs/DEMO_SCOPE.md`). Never commit `.env`.
 
 ## Start the UI
 

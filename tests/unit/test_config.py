@@ -40,3 +40,18 @@ def test_empty_env_value_does_not_shadow_key_or_default(monkeypatch) -> None:
     assert Settings().hosted_api_key == "gemini-key"
     monkeypatch.setenv("LLM_MODEL", "")
     assert Settings().llm_model == "gemini-3.5-flash"
+
+
+def test_cache_record_is_refused_outside_the_dev_profile(monkeypatch) -> None:
+    import pytest
+    from pydantic import ValidationError
+
+    monkeypatch.setenv("LLM_CACHE_RECORD", "1")
+    assert Settings().llm_cache_record is True  # dev profile is the default
+    monkeypatch.setenv("APP_PROFILE", "onprem")
+    with pytest.raises(ValidationError):
+        Settings()
+    monkeypatch.setenv("APP_PROFILE", "dev")
+    monkeypatch.setenv("LLM_CACHE_ONLY", "1")
+    with pytest.raises(ValidationError):
+        Settings()

@@ -56,6 +56,7 @@ services:
       EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
       EMBEDDING_CACHE_DIR: ${EMBEDDING_CACHE_DIR:-/app/models}
       LLM_RESPONSE_CACHE_PATH: ${LLM_RESPONSE_CACHE_PATH:-/app/data/demo_llm_cache.json}
+      LLM_CACHE_ONLY: ${LLM_CACHE_ONLY:-0}
       AUDIT_CHECKPOINT_PATH: /app/data/audit_checkpoints.log
       AUDIT_LEDGER_PATH: /ledger
     command:

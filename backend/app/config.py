@@ -7,7 +7,7 @@ always local. See AGENTS.md and docs/SPEC.md Section 8.
 
 from functools import lru_cache
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     embedding_dim: int = 1024
     embedding_cache_dir: str = "data/models"
     llm_response_cache_path: str = "data/demo_llm_cache.json"
+    # Demo cache modes (docs/PRODUCTION_DEBT.md). RECORD writes every successful
+    # live result to the cache (dev profile only); CACHE_ONLY never calls the
+    # hosted provider and serves from the cache alone. They are mutually exclusive.
+    app_profile: str = "dev"
+    llm_cache_record: bool = False
+    llm_cache_only: bool = False
 
     # Knowledge pathway (SPEC §8.2, §9)
     retrieval_top_k: int = 8
@@ -79,6 +85,14 @@ class Settings(BaseSettings):
     audit_checkpoint_path: str = "data/audit_checkpoints.log"
     audit_ledger_path: str = "~/projects/gateway-audit-ledger"
     audit_checkpoint_interval: int = 10
+
+    @model_validator(mode="after")
+    def _check_cache_modes(self) -> "Settings":
+        if self.llm_cache_record and self.app_profile != "dev":
+            raise ValueError("LLM_CACHE_RECORD is refused unless APP_PROFILE=dev")
+        if self.llm_cache_record and self.llm_cache_only:
+            raise ValueError("LLM_CACHE_RECORD and LLM_CACHE_ONLY are mutually exclusive")
+        return self
 
 
 @lru_cache

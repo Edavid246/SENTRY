@@ -68,10 +68,11 @@ class LLMResponseCache:
             },
         }
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(
-            json.dumps(entries, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        blob = json.dumps(entries, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+        # Bytes + replace: LF endings on Windows and no half-written cache file.
+        tmp = self._path.with_name(self._path.name + ".tmp")
+        tmp.write_bytes(blob.encode("utf-8"))
+        tmp.replace(self._path)
         return key
 
     def _load(self) -> dict:

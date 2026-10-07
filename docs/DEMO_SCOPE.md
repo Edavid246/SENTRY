@@ -18,7 +18,7 @@ in each step's report.
 | Access context | Login → token → `AccessContext` (clearance, compartments, unit path, data scope, permissions) from the seeded users, with `/api/v1/me` returning display name, unit breadcrumb and permissions for the UI. |
 | Authorization | `LocalPolicy.decide` before any read, `LocalPolicy.row_filter` **inside** the SQL together with Postgres row-level security; detail and cited-passage reads answer 404, never 403. |
 | Audit (SPEC §14) | Hash-chained, append-only events for every query, retrieval, answer, approval and policy decision; `GET /api/v1/audit` (filterable by `event_id` for deep links) and `GET /api/v1/audit/verify` returning `valid`, `checked_count`, `first_bad_event_id` plus checkpoint and git-ledger tips. |
-| AI gateway | `LLMProvider`/`EmbeddingProvider` interfaces; dev `HostedProvider` (Gemini, cache fallback flagged `cached=true`), local embeddings only; model and provider stored on every answer event. |
+| AI gateway | `LLMProvider`/`EmbeddingProvider` interfaces; dev `HostedProvider` (Gemini; cache fallback or `LLM_CACHE_ONLY` replay flagged `cached=true`), local embeddings only; model and provider stored on every answer event. |
 | Knowledge pathway | Question → embedding → hybrid retrieval (vector + full text, RRF) **with the authorization filter inside the query** → cited answer; `found` and `degraded` come from code paths, not from the answer text. |
 | Citations & provenance | Inline citations with chunk id / document ref / page / section, re-resolvable through the same row filter; `GET /api/v1/documents/{ref}/chunks/{chunk_id}` opens the exact cited passage. |
 | Assistant conversations | `POST /api/v1/assistant/query` (with history), `GET /api/v1/assistant/conversations` and `.../{id}` returning own turns with citations; cross-user reads answer 404. |
@@ -51,6 +51,31 @@ in each step's report.
 | Connected-systems map and timed synthetic feeds (surveillance, UAS, forensics) | §18.5 |
 | One planted correlation finding with its evidence panel | §18.6 |
 | Evaluation additions beyond the current authorization/retrieval/adversarial suite | §16 |
+
+## Demo answer cache (prefill)
+
+The hosted model is slow and quota-limited, so the demo can replay answers recorded
+earlier. `scripts/prefill_cache.py` logs in as each demo user (the asker plus `a.bello`
+and `t.adeyemi`), asks every `built` assistant question in `data/demo_questions.json`
+through `POST /api/v1/assistant/query` with `LLM_CACHE_RECORD=1` (refused unless
+`APP_PROFILE=dev`), and writes `data/demo_llm_cache.json`. `--verify` then re-asks every
+pair with the hosted provider disabled (`LLM_CACHE_ONLY=1`, key ignored) and prints a
+pass/fail table. A failure is reported, never filled with a placeholder answer.
+
+```bash
+set -a && . ./.env && set +a
+uv run python scripts/prefill_cache.py            # record (live Gemini, a few minutes)
+uv run python scripts/prefill_cache.py --verify   # cache-only check
+```
+
+> **Re-run the prefill after the code freeze.** Cache keys hash the exact model request
+> (system prompt + retrieved evidence + question), so **any change to prompts, the
+> corpus, chunking, retrieval, typed tools or the seeded data (including re-seeding on
+> a different day, which shifts the seeded dates) invalidates the cache**. A stale cache
+> does not fail quietly into wrong answers: a miss in cache-only mode is a 503. Ask each
+> demo question as the first message of a new chat; follow-ups carry history and have
+> their own keys. The prefill and verify runs add queries and audit events to the dev
+> database; they appear in the demo audit trail.
 
 ## Cut entirely (AGENTS.md DEMO CUT)
 

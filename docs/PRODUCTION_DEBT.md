@@ -284,3 +284,17 @@ end-of-step report. Never silently log it.
 - **Why acceptable:** local demo only, on a developer machine.
 - **Production needs:** a multi-stage image with `next build`, pinned lockfile install,
   non-root user, dependency audit in CI, and a reverse proxy in front.
+
+### 2026-10-07 — Demo cache record and cache-only modes
+- **Issue:** `LLM_CACHE_RECORD=1` makes the gateway persist every live model result
+  (the exact prompt, including the user's authorized evidence, and the answer) to the
+  plaintext `data/demo_llm_cache.json`; `LLM_CACHE_ONLY=1` serves answers from that file
+  without calling any model. Keys are exact-prompt hashes, so any change to prompts,
+  corpus, chunking, retrieval, tools or seed dates silently turns replays into 503
+  misses until the prefill is re-run. Record mode is refused unless `APP_PROFILE=dev`.
+  The prefill also leaves its queries, conversations and audit events in the dev
+  database, so they show up in the demo audit trail.
+- **Why acceptable:** demo only; the data and the answers are synthetic, and the
+  cached evidence is only what each demo user was already cleared to see.
+- **Production needs:** neither mode exists in a production profile; no stored prompt
+  corpus, no replay of model output, and a real on-prem model behind `LLMProvider`.
