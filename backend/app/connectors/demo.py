@@ -23,13 +23,18 @@ POLICY = LocalPolicy()
 
 # Record fields a search may compare as an ISO date. The name is a bound
 # parameter, never interpolated; the allow-list keeps the surface explicit.
-DATE_FIELDS: frozenset[str] = frozenset({"maintenance_due_date", "expires"})
+DATE_FIELDS: frozenset[str] = frozenset({"maintenance_due_date", "expires", "mission_date"})
 ENTITY_TYPES: tuple[str, ...] = (
     "Equipment",
     "Qualification",
     "StockItem",
     "FaultReport",
     "TrainingEvent",
+    "Sensor",
+    "Detection",
+    "Mission",
+    "EvidenceItem",
+    "CustodyEvent",
 )
 
 _SELECT = (

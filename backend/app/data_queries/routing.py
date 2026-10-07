@@ -51,6 +51,14 @@ _WITHIN_RE = re.compile(
     r"\bnext\s+(\d{1,6})\s+days?\b",
     re.IGNORECASE,
 )
+_UAS_RE = re.compile(r"\b(uas|drones?|uavs?|missions?|flights?)\b", re.IGNORECASE)
+_CANCELLED_RE = re.compile(r"\b(cancell?ed|aborted|scrubbed)\b", re.IGNORECASE)
+_DETECTION_RE = re.compile(
+    r"\b(detections?|detected|sightings?|surveillance|sensors?)\b", re.IGNORECASE
+)
+_SITE_RE = re.compile(r"\b(DEP-[A-Za-z0-9-]+|UAS-HANGAR)\b", re.IGNORECASE)
+_HOURS_RE = re.compile(r"\b(?:last|past)\s+(\d{1,4})\s+hours?\b", re.IGNORECASE)
+_THIS_PERIOD_RE = re.compile(r"\bthis\s+(week|month)\b", re.IGNORECASE)
 _PATH_RE = re.compile(r"(?<![\w])(?:\.\.?/|/)[\w./-]+")
 
 
@@ -91,4 +99,27 @@ def route_question(question: str) -> RoutedTool | None:
         if depot:
             params["depot"] = depot.group(0).upper()
         return RoutedTool("stock_below_threshold", params)
+    # The connected-tech rules read the question without unit paths: '/command-a/uas-wing/'
+    # names a unit, not a UAS request.
+    prose = _PATH_RE.sub(" ", question)
+    if _DETECTION_RE.search(prose):
+        site = _SITE_RE.search(question)
+        if site:
+            params["site"] = site.group(0).upper()
+        hours = _HOURS_RE.search(question)
+        if hours:
+            params["period_hours"] = int(hours.group(1))
+        return RoutedTool("detections_near_site", params)
+    if _UAS_RE.search(prose):
+        if _CANCELLED_RE.search(question):
+            params["status"] = "cancelled"
+        period = _PERIOD_RE.search(question)
+        this = _THIS_PERIOD_RE.search(question)
+        if period:
+            params["period_days"] = (
+                int(period.group(1)) if period.group(1) else _PERIOD_DAYS[period.group(2).lower()]
+            )
+        elif this:
+            params["period_days"] = _PERIOD_DAYS[this.group(1).lower()]
+        return RoutedTool("uas_missions", params)
     return None

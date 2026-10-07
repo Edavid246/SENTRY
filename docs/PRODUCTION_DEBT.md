@@ -330,3 +330,16 @@ end-of-step report. Never silently log it.
 - **Why acceptable:** it keeps recorded model answers valid for the scripted demo; it is
   off by default and cannot be enabled outside the dev profile.
 - **Production needs:** no date override at all; tools evaluate against the live clock.
+
+### 2026-10-07 — Connected-technology demo data is hand-seeded, windowed in Python
+- **Issue:** surveillance, UAS and forensics records (REC-046..062) are a small hand-written
+  set in `app/seed.py`, not output of a generator, and are served by the same
+  `DemoReferenceAdapter` as logistics data. A mission's track is a short coordinate list
+  inside the mission record (no `TrackPoint` rows). `uas_missions`, `detections_near_site`
+  and `/connected/map` fetch every authorized row of the entity type and apply the time
+  window in Python. Detection times are offsets from `demo_now()` (noon on the demo date,
+  pinned by `DEMO_DATE`), so "last 48 hours" is relative to that fixed instant.
+- **Why acceptable:** tens of rows, all authorized by the row filter + RLS before the
+  window is applied; the pinned instant keeps recorded model answers valid.
+- **Production needs:** real per-system adapters pushing windows (time, area, sensor) into
+  the source query or an indexed store, `TrackPoint`/telemetry storage, and live `stream()`.

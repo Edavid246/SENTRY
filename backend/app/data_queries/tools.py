@@ -17,15 +17,20 @@ from typing import Any
 from sqlalchemy.engine import Connection
 
 from app.authz.context import AccessContext
-from app.clock import demo_today
+from app.clock import demo_now, demo_today
 from app.connectors.base import RecordFilter, SourceRecord
 from app.connectors.demo import DemoReferenceAdapter
 from app.correlation.store import list_findings
 from app.data_queries.errors import ToolParamError
 
 MAX_WITHIN_DAYS = 365
+MAX_PERIOD_HOURS = 24 * 30
+DEFAULT_DETECTION_HOURS = 48
+DEFAULT_MISSION_DAYS = 30
+MISSION_STATUSES = frozenset({"completed", "cancelled"})
 DEFAULT_PERIOD_DAYS = 90  # one quarter
 _DEPOT_RE = re.compile(r"^DEP-[A-Z0-9]{1,8}(?:-[A-Z0-9]{1,8})?$")
+_SITE_RE = re.compile(r"^(?:DEP-[A-Z0-9]{1,8}|UAS-HANGAR)$")
 _UNIT_PATH_RE = re.compile(r"^/(?:[a-z0-9-]+/)+$")
 ADAPTER = DemoReferenceAdapter()
 
@@ -285,6 +290,115 @@ def training_activity(
     return ToolResult(
         tool="training_activity",
         params={"unit_path": unit_path, "period_days": period_days},
+        columns=columns,
+        rows=rows,
+        records=tuple(records),
+    )
+
+
+def uas_missions(ctx: AccessContext, params: Mapping[str, Any], conn: Connection) -> ToolResult:
+    """UAS missions dated in the last `period_days` (default 30), optionally by status."""
+    _check_names(params, frozenset({"unit_path", "status", "period_days"}))
+    unit_path = _resolve_unit_path(ctx, params.get("unit_path"))
+    status = params.get("status")
+    if status is not None and status not in MISSION_STATUSES:
+        raise ToolParamError("status must be 'completed' or 'cancelled'")
+    period_days = params.get("period_days", DEFAULT_MISSION_DAYS)
+    if isinstance(period_days, bool) or not isinstance(period_days, int):
+        raise ToolParamError("period_days must be an integer")
+    if not 1 <= period_days <= MAX_WITHIN_DAYS:
+        raise ToolParamError(f"period_days must be between 1 and {MAX_WITHIN_DAYS}")
+    today = demo_today()
+    start = (today - timedelta(days=period_days)).isoformat()
+    records = ADAPTER.search(
+        conn,
+        ctx,
+        RecordFilter(
+            entity_type="Mission",
+            unit_path=unit_path,
+            date_field="mission_date",
+            on_or_before=today,
+        ),
+    )
+    records = [
+        r
+        for r in records
+        if r.data["mission_date"] >= start and (status is None or r.data.get("status") == status)
+    ]
+    records.sort(key=lambda r: (r.data["mission_date"], r.source_ref), reverse=True)
+    columns = ("id", "mission", "platform", "status", "mission_date", "area", "reason", "unit_path")
+    rows = [
+        {
+            "id": r.source_ref,
+            "mission": r.data.get("mission"),
+            "platform": r.data.get("platform"),
+            "status": r.data.get("status"),
+            "mission_date": r.data["mission_date"],
+            "area": r.data.get("area"),
+            "reason": r.data.get("reason"),
+            "unit_path": r.unit_path,
+        }
+        for r in records
+    ]
+    return ToolResult(
+        tool="uas_missions",
+        params={
+            "unit_path": unit_path,
+            "period_days": period_days,
+            **({"status": status} if status else {}),
+        },
+        columns=columns,
+        rows=rows,
+        records=tuple(records),
+    )
+
+
+def detections_near_site(
+    ctx: AccessContext, params: Mapping[str, Any], conn: Connection
+) -> ToolResult:
+    """Surveillance detections at a site (depot or facility) in the last `period_hours`."""
+    _check_names(params, frozenset({"unit_path", "site", "period_hours"}))
+    unit_path = _resolve_unit_path(ctx, params.get("unit_path"))
+    site = params.get("site")
+    if site is not None and (not isinstance(site, str) or not _SITE_RE.match(site)):
+        raise ToolParamError("site must look like DEP-B4 or UAS-HANGAR")
+    period_hours = params.get("period_hours", DEFAULT_DETECTION_HOURS)
+    if isinstance(period_hours, bool) or not isinstance(period_hours, int):
+        raise ToolParamError("period_hours must be an integer")
+    if not 1 <= period_hours <= MAX_PERIOD_HOURS:
+        raise ToolParamError(f"period_hours must be between 1 and {MAX_PERIOD_HOURS}")
+    now = demo_now()
+    start = (now - timedelta(hours=period_hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    end = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    found = ADAPTER.search(conn, ctx, RecordFilter(entity_type="Detection", unit_path=unit_path))
+    # Fixed-width UTC timestamps order correctly as text; compared on authorized rows only.
+    records = [
+        r
+        for r in found
+        if start <= str(r.data.get("observed_at", "")) <= end
+        and (site is None or r.data.get("site") == site)
+    ]
+    records.sort(key=lambda r: (r.data["observed_at"], r.source_ref), reverse=True)
+    columns = ("id", "observed_at", "site", "sensor_id", "object_type", "confidence", "unit_path")
+    rows = [
+        {
+            "id": r.source_ref,
+            "observed_at": r.data["observed_at"],
+            "site": r.data.get("site"),
+            "sensor_id": r.data.get("sensor_id"),
+            "object_type": r.data.get("object_type"),
+            "confidence": r.data.get("confidence"),
+            "unit_path": r.unit_path,
+        }
+        for r in records
+    ]
+    return ToolResult(
+        tool="detections_near_site",
+        params={
+            "unit_path": unit_path,
+            "period_hours": period_hours,
+            **({"site": site} if site else {}),
+        },
         columns=columns,
         rows=rows,
         records=tuple(records),

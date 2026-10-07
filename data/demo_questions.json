@@ -93,8 +93,17 @@
       "pathway": "connected",
       "asked_by": "a.bello",
       "question": "How many UAS missions were cancelled this week, and where did they fly?",
-      "expected": "Map with live surveillance detections and UAS tracks plus an answer over the synthetic feed; streams are a timed replay behind the adapter interface.",
-      "status": "stub"
+      "expected": "Table of cancelled missions (id, mission, platform, date, area, reason) from the uas_missions typed tool over synthetic MAVLink/MISB-style records. Bello sees MSN-102, MSN-103 and the Secret MSN-106; k.musa sees the first two; t.adeyemi gets no rows and no UAS-OPS hint. The map view of the same tracks is GET /api/v1/connected/map (UI and timed replay are the next slice).",
+      "status": "built"
+    },
+    {
+      "id": "connected-detections-near-depot",
+      "spec_step": "18.5",
+      "pathway": "connected",
+      "asked_by": "a.bello",
+      "question": "Summarize detections near DEP-B4 in the last 48 hours",
+      "expected": "Table of synthetic ONVIF-style detections at DEP-B4 from the detections_near_site typed tool. Bello sees three, t.adeyemi only the Restricted ones (the Confidential detection is hidden), k.musa none at the depot.",
+      "status": "built"
     },
     {
       "id": "correlation-rising-faults",

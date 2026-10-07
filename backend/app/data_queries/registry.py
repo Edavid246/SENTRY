@@ -20,10 +20,12 @@ from app.data_queries.errors import ToolParamError
 from app.data_queries.tools import (
     ToolResult,
     correlation_findings,
+    detections_near_site,
     equipment_due_for_maintenance,
     expired_certifications,
     stock_below_threshold,
     training_activity,
+    uas_missions,
 )
 from app.db import get_engine
 
@@ -35,6 +37,8 @@ REGISTRY: dict[str, ToolFn] = {
     "stock_below_threshold": stock_below_threshold,
     "correlation_findings": correlation_findings,
     "training_activity": training_activity,
+    "uas_missions": uas_missions,
+    "detections_near_site": detections_near_site,
 }
 
 _AUDIT_VALUE_LIMIT = 120

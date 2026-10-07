@@ -6,12 +6,12 @@ of user compartments AND row unit at or below the user's unit, strictly
 downward). Deliberately NOT derived from app.seed: a seeding bug must not
 be able to rewrite its own expectations.
 
-Verified sets (16 documents, 45 records in the corpus):
+Verified sets (16 documents, 62 records in the corpus):
 
-    a.bello    14 documents, 44 records
-    a.okafor    6 documents, 34 records
-    t.adeyemi   1 document,  20 records
-    k.musa      1 document,  2 records
+    a.bello    14 documents, 61 records
+    a.okafor    6 documents, 42 records
+    t.adeyemi   1 document,  24 records
+    k.musa      1 document,  8 records
     s.eze       none  (data_scope=none)
     f.danjuma   none  (data_scope=audit)
 
@@ -60,7 +60,7 @@ GOLD_RECORDS: dict[str, frozenset[str]] = {
             "REC-007",
             "REC-009",
             "REC-010",
-            *(f"REC-0{n}" for n in range(11, 46)),
+            *(f"REC-0{n}" for n in range(11, 63)),
         }
     ),
     "a.okafor": frozenset(
@@ -71,6 +71,8 @@ GOLD_RECORDS: dict[str, frozenset[str]] = {
         | {f"REC-0{n}" for n in range(28, 36)}
         | {"REC-037", "REC-038", "REC-039", "REC-040", "REC-041", "REC-042"}
         | {"REC-043", "REC-045"}  # training events in Bde 2 / Bn 4 (044 is the UAS Wing)
+        # connected tech: depot sensors + detections (053 is UAS-OPS, 055-060 UAS Wing missions)
+        | {"REC-046", "REC-047", "REC-048", "REC-049", "REC-050", "REC-051", "REC-052", "REC-054"}
     ),
     "t.adeyemi": frozenset(
         {"REC-002", "REC-011", "REC-012", "REC-017", "REC-019", "REC-020", "REC-025"}
@@ -78,8 +80,14 @@ GOLD_RECORDS: dict[str, frozenset[str]] = {
         | {f"REC-0{n}" for n in range(28, 36)}  # Bn 4 faults, not the Secret 036
         | {"REC-041", "REC-042"}
         | {"REC-045"}
+        # Bn 4 sensor and Restricted detections (054 is Confidential)
+        | {"REC-046", "REC-048", "REC-049", "REC-050"}
     ),
-    "k.musa": frozenset({"REC-009", "REC-044"}),
+    "k.musa": frozenset(
+        {"REC-009", "REC-044"}
+        # UAS-OPS detection and Confidential missions (060 is Secret)
+        | {"REC-053", "REC-055", "REC-056", "REC-057", "REC-058", "REC-059"}
+    ),
     "s.eze": frozenset(),
     "f.danjuma": frozenset(),
 }
