@@ -6,11 +6,11 @@ of user compartments AND row unit at or below the user's unit, strictly
 downward). Deliberately NOT derived from app.seed: a seeding bug must not
 be able to rewrite its own expectations.
 
-Verified sets (16 documents, 10 records in the corpus):
+Verified sets (16 documents, 25 records in the corpus):
 
-    a.bello    14 documents, 9 records
-    a.okafor    6 documents, 5 records
-    t.adeyemi   1 document,  1 record
+    a.bello    14 documents, 24 records
+    a.okafor    6 documents, 16 records
+    t.adeyemi   1 document,  7 records
     k.musa      1 document,  1 record
     s.eze       none  (data_scope=none)
     f.danjuma   none  (data_scope=audit)
@@ -60,10 +60,17 @@ GOLD_RECORDS: dict[str, frozenset[str]] = {
             "REC-007",
             "REC-009",
             "REC-010",
+            *(f"REC-0{n}" for n in range(11, 26)),
         }
     ),
-    "a.okafor": frozenset({"REC-001", "REC-002", "REC-003", "REC-005", "REC-010"}),
-    "t.adeyemi": frozenset({"REC-002"}),
+    "a.okafor": frozenset(
+        {"REC-001", "REC-002", "REC-003", "REC-005", "REC-010"}
+        | {"REC-011", "REC-012", "REC-013", "REC-014", "REC-015", "REC-017"}
+        | {"REC-019", "REC-020", "REC-021", "REC-022", "REC-025"}
+    ),
+    "t.adeyemi": frozenset(
+        {"REC-002", "REC-011", "REC-012", "REC-017", "REC-019", "REC-020", "REC-025"}
+    ),
     "k.musa": frozenset({"REC-009"}),
     "s.eze": frozenset(),
     "f.danjuma": frozenset(),

@@ -11,6 +11,8 @@ component slots in. **Demo build only; never claim the dev profile is sovereign.
 | Identity | Keycloak, password+OTP (SPEC §4, §6, §7.1) | Seeded users, shared demo password, HS256 dev JWT behind `TokenValidator`; `users.keycloak_id` column reserved | Replace validator with Keycloak JWKS/OIDC |
 | Policy engine | OPA with partial evaluation (SPEC §7.3) | `LocalPolicy`, Python ABAC behind the `Policy` protocol (`decide` + `row_filter`) | `OpaPolicy` implements same protocol |
 | Job queue | Procrastinate worker (SPEC §6, §5.2) | `scripts/` run manually (seed today; ingestion/sync later) | Worker service |
+| Tool selection | Model selects a typed tool (SPEC §8.2) | Keyword router in `data_queries/routing.py`; the registry and tool contracts are the real ones | Model picks from `REGISTRY`; authorization is unchanged because tools authorize themselves |
+| Source-system adapters | One adapter per source system (SPEC §11) | A single `DemoReferenceAdapter` over `canonical_records`; `stream()` raises, `sync()` is a no-op | Per-system adapters behind `SourceAdapter`; only the translation layer changes |
 | Live streams | SSE live feeds (SPEC §6, §10.5) | Timed replay of synthetic events (later slice) | Real adapter `stream()` |
 | LLM provider | `LocalVLLMProvider` for on-prem inference (SPEC §8.1) | Dev profile uses `HostedProvider` (Gemini over HTTPS, `LLM_PROVIDER=hosted`, model `gemini-3.5-flash` — name deviation logged in docs/PRODUCTION_DEBT.md); `LocalVLLMProvider` occupies the interface and fails closed with `ProviderNotConfiguredError` | vLLM/OpenAI-compatible service behind the same `LLMProvider` protocol |
 | Retrieval fusion | Hybrid search with reranking (SPEC §8.1, §8.2) | Reciprocal rank fusion of vector similarity + full-text inside the retrieval SQL; **no reranker** (DEMO CUT); if the embedder is unavailable, retrieval degrades to full-text only (logged in docs/PRODUCTION_DEBT.md) | `LocalRerankerProvider` after fusion |
@@ -21,7 +23,7 @@ component slots in. **Demo build only; never claim the dev profile is sovereign.
 | Item | Note |
 |---|---|
 | Web app (Next.js) | Deferred per build decision — steps 1–6 are API + database only; `web` service will be added to Compose later. Air-gap rules apply when it lands (system fonts, no CDNs). |
-| `data_queries`, `connectors`, `modules`, `correlation`, `provenance` | Package scaffolds/interfaces as their slices arrive. (`assistant` and `knowledge` landed with step 9.) |
+| `modules`, `correlation`, `provenance` | Package scaffolds/interfaces as their slices arrive. (`assistant` and `knowledge` landed with step 9; `connectors` and `data_queries` with Task 2.) |
 | Vector index | **No HNSW (or IVFFlat) index on `chunks.embedding`** — chunks use exact (sequential) search; corpus is tiny and memory is constrained. Add an index when data grows. |
 | CI service | GitHub Actions skipped (no git remote). `scripts/check.sh` runs ruff, pytest and the air-gap grep locally. |
 | LLM response-cache prefill | No in-app or API prefill of `data/demo_llm_cache.json`; entries are recorded offline by `scripts/smoke_ai_gateway.py --record` (deferred to the demo script step, spec §18). |

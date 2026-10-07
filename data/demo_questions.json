@@ -44,8 +44,39 @@
       "pathway": "data",
       "asked_by": "a.bello",
       "question": "Show me the equipment currently awaiting maintenance.",
-      "expected": "Result table from a typed, parameterized query tool, each row linked to its canonical record, plus a short explanation.",
-      "status": "not-built"
+      "expected": "Result table (id, name, type, status, maintenance_due_date, location, unit_path) from the typed tool equipment_due_for_maintenance via the adapter, plus a short plain-English explanation. a.bello sees 7 rows (overdue and due within 30 days); each row id is a source record. Needs a live or cached model for the explanation; the table is deterministic.",
+      "status": "built",
+      "tool": "equipment_due_for_maintenance"
+    },
+    {
+      "id": "data-fewer-rows-lower-scope",
+      "spec_step": "18.7",
+      "pathway": "data",
+      "asked_by": "t.adeyemi",
+      "tool": "equipment_due_for_maintenance",
+      "question": "Show me the equipment currently awaiting maintenance.",
+      "expected": "Same question, fewer rows: t.adeyemi (Battalion 4, Restricted) sees 2 rows against a.bello's 7, because the adapter applies the unit/classification/compartment filter inside the query.",
+      "status": "built"
+    },
+    {
+      "id": "data-expired-certifications",
+      "spec_step": "18.3",
+      "pathway": "data",
+      "asked_by": "a.bello",
+      "tool": "expired_certifications",
+      "question": "List the expired certifications.",
+      "expected": "Result table (id, name, rank, certification, expired_date, unit_path): 6 rows for a.bello, 2 for t.adeyemi.",
+      "status": "built"
+    },
+    {
+      "id": "data-unit-outside-scope-refused",
+      "spec_step": "18.8",
+      "pathway": "data",
+      "asked_by": "t.adeyemi",
+      "tool": "equipment_due_for_maintenance",
+      "question": "Show me the equipment due for maintenance in /command-a/uas-wing/.",
+      "expected": "Safe refusal (refused=true, no table, no model call): the unit is outside the caller's scope; the denied data_query event is audited. The same happens for ../../secret.",
+      "status": "built"
     },
     {
       "id": "reporting-training-summary",

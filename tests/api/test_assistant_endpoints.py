@@ -169,9 +169,12 @@ def test_allowed_query_returns_citations_and_audits_retrieval_and_answer(
         "citations",
         "found",
         "degraded",
+        "refused",
+        "result_table",
         "conversation_id",
         "audit_event_id",
     }
+    assert body["refused"] is False and body["result_table"] is None
     assert body["answer"]
     assert body["citations"], "expected at least one authorized citation"
     # Found and degraded are set from code paths, not read out of the text:

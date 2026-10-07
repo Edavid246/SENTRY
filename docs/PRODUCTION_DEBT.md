@@ -235,3 +235,34 @@ end-of-step report. Never silently log it.
   absorb transient failures during the scripted demo.
 - **Production needs:** on-prem inference (the stubbed `LocalVLLMProvider`), or a
   contracted zero-retention endpoint with SLAs, quota monitoring and backpressure.
+
+### 2026-10-07 — Keyword router selects the data tool (SPEC: the model selects it)
+- **Issue:** SPEC 8.2 has the model choose a typed tool. The demo uses a deterministic
+  keyword router (`data_queries/routing.py`): record-style requests ("show me / list /
+  which" + equipment maintenance or expired certifications) go to a tool; anything that
+  mentions a document, policy, directive, SOP or manual always goes to the knowledge
+  pathway. Free-form phrasings that are not in the keyword set fall through to the
+  knowledge pathway and answer "not found"; unit scope is passed only as a literal path
+  token (no unit-name resolution such as "Brigade 2").
+- **Why acceptable:** predictable demo behaviour, no model in the routing decision, and
+  authorization does not depend on routing (tools authorize via the adapter either way).
+- **Production needs:** model-driven tool selection over the same registry with schema
+  validation of the model's arguments, unit-name resolution, and an evaluation set
+  (SPEC 16) for routing accuracy.
+
+### 2026-10-07 — Relative seed dates and one demo adapter
+- **Issue:** the maintenance/certification demo rows store dates as offsets from the day
+  the corpus is seeded (so "overdue" and "due in 15 days" stay true), and one
+  `DemoReferenceAdapter` serves both logistics and personnel entities from the gateway's
+  own `canonical_records`. Rows seeded on another day shift with it; a stale dev database
+  must be re-seeded.
+- **Why acceptable:** demo data only; the adapter contract is the real one.
+- **Production needs:** per-system adapters reading the client's systems; no seeded dates.
+
+### 2026-10-07 — Pre-existing: manipulation detection is a keyword regex
+- **Issue:** the SPEC 8.3 manipulation detector is a regex. Task 2 widened it to match
+  "ignore my permissions" (the SPEC 15 example and a demo question, previously
+  undetected, so no `notable` event was written). It remains evadable by paraphrase.
+  Access never depends on it: authorization decides before the model.
+- **Production needs:** a classifier-based detector plus an adversarial evaluation set
+  (SPEC 16).

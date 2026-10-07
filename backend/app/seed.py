@@ -12,7 +12,7 @@ Tests: app.seed.run(test_owner_database_url)
 from __future__ import annotations
 
 import hashlib
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from argon2 import PasswordHasher
@@ -278,6 +278,206 @@ RECORDS = [
         [],
         "/command-a/bde-2/",
         {"item": "Generator oil 5L", "depot": "DEP-B2", "quantity": 45, "threshold": 60},
+    ),
+]
+
+
+def _days_from_today(offset: int) -> str:
+    return (date.today() + timedelta(days=offset)).isoformat()
+
+
+# Data-pathway demo rows (Task 2). Dates are offsets from the seed date so
+# "overdue" and "due in 15 days" stay true whenever the corpus is re-seeded;
+# the offsets are the contract the tests rely on. Equipment carries
+# `maintenance_due_date`, qualifications carry `expires` (the adapter maps
+# both to the tool columns). REC-001/REC-009 keep their original field names
+# and are deliberately not matched by the maintenance tool.
+def _equipment(ref, source, classification, compartments, unit_path, offset, **fields):
+    data = {**fields, "maintenance_due_date": _days_from_today(offset)}
+    return (ref, "Equipment", source, classification, compartments, unit_path, data)
+
+
+def _qualification(ref, classification, compartments, unit_path, offset, **fields):
+    data = {**fields, "expires": _days_from_today(offset)}
+    return (ref, "Qualification", "personnel-ref", classification, compartments, unit_path, data)
+
+
+_BN4 = "/command-a/bde-2/bn-4/"
+_BDE2 = "/command-a/bde-2/"
+RECORDS += [
+    _equipment(
+        "REC-011",
+        "logistics-ref",
+        "restricted",
+        [],
+        _BN4,
+        -12,
+        equipment_id="EQ-3101",
+        name="Armoured Personnel Carrier APC-12",
+        type="vehicle",
+        status="in_service",
+        location="Battalion 4 motor pool",
+    ),
+    _equipment(
+        "REC-012",
+        "logistics-ref",
+        "restricted",
+        [],
+        _BN4,
+        15,
+        equipment_id="EQ-3102",
+        name="Cargo Truck 5T",
+        type="vehicle",
+        status="in_service",
+        location="Battalion 4 motor pool",
+    ),
+    _equipment(
+        "REC-013",
+        "logistics-ref",
+        "restricted",
+        [],
+        _BDE2,
+        10,
+        equipment_id="EQ-3103",
+        name="Field Radio Set FR-9",
+        type="communications",
+        status="in_service",
+        location="Brigade 2 signals store",
+    ),
+    _equipment(
+        "REC-014",
+        "logistics-ref",
+        "confidential",
+        [],
+        _BDE2,
+        -3,
+        equipment_id="EQ-3104",
+        name="Generator 40kW",
+        type="power",
+        status="degraded",
+        location="Brigade 2 depot",
+    ),
+    _equipment(
+        "REC-015",
+        "logistics-ref",
+        "confidential",
+        [],
+        _BN4,
+        20,
+        equipment_id="EQ-3105",
+        name="Water Purifier WP-7",
+        type="utility",
+        status="awaiting_parts",
+        location="Battalion 4 camp",
+    ),
+    _equipment(
+        "REC-016",
+        "logistics-ref",
+        "restricted",
+        [],
+        "/command-a/",
+        15,
+        equipment_id="EQ-3106",
+        name="Recovery Vehicle RV-2",
+        type="vehicle",
+        status="in_service",
+        location="Command A workshop",
+    ),
+    _equipment(
+        "REC-017",
+        "logistics-ref",
+        "restricted",
+        [],
+        _BN4,
+        90,
+        equipment_id="EQ-3107",
+        name="Field Kitchen FK-3",
+        type="catering",
+        status="in_service",
+        location="Battalion 4 camp",
+    ),
+    _equipment(
+        "REC-018",
+        "connected-tech-demo",
+        "secret",
+        ["UAS-OPS"],
+        "/command-a/uas-wing/",
+        5,
+        equipment_id="UAS-15",
+        name="Raven-II UAS (tail 15)",
+        type="uas",
+        status="in_service",
+        location="UAS Wing hangar",
+    ),
+    _qualification(
+        "REC-019",
+        "restricted",
+        [],
+        _BN4,
+        -30,
+        name="Cpl B. Ibrahim",
+        rank="Corporal",
+        certification="First Aid",
+    ),
+    _qualification(
+        "REC-020",
+        "restricted",
+        [],
+        _BN4,
+        -10,
+        name="Pte C. Nwosu",
+        rank="Private",
+        certification="Heavy Vehicle Driver",
+    ),
+    _qualification(
+        "REC-021",
+        "restricted",
+        [],
+        _BDE2,
+        -45,
+        name="Sgt D. Okoye",
+        rank="Sergeant",
+        certification="Rifle Marksman",
+    ),
+    _qualification(
+        "REC-022",
+        "confidential",
+        [],
+        _BDE2,
+        -5,
+        name="Capt E. Lawal",
+        rank="Captain",
+        certification="Signals Operator",
+    ),
+    _qualification(
+        "REC-023",
+        "secret",
+        ["UAS-OPS"],
+        "/command-a/uas-wing/",
+        -20,
+        name="Lt F. Garba",
+        rank="Lieutenant",
+        certification="UAS Pilot",
+    ),
+    _qualification(
+        "REC-024",
+        "restricted",
+        [],
+        "/command-a/",
+        -60,
+        name="WO G. Abubakar",
+        rank="Warrant Officer",
+        certification="Armoured Vehicle Driver",
+    ),
+    _qualification(
+        "REC-025",
+        "restricted",
+        [],
+        _BN4,
+        200,
+        name="Sgt H. Danladi",
+        rank="Sergeant",
+        certification="First Aid",
     ),
 ]
 

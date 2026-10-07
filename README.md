@@ -99,7 +99,7 @@ All routes are mounted under `/api/v1` (system health check at `/healthz`):
 | `GET` | `/api/v1/documents/{ref}` | Document detail (404 when not visible) |
 | `GET` | `/api/v1/documents/{ref}/chunks/{chunk_id}` | Cited-passage viewer |
 | `GET` | `/api/v1/records` | Canonical records visible to the caller |
-| `POST` | `/api/v1/assistant/query` | Cited question answering (`found`, `degraded`) |
+| `POST` | `/api/v1/assistant/query` | Cited question answering (`found`, `degraded`, `refused`); record-style requests return a `result_table` from a typed data tool |
 | `GET` | `/api/v1/assistant/conversations` | The caller's own threads |
 | `GET` | `/api/v1/assistant/conversations/{id}` | Turns with resolved citations |
 | `GET` | `/api/v1/audit` | Audit events (filter by `event_id`) |

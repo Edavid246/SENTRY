@@ -23,6 +23,7 @@ in each step's report.
 | Citations & provenance | Inline citations with chunk id / document ref / page / section, re-resolvable through the same row filter; `GET /api/v1/documents/{ref}/chunks/{chunk_id}` opens the exact cited passage. |
 | Assistant conversations | `POST /api/v1/assistant/query` (with history), `GET /api/v1/assistant/conversations` and `.../{id}` returning own turns with citations; cross-user reads answer 404. |
 | Manipulation defences (SPEC §8.3) | Requests to ignore permissions are refused with access unchanged and recorded as a notable event; answers citing outside the evidence set are blocked (`found=false`, decision `deny`). |
+| Data pathway (SPEC §8.2, §11) | `POST /api/v1/assistant/query` routes record-style requests to typed, parameterized tools (`equipment_due_for_maintenance`, `expired_certifications`) in `backend/app/data_queries/`. Tools reach records only through the adapter interface (`connectors/base.py`; `DemoReferenceAdapter` is the only reader of `canonical_records`), which applies `row_filter` + RLS. The response carries `result_table` (deterministic tool output) and a gateway-written explanation; a bad or out-of-scope `unit_path` is a safe refusal (`refused=true`, no SQL, no model call). One `data_query` audit event per call. |
 | Route convention | All routers under `/api/v1` (no root aliases), `/healthz` only at the root; no CORS middleware — same-origin proxy only. |
 | Authorization tests | RLS-only and filter-only layers checked against a hand-authored oracle (`tests/authz/`), plus API, adversarial and tamper-evidence tests. |
 
@@ -32,6 +33,7 @@ in each step's report.
 |---|---|---|
 | Identity | Seeded users, shared demo password, HS256 dev JWT (`DevTokenValidator`); **no logout/revocation** — a UI logout will only clear the token client-side (docs/PRODUCTION_DEBT.md). | Keycloak OIDC/JWKS behind `TokenValidator`. |
 | Policy engine | `LocalPolicy`, Python ABAC behind the `Policy` protocol. | `OpaPolicy` implementing the same `decide`/`row_filter`. |
+| Tool routing | Deterministic keyword router (SPEC: the model selects the tool); logged in `docs/PRODUCTION_DEBT.md`. | Model-driven tool selection over the same registry. |
 | Live streams (SPEC §10.5) | None yet; timed replay of synthetic events planned behind the adapter `stream()` contract. | Real adapter stream. |
 | Job queue | `scripts/ingest_documents.py` run by hand. | Procrastinate worker. |
 | On-prem model | `LocalVLLMProvider` present but fails closed (`ProviderNotConfiguredError`). | vLLM behind `LLMProvider`. |
@@ -44,7 +46,7 @@ in each step's report.
 | Item | Demo script step |
 |---|---|
 | Next.js UI (login, dashboard, chat, citation viewer, audit viewer, evidence panel) | §18.1 and every later step's presentation |
-| 4–5 typed, parameterized query tools (data pathway) | §18.3 |
+| Remaining typed tools for the data pathway (2 of 4–5 built: maintenance, expired certifications) | §18.3 |
 | Administrative/report drafting over records and documents | §18.4 |
 | Connected-systems map and timed synthetic feeds (surveillance, UAS, forensics) | §18.5 |
 | One planted correlation finding with its evidence panel | §18.6 |
@@ -59,7 +61,7 @@ profile. Map tiles are cut too (MapLibre renders GeoJSON without them).
 
 1. Login — API ready, dashboard waits for the UI (Part B).
 2. Knowledge pathway with citations + open a cited page — **works against the API today**.
-3. Data pathway — pending typed query tools.
+3. Data pathway — **works against the API today** (equipment due for maintenance, expired certifications; more tools to come). Needs a live or cached model for the explanation; the table is deterministic.
 4. Reporting — pending.
 5. Connected systems — pending.
 6. Correlation finding — pending.

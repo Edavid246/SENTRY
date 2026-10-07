@@ -26,7 +26,8 @@ row filter — a passage that is no longer visible simply drops out.
 from __future__ import annotations
 
 import re
-from typing import Annotated
+from collections.abc import Sequence
+from typing import Annotated, Any, Protocol
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, Query
@@ -38,6 +39,9 @@ from app.api.deps import ConnDep, CurrentContext, audit_events
 from app.audit.chain import utc_now_iso
 from app.authz.context import AccessContext
 from app.authz.policy import Decision, LocalPolicy
+from app.data_queries.explain import explain_result
+from app.data_queries.registry import ToolOutcome, execute_tool
+from app.data_queries.routing import RoutedTool, route_question
 from app.db import format_array, set_rls_context
 from app.knowledge.answer import CitedAnswer, generate_answer, parse_cited_chunk_ids
 from app.knowledge.retrieve import (
@@ -57,7 +61,7 @@ AUDIT_TEXT_LIMIT = 300
 # SPEC §8.3: requests to ignore permissions, reveal restricted sources or act
 # as another user have no effect on retrieval and are logged as notable events.
 _MANIPULATION_PATTERNS = (
-    r"ignore (all |your |the )?(previous |prior )?(instructions?|permissions?)",
+    r"ignore (all |your |my |the )?(previous |prior )?(instructions?|permissions?)",
     r"disregard (the |all )?(classification|restriction|permission)",
     r"reveal (the |all )?(secret|restricted|classified)",
     r"show me (the |all )?(secret|restricted|classified)",
@@ -84,6 +88,11 @@ class CitationOut(BaseModel):
     classification_code: str
 
 
+class ResultTable(BaseModel):
+    columns: list[str]
+    rows: list[dict[str, Any]]
+
+
 class AssistantQueryResponse(BaseModel):
     answer: str
     citations: list[CitationOut]
@@ -91,6 +100,14 @@ class AssistantQueryResponse(BaseModel):
         description="false when nothing was found in approved sources, or a refusal"
     )
     degraded: bool = Field(description="true when retrieval ran keyword-only (FTS only)")
+    refused: bool = Field(
+        description=(
+            "true for permission-manipulation attempts, blocked answers and safe tool refusals"
+        )
+    )
+    result_table: ResultTable | None = Field(
+        default=None, description="deterministic tool output of the data pathway, else null"
+    )
     conversation_id: str
     audit_event_id: str
 
@@ -192,6 +209,35 @@ def _answer_event(
     }
 
 
+def _data_answer_event(
+    ctx: AccessContext,
+    question: str,
+    conversation_id: str,
+    outcome: ToolOutcome,
+    *,
+    provider: str,
+    model: str,
+    cached: bool,
+) -> dict:
+    return {
+        "actor": ctx.username,
+        "action": "answer",
+        "resource": "assistant",
+        "pathway": "data",
+        "decision": "deny" if outcome.refused else "allow",
+        "conversation_id": conversation_id,
+        "question": question[:AUDIT_TEXT_LIMIT],
+        "tool": outcome.tool[:64],
+        "found": bool(outcome.result and outcome.result.rows),
+        "refused": outcome.refused,
+        "rows": len(outcome.result.rows) if outcome.result else 0,
+        "provider": provider,
+        "model": model,
+        "cached": cached,
+        "timestamp": utc_now_iso(),
+    }
+
+
 def _set_context(conn, ctx: AccessContext) -> None:
     set_rls_context(
         conn,
@@ -209,7 +255,14 @@ def _rank_map(conn) -> dict[str, int]:
     return {str(row.code): int(row.rank) for row in rows}
 
 
-def _derived_classification(chunks: list[RetrievedChunk], ranks: dict[str, int]) -> str:
+class _Labelled(Protocol):
+    """Anything that carries a classification and compartments (chunks, records)."""
+
+    classification_code: str
+    compartments: Any
+
+
+def _derived_classification(chunks: Sequence[_Labelled], ranks: dict[str, int]) -> str:
     if not chunks:
         return "unclassified"
     return max(
@@ -218,7 +271,7 @@ def _derived_classification(chunks: list[RetrievedChunk], ranks: dict[str, int])
     )
 
 
-def _derived_compartments(chunks: list[RetrievedChunk]) -> list[str]:
+def _derived_compartments(chunks: Sequence[_Labelled]) -> list[str]:
     merged: set[str] = set()
     for chunk in chunks:
         merged.update(chunk.compartments)
@@ -253,7 +306,7 @@ def _store_turn(
     conversation_id: UUID,
     question: str,
     answer: str,
-    chunks: list[RetrievedChunk],
+    chunks: Sequence[_Labelled],
     ranks: dict[str, int],
     *,
     new_conversation: bool,
@@ -300,6 +353,98 @@ def _store_turn(
     )
 
 
+def _query_data(
+    body: AssistantQueryRequest,
+    ctx: AccessContext,
+    conn,
+    answer_decision: Decision,
+    routed: RoutedTool,
+) -> AssistantQueryResponse:
+    """Data pathway (SPEC 8.2): typed tool -> authorized adapter query -> explanation.
+
+    The tool and the adapter run under the caller's row filter + RLS before the
+    model sees anything; the model only explains rows already returned, and the
+    table in the response is the deterministic tool output.
+    """
+    record_decision = POLICY.decide(ctx, "query", "record")
+    decisions = [
+        _decide_event(ctx, answer_decision),
+        _decide_event(ctx, record_decision, resource="record", requested="query"),
+    ]
+    if not record_decision.allowed:
+        audit_events(decisions)
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    new_conversation = body.conversation_id is None
+    if new_conversation:
+        conversation_id = uuid4()
+    else:
+        conversation_id = body.conversation_id
+        _set_context(conn, ctx)
+        _resolve_conversation(conn, ctx, conversation_id)
+
+    audit_events(decisions)
+    outcome = execute_tool(ctx, conn, routed.tool, routed.params)
+
+    result = outcome.result
+    provider = model = ""
+    cached = False
+    if result is None:
+        answer = f"That request was refused: {outcome.refusal}. No data was retrieved."
+    else:
+        try:
+            explanation = explain_result(body.question, result)
+        except ProviderError as exc:
+            # The tool ran and was audited; only the explanation is unavailable.
+            if isinstance(exc, ProviderNotConfiguredError):
+                detail = "the answer model is not configured on this server"
+            else:
+                detail = "the answer model is currently unavailable; retry later"
+            raise HTTPException(status_code=503, detail=detail) from exc
+        answer = explanation.text
+        provider, model, cached = explanation.provider, explanation.model, explanation.cached
+
+    # Derived turn inherits the highest classification and union of compartments
+    # of the records behind it (AGENTS.md); a refusal retrieved nothing.
+    _set_context(conn, ctx)
+    _store_turn(
+        conn,
+        ctx,
+        conversation_id,
+        body.question,
+        answer,
+        result.records if result else (),
+        _rank_map(conn),
+        new_conversation=new_conversation,
+    )
+    conn.commit()
+    written = audit_events(
+        [
+            _data_answer_event(
+                ctx,
+                body.question,
+                str(conversation_id),
+                outcome,
+                provider=provider,
+                model=model,
+                cached=cached,
+            )
+        ]
+    )
+    return AssistantQueryResponse(
+        answer=answer,
+        citations=[],
+        found=bool(result and result.rows),
+        degraded=False,
+        refused=outcome.refused,
+        result_table=(
+            ResultTable(columns=list(result.columns), rows=result.rows) if result else None
+        ),
+        conversation_id=str(conversation_id),
+        audit_event_id=str(written[-1]["event_id"]),
+    )
+
+
 @router.post("/query", response_model=AssistantQueryResponse)
 def query_assistant(
     body: AssistantQueryRequest,
@@ -310,6 +455,13 @@ def query_assistant(
     if not decision.allowed:
         audit_events([_decide_event(ctx, decision)])
         raise HTTPException(status_code=403, detail="forbidden")
+
+    manipulation = bool(_MANIPULATION_RE.search(body.question))
+    # A manipulation-style request never reaches a data tool: it stays on the
+    # knowledge pathway, where it is logged and changes nothing (SPEC 8.3).
+    routed = None if manipulation else route_question(body.question)
+    if routed is not None:
+        return _query_data(body, ctx, conn, decision, routed)
 
     _set_context(conn, ctx)
     new_conversation = body.conversation_id is None
@@ -332,7 +484,7 @@ def query_assistant(
             _decide_event(ctx, decision),
             _retrieval_event(ctx, body.question, chunks),
         ]
-        if _MANIPULATION_RE.search(body.question):
+        if manipulation:
             failed.append(_notable_event(ctx, body.question))
         audit_events(failed)
         if isinstance(exc, ProviderNotConfiguredError):
@@ -357,7 +509,7 @@ def query_assistant(
         _decide_event(ctx, decision),
         _retrieval_event(ctx, body.question, chunks),
     ]
-    if _MANIPULATION_RE.search(body.question):
+    if manipulation:
         events.append(_notable_event(ctx, body.question))
     events.append(_answer_event(ctx, body.question, str(conversation_id), cited, degraded))
     written = audit_events(events)
@@ -377,6 +529,8 @@ def query_assistant(
         ],
         found=cited.found,
         degraded=degraded,
+        refused=manipulation or cited.blocked,
+        result_table=None,
         conversation_id=str(conversation_id),
         audit_event_id=str(written[-1]["event_id"]),
     )

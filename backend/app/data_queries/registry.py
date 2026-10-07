@@ -1,0 +1,93 @@
+"""Tool registry and audited execution (SPEC 8.2, 14).
+
+name -> callable(ctx, params, conn). `execute_tool` is the only entry point
+the API uses: it validates the tool name, runs the tool, and writes exactly
+one `data_query` audit event per call: an allow with the row count, or a
+deny when the call was refused with a ToolParamError (no SQL ran).
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from typing import Any
+
+from sqlalchemy.engine import Connection
+
+from app.audit.chain import append_events, utc_now_iso
+from app.authz.context import AccessContext
+from app.data_queries.errors import ToolParamError
+from app.data_queries.tools import (
+    ToolResult,
+    equipment_due_for_maintenance,
+    expired_certifications,
+)
+from app.db import get_engine
+
+ToolFn = Callable[[AccessContext, Mapping[str, Any], Connection], ToolResult]
+
+REGISTRY: dict[str, ToolFn] = {
+    "equipment_due_for_maintenance": equipment_due_for_maintenance,
+    "expired_certifications": expired_certifications,
+}
+
+_AUDIT_VALUE_LIMIT = 120
+
+
+@dataclass(frozen=True, slots=True)
+class ToolOutcome:
+    tool: str
+    result: ToolResult | None
+    refusal: str | None
+    audit_event_id: str
+
+    @property
+    def refused(self) -> bool:
+        return self.refusal is not None
+
+
+def sanitize_params(params: Mapping[str, Any]) -> dict[str, Any]:
+    """Audit-safe copy: bounded keys, scalars kept, everything else stringified and cut."""
+    clean: dict[str, Any] = {}
+    for key, value in list(params.items())[:20]:
+        if value is None or isinstance(value, bool | int | float):
+            clean[str(key)[:64]] = value
+        else:
+            clean[str(key)[:64]] = str(value)[:_AUDIT_VALUE_LIMIT]
+    return clean
+
+
+def execute_tool(
+    ctx: AccessContext, conn: Connection, name: str, params: Mapping[str, Any]
+) -> ToolOutcome:
+    result: ToolResult | None = None
+    refusal: str | None = None
+    try:
+        tool = REGISTRY.get(name)
+        if tool is None:
+            raise ToolParamError("unknown tool")
+        result = tool(ctx, params, conn)
+    except ToolParamError as exc:
+        refusal = str(exc)
+
+    payload: dict[str, Any] = {
+        "actor": ctx.username,
+        "action": "data_query",
+        "resource": "record",
+        "tool": name[:64],
+        "params": sanitize_params(result.params if result else params),
+        "decision": "deny" if refusal else "allow",
+        "rows": len(result.rows) if result else 0,
+        "timestamp": utc_now_iso(),
+    }
+    if refusal:
+        payload["reasons"] = [refusal]
+    else:
+        payload["record_ids"] = [record.source_ref for record in result.records]
+    written = append_events(get_engine(), [payload])
+    return ToolOutcome(
+        tool=name,
+        result=result,
+        refusal=refusal,
+        audit_event_id=str(written[-1]["event_id"]),
+    )
