@@ -27,7 +27,7 @@ EXPECTED_COUNTS = {
     SourceSystem: 6,
     Document: 16,
     Chunk: 32,
-    CanonicalRecord: 27,
+    CanonicalRecord: 42,
 }
 
 

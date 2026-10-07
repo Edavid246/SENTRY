@@ -37,10 +37,14 @@ CLASSIFIED_TABLES = (
     "canonical_records",
     "conversations",
     "messages",
+    "findings",
 )
 # Tables the runtime role may add rows to (all with a SELECT policy); their
 # UPDATE/DELETE stay denied so turns are append-only like the audit log.
 APPEND_TABLES = ("conversations", "messages")
+# Derived findings are upserted by the correlation job: INSERT and UPDATE, both gated by the
+# same rule as WITH CHECK; never DELETE.
+UPSERT_TABLES = ("findings",)
 
 
 def test_migration_created_all_tables(owner_engine: Engine, migrated: None) -> None:
@@ -96,7 +100,7 @@ def test_policies_are_scoped_to_gateway_app_with_literal_rule(
         for guc in ("app.data_scope", "app.clearance_rank", "app.compartments", "app.unit_path"):
             assert guc in select.qual
         # Only the append-only conversation tables admit INSERT (as WITH CHECK).
-        if table in APPEND_TABLES:
+        if table in APPEND_TABLES + UPSERT_TABLES:
             assert f"{table}_insert" in policies
         else:
             assert not any(name.endswith("_insert") for name in policies)
@@ -146,6 +150,23 @@ def test_grants_are_read_only_plus_append_only_audit(owner_engine: Engine, migra
                 ).scalar()
                 is False
             )
+
+
+def test_findings_grants_allow_upsert_but_not_delete(owner_engine: Engine, migrated: None) -> None:
+    with owner_engine.connect() as conn:
+        for privilege, expected in (
+            ("SELECT", True),
+            ("INSERT", True),
+            ("UPDATE", True),
+            ("DELETE", False),
+        ):
+            assert (
+                conn.execute(
+                    text("SELECT has_table_privilege('gateway_app', 'findings', :p)"),
+                    {"p": privilege},
+                ).scalar()
+                is expected
+            ), privilege
 
 
 def test_embedding_column_is_vector_without_index(owner_engine: Engine, migrated: None) -> None:

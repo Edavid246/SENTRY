@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type DashboardItem, type DashboardSummary, type DashboardTile } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
@@ -27,17 +28,22 @@ function PlaceholderTag() {
 function TileFrame({
   tileKey,
   tile,
+  action,
   children,
 }: {
   tileKey: string;
   tile: DashboardTile;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section data-testid={`tile-${tileKey}`} className="border border-rule bg-surface">
       <header className="flex items-center justify-between border-b border-rule px-4 py-3">
         <h2 className="label">{tile.title}</h2>
-        {tile.stub && <PlaceholderTag />}
+        <div className="flex items-center gap-3">
+          {action}
+          {tile.stub && <PlaceholderTag />}
+        </div>
       </header>
       <div className="p-4">
         {tile.items.length === 0 ? <p className="text-[0.85rem] text-mute">No items.</p> : children}
@@ -106,7 +112,13 @@ function Findings({ items }: { items: DashboardItem[] }) {
               {item.severity}
             </span>
           )}
-          <div className="text-[0.95rem]">{item.label}</div>
+          <Link
+            href={`/findings/${encodeURIComponent(item.id)}`}
+            data-testid="finding-link"
+            className="block text-[0.95rem] text-amber hover:underline"
+          >
+            {item.label}
+          </Link>
           <p className="mt-1 text-[0.85rem] text-sage">{item.detail}</p>
           <Provenance item={item} />
         </li>
@@ -116,13 +128,13 @@ function Findings({ items }: { items: DashboardItem[] }) {
 }
 
 export default function DashboardPage() {
-  const { me } = useSession();
+  const { me, can } = useSession();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
 
-  useEffect(() => {
-    if (!me) return;
-    api
+  const load = useCallback(() => {
+    return api
       .dashboard()
       .then(setSummary)
       .catch((err) =>
@@ -132,7 +144,23 @@ export default function DashboardPage() {
             : "The dashboard could not be loaded.",
         ),
       );
-  }, [me]);
+  }, []);
+
+  useEffect(() => {
+    if (me) void load();
+  }, [me, load]);
+
+  async function runCorrelation() {
+    setRunning(true);
+    try {
+      await api.runCorrelation();
+      await load();
+    } catch {
+      setError("The correlation job could not be run.");
+    } finally {
+      setRunning(false);
+    }
+  }
 
   return (
     <Shell>
@@ -155,7 +183,23 @@ export default function DashboardPage() {
             <TileFrame tileKey="expiring_certifications" tile={summary.tiles.expiring_certifications}>
               <BarList items={summary.tiles.expiring_certifications.items} />
             </TileFrame>
-            <TileFrame tileKey="recent_findings" tile={summary.tiles.recent_findings}>
+            <TileFrame
+              tileKey="recent_findings"
+              tile={summary.tiles.recent_findings}
+              action={
+                can("run_correlation") && (
+                  <button
+                    type="button"
+                    data-testid="run-correlation"
+                    onClick={runCorrelation}
+                    disabled={running}
+                    className="btn"
+                  >
+                    {running ? "Running…" : "Run correlation"}
+                  </button>
+                )
+              }
+            >
               <Findings items={summary.tiles.recent_findings.items} />
             </TileFrame>
           </div>

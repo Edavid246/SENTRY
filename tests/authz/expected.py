@@ -6,11 +6,11 @@ of user compartments AND row unit at or below the user's unit, strictly
 downward). Deliberately NOT derived from app.seed: a seeding bug must not
 be able to rewrite its own expectations.
 
-Verified sets (16 documents, 27 records in the corpus):
+Verified sets (16 documents, 42 records in the corpus):
 
-    a.bello    14 documents, 26 records
-    a.okafor    6 documents, 18 records
-    t.adeyemi   1 document,  9 records
+    a.bello    14 documents, 41 records
+    a.okafor    6 documents, 32 records
+    t.adeyemi   1 document,  19 records
     k.musa      1 document,  1 record
     s.eze       none  (data_scope=none)
     f.danjuma   none  (data_scope=audit)
@@ -60,17 +60,22 @@ GOLD_RECORDS: dict[str, frozenset[str]] = {
             "REC-007",
             "REC-009",
             "REC-010",
-            *(f"REC-0{n}" for n in range(11, 28)),
+            *(f"REC-0{n}" for n in range(11, 43)),
         }
     ),
     "a.okafor": frozenset(
         {"REC-001", "REC-002", "REC-003", "REC-005", "REC-010"}
         | {"REC-011", "REC-012", "REC-013", "REC-014", "REC-015", "REC-017"}
         | {"REC-019", "REC-020", "REC-021", "REC-022", "REC-025", "REC-026", "REC-027"}
+        # planted-pattern records: Bn 4 faults 028-035 (036 is Secret), Bde 2 faults, maintainers
+        | {f"REC-0{n}" for n in range(28, 36)}
+        | {"REC-037", "REC-038", "REC-039", "REC-040", "REC-041", "REC-042"}
     ),
     "t.adeyemi": frozenset(
         {"REC-002", "REC-011", "REC-012", "REC-017", "REC-019", "REC-020", "REC-025"}
         | {"REC-026", "REC-027"}
+        | {f"REC-0{n}" for n in range(28, 36)}  # Bn 4 faults, not the Secret 036
+        | {"REC-041", "REC-042"}
     ),
     "k.musa": frozenset({"REC-009"}),
     "s.eze": frozenset(),

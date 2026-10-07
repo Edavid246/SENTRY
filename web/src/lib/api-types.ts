@@ -268,6 +268,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/correlation/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Correlation */
+        post: operations["run_correlation_api_v1_correlation_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/correlation/findings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Findings */
+        get: operations["findings_api_v1_correlation_findings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/correlation/findings/{finding_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Finding */
+        get: operations["finding_api_v1_correlation_findings__finding_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -438,6 +489,44 @@ export interface components {
             expiring_certifications: components["schemas"]["DashboardTile"];
             recent_findings: components["schemas"]["DashboardTile"];
         };
+        /** FindingOut */
+        FindingOut: {
+            /**
+             * Id
+             * @description stable finding id, e.g. FND-RISING-FAULTS-BN-4
+             */
+            id: string;
+            /** Analysis */
+            analysis: string;
+            /** Title */
+            title: string;
+            /** Summary */
+            summary: string;
+            /** Severity */
+            severity: string;
+            /** Classification Code */
+            classification_code: string;
+            /** Compartments */
+            compartments: string[];
+            /** Unit Path */
+            unit_path: string;
+            /** Unit Name */
+            unit_name: string;
+            /**
+             * Evidence Ids
+             * @description record references (open via /records/{id})
+             */
+            evidence_ids: string[];
+            /**
+             * Details
+             * @description the analysis parameters that produced it
+             */
+            details: {
+                [key: string]: unknown;
+            };
+            /** Created At */
+            created_at: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -479,6 +568,13 @@ export interface components {
             rows: {
                 [key: string]: unknown;
             }[];
+        };
+        /** RunResult */
+        RunResult: {
+            /** Analysis */
+            analysis: string;
+            /** Findings */
+            findings: components["schemas"]["FindingOut"][];
         };
         /** TurnOut */
         TurnOut: {
@@ -940,6 +1036,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_correlation_api_v1_correlation_run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    findings_api_v1_correlation_findings_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FindingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    finding_api_v1_correlation_findings__finding_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                finding_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FindingOut"];
                 };
             };
             /** @description Validation Error */

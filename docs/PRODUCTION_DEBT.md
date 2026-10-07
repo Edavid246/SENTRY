@@ -299,8 +299,20 @@ end-of-step report. Never silently log it.
 - **Production needs:** neither mode exists in a production profile; no stored prompt
   corpus, no replay of model output, and a real on-prem model behind `LLMProvider`.
 
+### 2026-10-08 — Correlation: one rule-based analysis, run by hand
+- **Issue:** the correlation job is a single hard-coded rule (`rising_faults`: fault count
+  doubling over two 21-day windows, plus lapsed maintainer certifications and stock below
+  threshold in the same unit), run on demand by a commander; it is not scheduled, has no
+  tuning, no false-positive review and no history of earlier runs (a rerun updates the
+  finding in place). The dashboard certification tile reports expired, not expiring, certs.
+- **Why acceptable:** the demo needs one reproducible planted pattern with provenance; the
+  summary is deterministic text from the numbers, so no model can embellish or leak it.
+- **Production needs:** scheduled worker (Procrastinate), a library of analyses with
+  thresholds under change control, finding lifecycle (acknowledge, dismiss, history), and
+  the findings table's UPDATE grant narrowed to the worker role.
+
 ### 2026-10-07 — Dashboard placeholders and a second copy of the visibility rule
-- **Issue:** the readiness and recent-findings dashboard tiles are hard-coded fixtures, not
+- **Issue:** the readiness dashboard tile is a hard-coded fixture, not
   module data, and they are authorized by `LocalPolicy.item_visible`, a Python re-statement of the SQL row filter
   (two implementations of SPEC 7.1 that can drift).
 - **Why acceptable:** the fixtures are fictitious and tagged PLACEHOLDER DATA in the UI;

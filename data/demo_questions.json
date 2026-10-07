@@ -102,8 +102,8 @@
       "pathway": "correlation",
       "asked_by": "a.bello",
       "question": "Why are maintenance faults rising in one battalion?",
-      "expected": "Planted finding linking rising faults to lapsed maintainer certifications and a spare-part shortage, with an evidence panel; the finding inherits Secret and must stay hidden from t.adeyemi.",
-      "status": "not-built"
+      "expected": "Run the correlation job first (dashboard button or POST /api/v1/correlation/run, commander only). a.bello gets the planted Secret finding (rising Bn 4 faults, lapsed maintainer certifications, spare-part shortage) with its evidence list and analysis; t.adeyemi gets no rows and no hint that it exists.",
+      "status": "built"
     },
     {
       "id": "data-stock-below-threshold",

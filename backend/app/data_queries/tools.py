@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy.engine import Connection
@@ -20,6 +20,7 @@ from app.authz.context import AccessContext
 from app.clock import demo_today
 from app.connectors.base import RecordFilter, SourceRecord
 from app.connectors.demo import DemoReferenceAdapter
+from app.correlation.store import list_findings
 from app.data_queries.errors import ToolParamError
 
 MAX_WITHIN_DAYS = 365
@@ -200,4 +201,45 @@ def stock_below_threshold(
         columns=columns,
         rows=rows,
         records=tuple(records),
+    )
+
+
+def correlation_findings(
+    ctx: AccessContext, params: Mapping[str, Any], conn: Connection
+) -> ToolResult:
+    """The correlation findings this caller may see (row filter + RLS in the query).
+
+    Findings are produced by our own correlation job, not a source system, so this
+    reads the findings store rather than an adapter. Each finding is wrapped as a
+    record so the answer inherits its classification and compartments like any other.
+    """
+    _check_names(params, frozenset())
+    findings = list_findings(conn, ctx)
+    records = tuple(
+        SourceRecord(
+            source_ref=f.key,
+            entity_type="Finding",
+            source_system="correlation",
+            data={"title": f.title, "summary": f.summary, "severity": f.severity},
+            classification_code=f.classification_code,
+            compartments=tuple(f.compartments),
+            unit_path=f.unit_path,
+            retrieved_at=datetime.fromisoformat(f.created_at),
+        )
+        for f in findings
+    )
+    columns = ("id", "title", "severity", "classification", "unit_path", "summary")
+    rows = [
+        {
+            "id": f.key,
+            "title": f.title,
+            "severity": f.severity,
+            "classification": f.classification_code,
+            "unit_path": f.unit_path,
+            "summary": f.summary,
+        }
+        for f in findings
+    ]
+    return ToolResult(
+        tool="correlation_findings", params={}, columns=columns, rows=rows, records=records
     )

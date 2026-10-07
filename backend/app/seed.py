@@ -29,6 +29,7 @@ from app.authz.models import (
 from app.clock import demo_today
 from app.config import get_settings
 from app.connectors.models import CanonicalRecord, SourceSystem
+from app.correlation.models import Finding
 from app.knowledge.models import Chunk, Conversation, Document, Message
 
 DEMO_PASSWORD = "Demo!Gateway2026"
@@ -304,6 +305,15 @@ def _qualification(ref, classification, compartments, unit_path, offset, **field
     return (ref, "Qualification", "personnel-ref", classification, compartments, unit_path, data)
 
 
+def _fault(ref, classification, unit_path, offset, equipment, description):
+    data = {
+        "equipment": equipment,
+        "description": description,
+        "reported_on": _days_from_today(offset),
+    }
+    return (ref, "FaultReport", "logistics-ref", classification, [], unit_path, data)
+
+
 _BN4 = "/command-a/bde-2/bn-4/"
 _BDE2 = "/command-a/bde-2/"
 RECORDS += [
@@ -500,6 +510,46 @@ RECORDS += [
         _BN4,
         {"item": "Ration pack 24h", "depot": "DEP-B4", "quantity": 400, "threshold": 250},
     ),
+    # Planted correlation pattern (Part D2): fault reports rise in Battalion 4 while
+    # its maintainers' certifications lapse (REC-041/042) and a spare-part line is
+    # short (REC-026). Brigade 2's fault rate stays flat as the control. The newest
+    # Bn 4 report is Secret, so the derived finding inherits Secret (SPEC 7.2).
+    # Windows are relative to the seed date: 42..22 days ago vs the last 21 days.
+    _fault("REC-028", "restricted", _BN4, -40, "APC-12", "Hydraulic leak, rear ramp"),
+    _fault("REC-029", "restricted", _BN4, -30, "Cargo Truck 5T", "Brake pressure warning"),
+    _fault("REC-030", "restricted", _BN4, -18, "APC-12", "Transmission slip under load"),
+    _fault("REC-031", "restricted", _BN4, -14, "Cargo Truck 5T", "Alternator failure"),
+    _fault("REC-032", "restricted", _BN4, -11, "Water Purifier WP-7", "Filter housing crack"),
+    _fault("REC-033", "restricted", _BN4, -8, "APC-12", "Coolant loss"),
+    _fault("REC-034", "restricted", _BN4, -5, "Cargo Truck 5T", "Steering play"),
+    _fault("REC-035", "restricted", _BN4, -3, "Water Purifier WP-7", "Pump seal failure"),
+    _fault(
+        "REC-036", "secret", _BN4, -1, "Command vehicle secure radio", "Encryption module fault"
+    ),
+    _fault("REC-037", "restricted", _BDE2, -38, "Generator 15kW", "Fuel pump fault"),
+    _fault("REC-038", "restricted", _BDE2, -28, "Generator 15kW", "Exhaust leak"),
+    _fault("REC-039", "restricted", _BDE2, -15, "Light Truck 2T", "Tyre wear"),
+    _fault("REC-040", "restricted", _BDE2, -6, "Light Truck 2T", "Clutch wear"),
+    _qualification(
+        "REC-041",
+        "restricted",
+        [],
+        _BN4,
+        -18,
+        name="Cpl J. Lawal",
+        rank="Corporal",
+        certification="Vehicle Maintainer",
+    ),
+    _qualification(
+        "REC-042",
+        "restricted",
+        [],
+        _BN4,
+        -9,
+        name="Pte S. Ogunleye",
+        rank="Private",
+        certification="Vehicle Maintainer",
+    ),
 ]
 
 
@@ -652,6 +702,7 @@ def _rows() -> dict[type, list[dict]]:
 # that reference users, so a reseed clears them too. audit_events is never
 # touched.
 _DELETE_ORDER = (
+    Finding,
     Message,
     Conversation,
     Chunk,

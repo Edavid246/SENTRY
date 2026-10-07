@@ -14,6 +14,7 @@ import os
 import app.audit.models  # noqa: F401
 import app.authz.models  # noqa: F401
 import app.connectors.models  # noqa: F401
+import app.correlation.models  # noqa: F401
 import app.knowledge.models  # noqa: F401
 from alembic import context
 from app.config import get_settings

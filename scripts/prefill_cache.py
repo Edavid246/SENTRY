@@ -150,6 +150,16 @@ def run(pairs: list[Pair], *, verify: bool, pause: float) -> list[Outcome]:
     outcomes: list[Outcome] = []
     tokens: dict[str, str] = {}
     with TestClient(app, raise_server_exceptions=False) as client:
+        # The planted finding exists only once a commander has run the correlation job;
+        # the findings question needs it in place (idempotent, so safe on every run).
+        boss = client.post(
+            "/api/v1/auth/login", json={"username": "a.bello", "password": DEMO_PASSWORD}
+        )
+        if boss.status_code == 200:
+            client.post(
+                "/api/v1/correlation/run",
+                headers={"Authorization": f"Bearer {boss.json()['access_token']}"},
+            )
         for index, pair in enumerate(pairs):
             if pair.user not in tokens:
                 login = client.post(

@@ -19,6 +19,7 @@ from app.authz.context import AccessContext
 from app.data_queries.errors import ToolParamError
 from app.data_queries.tools import (
     ToolResult,
+    correlation_findings,
     equipment_due_for_maintenance,
     expired_certifications,
     stock_below_threshold,
@@ -31,6 +32,7 @@ REGISTRY: dict[str, ToolFn] = {
     "equipment_due_for_maintenance": equipment_due_for_maintenance,
     "expired_certifications": expired_certifications,
     "stock_below_threshold": stock_below_threshold,
+    "correlation_findings": correlation_findings,
 }
 
 _AUDIT_VALUE_LIMIT = 120

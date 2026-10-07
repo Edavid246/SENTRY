@@ -27,6 +27,17 @@ ITEM_KEYS = {
 }
 
 
+FINDING = "FND-RISING-FAULTS-BN-4"
+
+
+def _run_correlation(client) -> None:
+    """The finding exists only once a commander has run the job (idempotent)."""
+    assert (
+        client.post("/api/v1/correlation/run", headers=auth_header(client, "a.bello")).status_code
+        == 200
+    )
+
+
 def _summary(client, username: str):
     return client.get(PATH, headers=auth_header(client, username))
 
@@ -68,13 +79,14 @@ def test_bello_and_adeyemi_get_different_dashboards(client) -> None:
 
 
 def test_secret_finding_is_visible_to_bello_and_absent_for_adeyemi(client) -> None:
+    _run_correlation(client)
     bello = _summary(client, "a.bello").json()
     adeyemi = _summary(client, "t.adeyemi").json()
-    assert "FND-CORR" in _ids(bello, "recent_findings")
-    assert _ids(adeyemi, "recent_findings") == {"FND-ATT"}
+    assert _ids(bello, "recent_findings") == {FINDING}
+    assert _ids(adeyemi, "recent_findings") == set()
     # Nowhere in the raw response either, not even as text.
-    assert "FND-CORR" not in _summary(client, "t.adeyemi").text
-    assert "spare-part shortage" not in _summary(client, "t.adeyemi").text
+    for needle in (FINDING, "spare-part shortage", "lapsed maintainer"):
+        assert needle not in _summary(client, "t.adeyemi").text
 
 
 def test_tiles_are_real_exactly_where_the_data_is_real(client) -> None:
@@ -83,7 +95,7 @@ def test_tiles_are_real_exactly_where_the_data_is_real(client) -> None:
         "readiness": True,
         "maintenance_backlog": False,
         "expiring_certifications": False,
-        "recent_findings": True,
+        "recent_findings": False,
     }
     assert "typed tool" in tiles["maintenance_backlog"]["source"]
 
@@ -99,7 +111,7 @@ def test_real_tile_items_are_derived_and_inherit_classification(client) -> None:
     # Bde 2 group mixes Restricted and Confidential records: highest wins
     assert items["CRT-BDE-2"]["classification"] == "confidential"
     assert items["CRT-BDE-2"]["value"] == 2
-    assert items["CRT-BN-4"]["detail"] == "REC-019, REC-020"
+    assert items["CRT-BN-4"]["detail"] == "REC-019, REC-020, REC-041, REC-042"
 
 
 def test_real_tiles_call_the_audited_typed_tools(client) -> None:
@@ -114,7 +126,8 @@ def test_real_tiles_call_the_audited_typed_tools(client) -> None:
 
 def test_confidential_user_sees_confidential_but_not_secret(client) -> None:
     okafor = _summary(client, "a.okafor").json()
-    assert _ids(okafor, "recent_findings") == {"FND-ATT", "FND-AMM"}
+    _run_correlation(client)
+    assert _ids(_summary(client, "a.okafor").json(), "recent_findings") == set()
     # UAS Wing is outside Okafor's unit scope (and needs UAS-OPS).
     assert "RDY-UAS" not in _ids(okafor, "readiness")
 
@@ -137,7 +150,9 @@ def test_unauthenticated_is_401(client) -> None:
 
 def test_every_returned_item_is_labelled_with_its_classification(client) -> None:
     body = _summary(client, "a.bello").json()
-    secret = [i for t in body["tiles"].values() for i in t["items"] if i["id"] == "FND-CORR"][0]
+    _run_correlation(client)
+    body = _summary(client, "a.bello").json()
+    secret = [i for t in body["tiles"].values() for i in t["items"] if i["id"] == FINDING][0]
     assert secret["classification"] == "secret"
     assert secret["unit_name"] == "Battalion 4"
 

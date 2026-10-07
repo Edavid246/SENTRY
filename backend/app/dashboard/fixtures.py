@@ -5,10 +5,10 @@ summary service can run it through the same SPEC 7.1 rule as database rows
 (`LocalPolicy.item_visible`). The fixtures are NOT an authorization shortcut:
 they are filtered per caller before anything is returned.
 
-Part D1 replaced the maintenance and certification tiles with typed-tool
-results (`app.api.dashboard._real_tile`); only readiness and recent findings
-remain fixtures (Part D2 replaces findings). A tile's `stub` flag is false
-only when its data is real; the response shape never changes.
+Maintenance and certification tiles are typed-tool results and recent findings
+come from the correlation store (`app.api.dashboard`); only readiness remains a
+fixture. A tile's `stub` flag is false only when its data is real; the response
+shape never changes.
 """
 
 from __future__ import annotations
@@ -87,40 +87,6 @@ TILES: tuple[FixtureTile, ...] = (
                 unit="%",
                 compartments=("UAS-OPS",),
                 trend=(86, 87, 87, 88, 88, 88),
-            ),
-        ),
-    ),
-    FixtureTile(
-        key="recent_findings",
-        title="Recent findings",
-        source=_SOURCE,
-        items=(
-            FixtureItem(
-                "FND-ATT",
-                "Rifle Refresher attendance below plan",
-                "restricted",
-                _BN4,
-                detail="Attendance 71% against a plan of 90% over the last three sessions.",
-                severity="low",
-            ),
-            FixtureItem(
-                "FND-AMM",
-                "Ammunition stocktake variance",
-                "confidential",
-                _BDE2,
-                detail="Stocktake differs from the ledger by 3% for one calibre.",
-                severity="medium",
-            ),
-            # Stand-in for the planted correlation finding (Part D2 replaces it with
-            # a computed one). It is Secret, so Restricted callers never receive it.
-            FixtureItem(
-                "FND-CORR",
-                "Rising faults in Battalion 4 linked to lapsed certifications and a parts shortage",
-                "secret",
-                _BN4,
-                detail="Fault reports up 40% in six weeks; maintainer certifications lapsed and"
-                " the water purifier filter stock is below threshold.",
-                severity="high",
             ),
         ),
     ),

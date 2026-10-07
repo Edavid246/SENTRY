@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
-    "commander": frozenset({"read", "query", "retrieve", "answer"}),
+    "commander": frozenset({"read", "query", "retrieve", "answer", "run_correlation"}),
     "logistics": frozenset({"read", "query", "retrieve", "answer"}),
     "training": frozenset({"read", "query", "retrieve", "answer"}),
     "uas_ops": frozenset({"read", "query", "retrieve", "answer"}),

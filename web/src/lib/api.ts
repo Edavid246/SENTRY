@@ -6,6 +6,8 @@ export type Citation = Schemas["CitationOut"];
 export type ConversationSummary = Schemas["ConversationSummary"];
 export type ConversationDetail = Schemas["ConversationDetail"];
 export type ResultTable = Schemas["ResultTable"];
+export type Finding = Schemas["FindingOut"];
+export type RunResult = Schemas["RunResult"];
 export type RecordDetail = Schemas["RecordDetail"];
 export type DashboardSummary =Schemas["DashboardSummary"];
 export type DashboardTile = Schemas["DashboardTile"];
@@ -131,6 +133,8 @@ export const api = {
     request<AuditEvent[]>(
       `/audit?limit=${limit}${eventId ? `&event_id=${encodeURIComponent(eventId)}` : ""}`,
     ),
+  runCorrelation: () => request<RunResult>("/correlation/run", { method: "POST" }),
+  finding: (id: string) => request<Finding>(`/correlation/findings/${encodeURIComponent(id)}`),
   record: (sourceRef: string) =>
     request<RecordDetail>(`/records/${encodeURIComponent(sourceRef)}`),
   dashboard: () => request<DashboardSummary>("/dashboard/summary"),

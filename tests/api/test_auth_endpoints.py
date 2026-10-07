@@ -15,7 +15,7 @@ from test_rls_only import CONTEXTS, USERNAMES
 # /me response is checked against an independent oracle, not against
 # ROLE_PERMISSIONS in the code under test.
 EXPECTED_PERMISSIONS: dict[str, list[str]] = {
-    "commander": ["answer", "query", "read", "retrieve"],
+    "commander": ["answer", "query", "read", "retrieve", "run_correlation"],
     "logistics": ["answer", "query", "read", "retrieve"],
     "training": ["answer", "query", "read", "retrieve"],
     "uas_ops": ["answer", "query", "read", "retrieve"],

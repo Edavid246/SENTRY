@@ -72,10 +72,24 @@ try {
 
   // dashboard: login lands here; every stub tile is tagged; the Secret finding is shown
   await page.waitForSelector('[data-testid="tile-recent_findings"]');
-  check((await page.locator('[data-testid="placeholder-tag"]').count()) === 2, "the two fixture tiles are tagged PLACEHOLDER DATA (the two real tiles are not)");
-  check((await page.locator('[data-testid="item-FND-CORR"]').count()) === 1, "a.bello sees the Secret finding");
+  check((await page.locator('[data-testid="placeholder-tag"]').count()) === 1, "only the readiness tile is tagged PLACEHOLDER DATA");
+  // the finding exists once a commander runs the correlation job
+  await page.click('[data-testid="run-correlation"]');
+  await page.waitForSelector('[data-testid="finding-link"]');
+  check((await page.locator('[data-testid="item-FND-RISING-FAULTS-BN-4"]').count()) === 1, "a.bello sees the Secret finding after running correlation");
   const belloItems = await page.locator('[data-testid^="item-"]').count();
   await shot("13-dashboard-bello");
+  await page.click('[data-testid="finding-link"]');
+  await page.waitForSelector('[data-testid="finding-detail"]');
+  const evidence = await page.locator('[data-testid="evidence-link"]').count();
+  check(evidence === 10, `finding detail lists its evidence (${evidence} records)`);
+  check((await page.textContent('[data-testid="finding-detail"]')).includes("SECRET"), "finding detail shows the derived SECRET label");
+  await shot("17-finding-detail");
+  await page.locator('[data-testid="evidence-link"]').first().click();
+  await page.waitForSelector('[data-testid="record-detail"]');
+  check(true, "an evidence link opens the record");
+  await page.click('a[href="/dashboard"]');
+  await page.waitForSelector('[data-testid="tile-recent_findings"]');
   await page.click('a[href="/chat"]');
   await page.waitForURL("**/chat");
   await shot("03-chat-empty");
@@ -104,7 +118,8 @@ try {
   await login("t.adeyemi");
   await page.waitForURL("**/dashboard");
   await page.waitForSelector('[data-testid="tile-recent_findings"]');
-  check((await page.locator('[data-testid="item-FND-CORR"]').count()) === 0, "t.adeyemi does not see the Secret finding");
+  check((await page.locator('[data-testid="finding-link"]').count()) === 0, "t.adeyemi does not see the Secret finding");
+  check((await page.locator('[data-testid="run-correlation"]').count()) === 0, "t.adeyemi has no run-correlation button");
   const adeyemiItems = await page.locator('[data-testid^="item-"]').count();
   check(adeyemiItems < belloItems, `t.adeyemi dashboard is smaller (${adeyemiItems} < ${belloItems} items)`);
   await shot("14-dashboard-adeyemi");
@@ -119,6 +134,9 @@ try {
   check(adeyemiRows < belloRows, `t.adeyemi sees fewer equipment rows (${adeyemiRows} < ${belloRows})`);
   check(adeyemiCites <= belloCites, `t.adeyemi citations ${adeyemiCites} <= a.bello ${belloCites}`);
   await shot("07-adeyemi-fewer-results");
+  await page.goto(BASE + "/findings/FND-RISING-FAULTS-BN-4");
+  await page.waitForSelector('[data-testid="finding-error"]');
+  check(true, "t.adeyemi gets 'not found' for the Secret finding page");
   await page.goto(BASE + "/records/REC-023");
   await page.waitForSelector('[data-testid="record-error"]');
   check(true, "t.adeyemi gets 'not found' for a Secret UAS record, same as a missing one");

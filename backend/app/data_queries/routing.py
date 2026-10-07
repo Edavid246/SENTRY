@@ -33,6 +33,11 @@ _STOCK_RE = re.compile(
 )
 _LOW_RE = re.compile(r"\b(below|low|short|shortages?|under|depleted|running out)\b", re.IGNORECASE)
 _DEPOT_RE = re.compile(r"\bDEP-[A-Za-z0-9-]+\b", re.IGNORECASE)
+_FINDING_RE = re.compile(r"\b(findings?|correlations?)\b", re.IGNORECASE)
+_FAULT_RE = re.compile(r"\bfaults?\b", re.IGNORECASE)
+_RISING_RE = re.compile(
+    r"\b(rising|rise|rose|increas\w+|spiking|growing|trend\w*)\b", re.IGNORECASE
+)
 _WITHIN_RE = re.compile(
     r"\b(?:within|in|over)\s+(?:the\s+)?(?:next\s+)?(\d{1,6})\s+days?\b|"
     r"\bnext\s+(\d{1,6})\s+days?\b",
@@ -49,7 +54,11 @@ class RoutedTool:
 
 def route_question(question: str) -> RoutedTool | None:
     """The data tool for a record-style request, or None (knowledge pathway)."""
-    if _KNOWLEDGE_RE.search(question) or not _REQUEST_RE.search(question):
+    if _KNOWLEDGE_RE.search(question):
+        return None
+    if _FINDING_RE.search(question) or (_FAULT_RE.search(question) and _RISING_RE.search(question)):
+        return RoutedTool("correlation_findings", {})
+    if not _REQUEST_RE.search(question):
         return None
     params: dict[str, Any] = {}
     path = _PATH_RE.search(question)

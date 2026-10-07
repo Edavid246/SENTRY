@@ -28,7 +28,7 @@ export function ResultTableView({ table }: { table: ResultTable }) {
                 <td key={c} className="whitespace-nowrap px-3 py-2">
                   {c === "id" && typeof row[c] === "string" ? (
                     <Link
-                      href={`/records/${encodeURIComponent(row[c] as string)}`}
+                      href={`/${(row[c] as string).startsWith("FND-") ? "findings" : "records"}/${encodeURIComponent(row[c] as string)}`}
                       data-testid="record-link"
                       className="font-mono text-amber hover:underline"
                     >

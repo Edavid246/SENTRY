@@ -26,10 +26,11 @@ RESOURCE_TABLES: dict[str, str] = {
     "record": "canonical_records",
     "conversation": "conversations",
     "message": "messages",
+    "finding": "findings",
 }
 KNOWN_RESOURCES: frozenset[str] = frozenset(RESOURCE_TABLES) | {"audit", "assistant", "dashboard"}
 DATA_ACTIONS: frozenset[str] = frozenset(
-    {"read", "query", "retrieve", "answer", "view_record", "ask"}
+    {"read", "query", "retrieve", "answer", "view_record", "ask", "run_correlation"}
 )
 
 

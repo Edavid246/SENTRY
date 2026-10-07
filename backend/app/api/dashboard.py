@@ -24,6 +24,7 @@ from app.api.deps import ConnDep, CurrentContext, audit_events
 from app.audit.chain import utc_now_iso
 from app.authz.context import AccessContext
 from app.authz.policy import LocalPolicy
+from app.correlation.store import list_findings
 from app.dashboard.fixtures import TILES, FixtureTile
 from app.data_queries.registry import execute_tool
 
@@ -177,6 +178,32 @@ def _real_tile(
     )
 
 
+def _findings_tile(ctx: AccessContext, conn: Connection, names: dict[str, str]) -> DashboardTile:
+    """Findings the caller may see (row filter + RLS inside the query)."""
+    items = [
+        DashboardItem(
+            id=row.key,
+            label=row.title,
+            value=None,
+            unit=None,
+            detail=row.summary,
+            severity=row.severity,
+            trend=[],
+            classification=row.classification_code,
+            compartments=row.compartments,
+            unit_path=row.unit_path,
+            unit_name=names.get(row.unit_path, row.unit_path),
+        )
+        for row in list_findings(conn, ctx)
+    ]
+    return DashboardTile(
+        stub=False,
+        source="correlation job (rising_faults), run on demand by a commander",
+        title="Recent findings",
+        items=items,
+    )
+
+
 @router.get("/summary", response_model=DashboardSummary)
 def dashboard_summary(ctx: CurrentContext, conn: ConnDep) -> DashboardSummary:
     decision = POLICY.decide(ctx, "read", "dashboard")
@@ -199,6 +226,8 @@ def dashboard_summary(ctx: CurrentContext, conn: ConnDep) -> DashboardSummary:
         key: (
             _real_tile(ctx, conn, key, ranks, names)
             if key in _REAL_TILES
+            else _findings_tile(ctx, conn, names)
+            if key == "recent_findings"
             else _build_tile(ctx, fixtures[key], ranks, names)
         )
         for key in DashboardTiles.model_fields

@@ -25,6 +25,7 @@ in each step's report.
 | Manipulation defences (SPEC §8.3) | Requests to ignore permissions are refused with access unchanged and recorded as a notable event; answers citing outside the evidence set are blocked (`found=false`, decision `deny`). |
 | Data pathway (SPEC §8.2, §11) | `POST /api/v1/assistant/query` routes record-style requests to typed, parameterized tools (`equipment_due_for_maintenance`, `expired_certifications`, `stock_below_threshold`) in `backend/app/data_queries/`. Tools reach records only through the adapter interface (`connectors/base.py`; `DemoReferenceAdapter` is the only reader of `canonical_records`), which applies `row_filter` + RLS. The response carries `result_table` (deterministic tool output) and a gateway-written explanation; a bad or out-of-scope `unit_path` is a safe refusal (`refused=true`, no SQL, no model call). One `data_query` audit event per call. |
 | Dashboard (SPEC §18.1) | `GET /api/v1/dashboard/summary`: four tiles (readiness, maintenance backlog, expiring certifications, recent findings), permission-aware per caller, audited (decide + query with item ids), 403 for roles without data access. Maintenance backlog (overdue equipment) and certifications (expired, not "expiring": the tool reports lapsed ones) are **real** typed-tool results grouped by unit, `stub: false`, each count inheriting the highest classification and union of compartments of its records. Readiness and recent findings are still placeholder fixtures (`stub: true`, tagged PLACEHOLDER DATA); findings become real in D2. Result-table rows link to `GET /api/v1/records/{source_ref}` (adapter + row filter, 404 when not visible). Login lands here. |
+| Correlation (SPEC §10.6, §18.6) | The seed plants rising Bn 4 faults, two lapsed Vehicle Maintainer certifications and a short stock line (Bde 2 faults flat as control). `POST /api/v1/correlation/run` (commander only, on demand) computes the `rising_faults` finding from the adapter and the audited typed tools and stores it with its evidence references and the analysis parameters; `GET /api/v1/correlation/findings[/{id}]` reads it through the policy row filter + RLS (404, never 403, when hidden). It is Secret because one input is Secret: derived items take the highest classification and the union of compartments (`app/correlation/derive.py`, tested directly). Dashboard findings tile is real; the assistant answers about visible findings; the UI has a finding page with an evidence list. Run it once before the demo (dashboard "Run correlation"). |
 | Route convention | All routers under `/api/v1` (no root aliases), `/healthz` only at the root; no CORS middleware — same-origin proxy only. |
 | Authorization tests | RLS-only and filter-only layers checked against a hand-authored oracle (`tests/authz/`), plus API, adversarial and tamper-evidence tests. |
 
@@ -50,7 +51,6 @@ in each step's report.
 | Remaining typed tool `training_activity` (3 of 4–5 built: maintenance, expired certifications, stock below threshold) | §18.3 |
 | Administrative/report drafting over records and documents | §18.4 |
 | Connected-systems map and timed synthetic feeds (surveillance, UAS, forensics) | §18.5 |
-| One planted correlation finding with its evidence panel | §18.6 |
 | Evaluation additions beyond the current authorization/retrieval/adversarial suite | §16 |
 
 ## Not built (spec modules outside the Monday demo)
@@ -130,12 +130,12 @@ profile. Map tiles are cut too (MapLibre renders GeoJSON without them).
 
 ## Trimmed demo script (spec §18)
 
-1. Login — API ready, dashboard waits for the UI (Part B).
+1. Login lands on the dashboard (permission-aware tiles) — **works**.
 2. Knowledge pathway with citations + open a cited page — **works against the API today**.
 3. Data pathway — **works against the API today** (equipment due for maintenance, expired certifications; more tools to come). Needs a live or cached model for the explanation; the table is deterministic.
 4. Reporting — pending.
 5. Connected systems — pending.
-6. Correlation finding — pending.
+6. Correlation finding — **works**: commander clicks "Run correlation" on the dashboard (or `POST /api/v1/correlation/run`), opens the finding, follows evidence links; ask "Why are maintenance faults rising in one battalion?".
 7. Security moment (same question, lower clearance) — **works against the API today**.
 8. Manipulation attempt — **works against the API today**.
 9. Audit trail + chain verification — **works against the API today**.

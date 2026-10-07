@@ -53,8 +53,8 @@ CERT_COLUMNS = ["id", "name", "rank", "certification", "expired_date", "unit_pat
 
 BELLO_EQUIPMENT = {f"REC-0{n}" for n in (11, 12, 13, 14, 15, 16, 18)}  # 017 is due in 90 days
 ADEYEMI_EQUIPMENT = {"REC-011", "REC-012"}
-BELLO_CERTS = {f"REC-0{n}" for n in (19, 20, 21, 22, 23, 24)}  # 025 is valid for 200 days
-ADEYEMI_CERTS = {"REC-019", "REC-020"}
+BELLO_CERTS = {f"REC-0{n}" for n in (19, 20, 21, 22, 23, 24, 41, 42)}  # 025 is valid for 200 days
+ADEYEMI_CERTS = {"REC-019", "REC-020", "REC-041", "REC-042"}
 BN4 = "/command-a/bde-2/bn-4/"
 
 

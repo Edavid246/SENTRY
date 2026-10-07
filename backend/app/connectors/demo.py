@@ -24,7 +24,7 @@ POLICY = LocalPolicy()
 # Record fields a search may compare as an ISO date. The name is a bound
 # parameter, never interpolated; the allow-list keeps the surface explicit.
 DATE_FIELDS: frozenset[str] = frozenset({"maintenance_due_date", "expires"})
-ENTITY_TYPES: tuple[str, ...] = ("Equipment", "Qualification", "StockItem")
+ENTITY_TYPES: tuple[str, ...] = ("Equipment", "Qualification", "StockItem", "FaultReport")
 
 _SELECT = (
     "SELECT canonical_records.source_ref, canonical_records.entity_type,"
