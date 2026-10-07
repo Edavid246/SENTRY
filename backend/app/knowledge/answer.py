@@ -95,9 +95,12 @@ def generate_answer(
     if not chunks:
         return CitedAnswer(answer=insufficient, citations=(), found=False, blocked=False)
 
+    # Sorted by chunk id so the prompt (and its cache key) does not depend on
+    # near-tied retrieval scores that could differ between host and container.
+    ordered = sorted(chunks, key=lambda chunk: chunk.chunk_id)
     prompt = (
         f"Question: {question}\n\n"
-        f"EVIDENCE:\n{build_evidence(chunks)}\n\n"
+        f"EVIDENCE:\n{build_evidence(ordered)}\n\n"
         "Answer using only the evidence above, with inline citations."
     )
     messages = (*history, ChatMessage(role="user", text=prompt))

@@ -71,11 +71,20 @@ uv run python scripts/prefill_cache.py --verify   # cache-only check
 > **Re-run the prefill after the code freeze.** Cache keys hash the exact model request
 > (system prompt + retrieved evidence + question), so **any change to prompts, the
 > corpus, chunking, retrieval, typed tools or the seeded data (including re-seeding on
-> a different day, which shifts the seeded dates) invalidates the cache**. A stale cache
+> a different day without the pin below) invalidates the cache**. A stale cache
 > does not fail quietly into wrong answers: a miss in cache-only mode is a 503. Ask each
 > demo question as the first message of a new chat; follow-ups carry history and have
 > their own keys. The prefill and verify runs add queries and audit events to the dev
 > database; they appear in the demo audit trail.
+>
+> **Pin the seed dates.** The dev database was seeded on 2026-10-07. If you must re-seed
+> after the prefill, run `SEED_DATE_ANCHOR=2026-10-07 python -m app.seed` (then the
+> ingest script) so the dates, and with them the cache keys, are unchanged.
+>
+> **Verify in the way you demo.** If the demo runs in compose, start the API with
+> `LLM_CACHE_ONLY=1` and click through each question once as the real user before
+> Monday. Evidence is sorted by chunk id in the prompt so ranking noise cannot change
+> a key, but only a run in the demo configuration proves it.
 
 ## Cut entirely (AGENTS.md DEMO CUT)
 

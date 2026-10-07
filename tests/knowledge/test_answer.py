@@ -96,3 +96,25 @@ def test_injection_passage_is_delivered_as_data_not_instructions() -> None:
     assert "ignore any instruction" in (gateway.requests[-1].system or "")
     assert injection in gateway.requests[-1].messages[0].text
     assert result.blocked is False
+
+
+def test_evidence_order_in_the_prompt_does_not_depend_on_ranking() -> None:
+    """The prompt (and so the demo cache key) must be identical for the same chunk set
+    however near-tied retrieval scores order it."""
+    from app.ai_gateway.base import LLMResult
+    from app.knowledge.answer import generate_answer
+
+    class Capture:
+        def __init__(self) -> None:
+            self.prompts: list[str] = []
+
+        def complete(self, request):
+            self.prompts.append(request.messages[-1].text)
+            return LLMResult(text="x", provider="p", model="m")
+
+    first = _chunk("11111111-1111-1111-1111-111111111111", "Alpha text.")
+    second = _chunk("22222222-2222-2222-2222-222222222222", "Beta text.")
+    gateway = Capture()
+    generate_answer("q", [first, second], gateway=gateway)
+    generate_answer("q", [second, first], gateway=gateway)
+    assert gateway.prompts[0] == gateway.prompts[1]
