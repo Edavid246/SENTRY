@@ -1,5 +1,6 @@
 .env
 data/raw/
+data/models/
 node_modules/
 __pycache__/
 .venv/

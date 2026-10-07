@@ -16,6 +16,15 @@ ENV UV_COMPILE_BYTECODE=1 \
 COPY .python-version pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
+# Baked local embedding weights (BGE-M3 int8 ONNX, ~570 MB, gitignored on the
+# host and copied into the image so the container never downloads models).
+# Lives outside /app/data because ../data is bind-mounted over it at runtime.
+ENV EMBEDDING_CACHE_DIR=/app/models \
+    LLM_RESPONSE_CACHE_PATH=/app/data/demo_llm_cache.json
+COPY data/models /app/models
+RUN f="$(ls /app/models/models--Xenova--bge-m3/snapshots/*/onnx/model_int8.onnx)" \
+    && [ "$(stat -Lc %s "$f")" -gt 100000000 ]
+
 # Application source; project installed editable so --reload picks up binds.
 COPY backend ./backend
 RUN uv sync --frozen --no-dev

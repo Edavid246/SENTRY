@@ -7,6 +7,7 @@ always local. See AGENTS.md and docs/SPEC.md Section 8.
 
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,7 +19,7 @@ class Settings(BaseSettings):
     environment, or the defaults below (dev/demo defaults, not secrets).
     """
 
-    model_config = SettingsConfigDict(env_file=None, extra="ignore")
+    model_config = SettingsConfigDict(env_file=None, extra="ignore", populate_by_name=True)
 
     app_name: str = "Defence Gateway AI"
     app_version: str = "0.1.0"
@@ -45,12 +46,22 @@ class Settings(BaseSettings):
     dev_jwt_ttl_seconds: int = 7200
 
     # AI gateway — provider/model from config, never hardcoded (AGENTS.md).
+    # The hosted API key is accepted under either name so the Compose env and
+    # the developer's .env (Gemini) both work; the value is never logged.
     llm_provider: str = "hosted"
-    llm_model: str = ""
-    hosted_api_key: str = ""
+    llm_model: str = "gemini-3.5-flash"
+    hosted_api_key: str = Field(
+        default="", validation_alias=AliasChoices("HOSTED_API_KEY", "GEMINI_API_KEY")
+    )
+    hosted_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    hosted_timeout_seconds: float = 25.0
+    hosted_max_retries: int = 2
+    local_vllm_base_url: str = "http://localhost:8000/v1"
     embedding_provider: str = "local"
     embedding_model: str = "bge-m3"
     embedding_dim: int = 1024
+    embedding_cache_dir: str = "data/models"
+    llm_response_cache_path: str = "data/demo_llm_cache.json"
 
     # Audit tamper evidence (SPEC 14.2): checkpoint file (layer 1) and the
     # external git ledger repo (layer 2). A checkpoint line is written when

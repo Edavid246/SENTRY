@@ -12,14 +12,14 @@ component slots in. **Demo build only; never claim the dev profile is sovereign.
 | Policy engine | OPA with partial evaluation (SPEC §7.3) | `LocalPolicy`, Python ABAC behind the `Policy` protocol (`decide` + `row_filter`) | `OpaPolicy` implements same protocol |
 | Job queue | Procrastinate worker (SPEC §6, §5.2) | `scripts/` run manually (seed today; ingestion/sync later) | Worker service |
 | Live streams | SSE live feeds (SPEC §6, §10.5) | Timed replay of synthetic events (later slice) | Real adapter `stream()` |
-| Audit hash chain | Hash-chained append-only audit (SPEC §14) | `audit_events` table created, append-only grants applied; chain/verify **not implemented yet** (audit becomes real next slice) | `audit` package implementation |
+| LLM provider | `LocalVLLMProvider` for on-prem inference (SPEC §8.1) | Dev profile uses `HostedProvider` (Gemini over HTTPS, `LLM_PROVIDER=hosted`); `LocalVLLMProvider` occupies the interface and fails closed with `ProviderNotConfiguredError` | vLLM/OpenAI-compatible service behind the same `LLMProvider` protocol |
 
 ## Deferred (not yet built; part of the demo build)
 
 | Item | Note |
 |---|---|
 | Web app (Next.js) | Deferred per build decision — steps 1–6 are API + database only; `web` service will be added to Compose later. Air-gap rules apply when it lands (system fonts, no CDNs). |
-| `assistant`, `knowledge`, `data_queries`, `connectors`, `ai_gateway`, `modules`, `correlation`, `provenance` | Package scaffolds/interfaces as their slices arrive. |
+| `assistant`, `knowledge`, `data_queries`, `connectors`, `modules`, `correlation`, `provenance` | Package scaffolds/interfaces as their slices arrive. |
 | FTS / hybrid search | Chunk search uses `ILIKE` for now; Postgres full-text + vector search arrive with the knowledge slice. |
 | Vector index | **No HNSW (or IVFFlat) index on `chunks.embedding`** — chunks use exact (sequential) search; corpus is tiny and memory is constrained. Add an index with the knowledge slice when data grows. |
 | CI service | GitHub Actions skipped (no git remote). `scripts/check.sh` runs ruff, pytest and the air-gap grep locally. |

@@ -1,0 +1,25 @@
+{
+  "7d772ba8f87189b3011da0b93e2cb0a116532a0d094d3cefe2b9d06eff0f5d1b": {
+    "request": {
+      "max_output_tokens": 1024,
+      "messages": [
+        [
+          "user",
+          "Summarise the key requirements of the vehicle maintenance policy."
+        ]
+      ],
+      "model": "gemini-3.5-flash",
+      "system": "You are the Defence Gateway demo assistant. All data referenced is fictitious demo data. Answer in at most three sentences.",
+      "temperature": 0.0
+    },
+    "response": {
+      "model_version": "gemini-3.5-flash",
+      "text": "Under the Defence Gateway Demo Policy, all operators must conduct daily pre-use safety inspections and log them directly into the digital vehicle diary. Scheduled servicing must be completed every 10,000 kilometers or six months at an authorized demo depot. Finally, any identified defects must be reported immediately through the online portal, grounding the vehicle until a certified technician signs off on the repairs.",
+      "usage": {
+        "completion_tokens": 77,
+        "prompt_tokens": 35,
+        "total_tokens": 458
+      }
+    }
+  }
+}

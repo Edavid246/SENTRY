@@ -19,3 +19,16 @@ def test_provider_and_model_come_from_environment(monkeypatch) -> None:
     assert settings.llm_provider == "local-vllm"
     assert settings.llm_model == "some-open-weight-model"
     assert settings.embedding_dim == 768
+
+
+def test_api_key_accepts_compose_and_gemini_env_names(monkeypatch) -> None:
+    monkeypatch.delenv("HOSTED_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    assert Settings().hosted_api_key == ""
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-key")
+    assert Settings().hosted_api_key == "gemini-key"
+    monkeypatch.setenv("HOSTED_API_KEY", "compose-key")
+    settings = Settings()
+    assert settings.hosted_api_key == "compose-key"
+    assert settings.llm_model == "gemini-3.5-flash"
+    assert settings.hosted_base_url.startswith("https://")

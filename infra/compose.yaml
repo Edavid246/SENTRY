@@ -46,11 +46,14 @@ services:
       DEV_JWT_SECRET: ${DEV_JWT_SECRET:-dev-only-secret-change-me}
       DEV_JWT_TTL_SECONDS: ${DEV_JWT_TTL_SECONDS:-7200}
       LLM_PROVIDER: ${LLM_PROVIDER:-hosted}
-      LLM_MODEL: ${LLM_MODEL:-}
-      HOSTED_API_KEY: ${HOSTED_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gemini-3.5-flash}
+      HOSTED_API_KEY: ${HOSTED_API_KEY:-${GEMINI_API_KEY:-}}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
       EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
+      EMBEDDING_CACHE_DIR: ${EMBEDDING_CACHE_DIR:-/app/models}
+      LLM_RESPONSE_CACHE_PATH: ${LLM_RESPONSE_CACHE_PATH:-/app/data/demo_llm_cache.json}
       AUDIT_CHECKPOINT_PATH: /app/data/audit_checkpoints.log
       AUDIT_LEDGER_PATH: /ledger
     command:

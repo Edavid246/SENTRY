@@ -105,3 +105,54 @@ end-of-step report. Never silently log it.
 - **Why acceptable:** demo CUT item; the interface keeps the swap-in point honest.
 - **Production needs:** OPA sidecar/SDK evaluation with the same `decide()` contract and
   policy-as-code tests.
+
+### 2026-10-07 — Pre-canned response cache can mask provider failure
+- **Issue:** when the hosted LLM fails after retries, `AIGateway` falls back to a
+  pre-recorded answer from `data/demo_llm_cache.json` (keyed by the full request shape:
+  model, messages, temperature, max_output_tokens). A stale canned answer can therefore
+  be shown instead of a hard failure.
+- **Why acceptable:** keeps the demo script runnable offline and on free-tier quota;
+  the result is flagged (`cached=True`, notice string) for provenance display.
+- **Production needs:** fail closed — surface the provider error; if a degraded mode is
+  required, label it explicitly in the UI and exclude cached answers from any
+  operational or evidentiary output.
+
+### 2026-10-07 — Committed canned-answer file
+- **Issue:** `data/demo_llm_cache.json` (prompt→answer pairs for the demo script) is
+  committed to the repository as plaintext.
+- **Why acceptable:** answers are synthetic demo data about synthetic records.
+- **Production needs:** no committed response corpus at all; if caching is kept, store
+  entries server-side with retention limits and access control.
+
+### 2026-10-07 — Hosted API key via environment/compose, no vault or rotation
+- **Issue:** the Gemini key is a plaintext env var (`HOSTED_API_KEY`/`GEMINI_API_KEY`)
+  passed through compose; no secret manager, no rotation, no redaction beyond not
+  logging it.
+- **Why acceptable:** single demo machine, free-tier key, air-gapped demo narrative.
+- **Production needs:** vault/KMS-backed secrets with short-lived scoped credentials,
+  rotation, and egress controls.
+
+### 2026-10-07 — Synchronous non-streaming completion (25 s cap)
+- **Issue:** `AIGateway.complete()` is a blocking request/response; there is no
+  streaming of tokens (`HostedProvider` does not implement the spec's streaming path).
+- **Why acceptable:** demo answers are short; SPEC's 25 s sync-response ceiling is
+  respected via `hosted_timeout_seconds`.
+- **Production needs:** server-sent streaming end to end, with cancellation and
+  per-token accounting.
+
+### 2026-10-07 — Embedding weights downloaded from HuggingFace, not an air-gapped build
+- **Issue:** the BGE-M3 int8 ONNX weights are fetched from the HuggingFace Hub on the
+  dev machine and copied into the image at build (`COPY data/models`); the build is not
+  air-gapped and the upstream source is not mirrored or verified by signature.
+- **Why acceptable:** DEMO CUT removes the air-gapped profile for now; weights are
+  gitignored, baked once, and never fetched at runtime.
+- **Production needs:** internally mirrored model registry, checksum/signature
+  verification at build, and a build pipeline that makes no external calls.
+
+### 2026-10-07 — Live hosted API dependency and free-tier quota
+- **Issue:** every uncached LLM call leaves the machine for the Gemini API; availability
+  and rate limits are Google's, and the free tier has RPM/RPD quotas.
+- **Why acceptable:** development/demo profile only; retries and the response cache
+  absorb transient failures during the scripted demo.
+- **Production needs:** on-prem inference (the stubbed `LocalVLLMProvider`), or a
+  contracted zero-retention endpoint with SLAs, quota monitoring and backpressure.
