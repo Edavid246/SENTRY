@@ -105,3 +105,9 @@ export const IconLogout = (p: P) => (
     <path d="M9 4H4v16h5M16 8l4 4-4 4M20 12H9" />
   </Svg>
 );
+
+export const IconMap = (p: P) => (
+  <Svg {...p}>
+    <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2ZM9 4v14M15 6v14" />
+  </Svg>
+);

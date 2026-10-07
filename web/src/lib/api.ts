@@ -64,6 +64,41 @@ export interface VerifyReport {
   ledger_tip: ChainTip | null;
 }
 
+export type MapKind = "sensor" | "detection" | "mission";
+
+export interface MapProperties {
+  ref: string;
+  kind: MapKind;
+  label: string;
+  classification: string;
+  compartments: string[];
+  unit_path: string;
+  source_system: string;
+  status?: string | null;
+  observed_at?: string;
+  object_type?: string;
+  confidence?: number;
+  site?: string;
+  mission_date?: string;
+  track_kind?: string;
+  area?: string;
+  reason?: string | null;
+}
+
+export interface MapFeature {
+  type: "Feature";
+  geometry:
+    | { type: "Point"; coordinates: [number, number] }
+    | { type: "LineString"; coordinates: [number, number][] };
+  properties: MapProperties;
+}
+
+export interface ConnectedMap {
+  type: "FeatureCollection";
+  features: MapFeature[];
+  generated_at: string;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -138,5 +173,6 @@ export const api = {
   record: (sourceRef: string) =>
     request<RecordDetail>(`/records/${encodeURIComponent(sourceRef)}`),
   dashboard: () => request<DashboardSummary>("/dashboard/summary"),
+  connectedMap: () => request<ConnectedMap>("/connected/map"),
   verify: () => request<VerifyReport>("/audit/verify"),
 };

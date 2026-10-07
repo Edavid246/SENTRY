@@ -7,7 +7,7 @@ import { useSession } from "@/lib/session";
 import { Clock } from "./Clock";
 import { ClearanceBadge } from "./ClearanceBadge";
 import { Emblem } from "./Emblem";
-import { IconChat, IconDashboard, IconLock, IconLog, IconLogout, IconOrg, IconShield } from "./Icons";
+import { IconChat, IconDashboard, IconLock, IconLog, IconLogout, IconMap, IconOrg, IconShield } from "./Icons";
 
 export function Watermark() {
   return (
@@ -65,6 +65,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const nav = [
     { href: "/dashboard", label: "Dashboard", icon: <IconDashboard />, show: can("read") },
     { href: "/chat", label: "Assistant", icon: <IconChat />, show: true },
+    { href: "/map", label: "Map", icon: <IconMap />, show: can("read") },
     { href: "/audit", label: "Audit log", icon: <IconLog />, show: can("read_audit") },
   ].filter((n) => n.show);
 
@@ -154,7 +155,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
-          {["Personnel", "Logistics", "Training", "Map"].map((label) => (
+          {["Personnel", "Logistics", "Training"].map((label) => (
             <div
               key={label}
               aria-disabled="true"

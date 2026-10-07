@@ -1,0 +1,276 @@
+"use client";
+
+import "maplibre-gl/dist/maplibre-gl.css";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { GeoJSONSource, Map as MlMap } from "maplibre-gl";
+import { api, type ConnectedMap, type MapFeature, type MapKind } from "@/lib/api";
+import { useSession } from "@/lib/session";
+import { Shell } from "@/components/Shell";
+import { ClearanceBadge } from "@/components/ClearanceBadge";
+
+const COLOURS: Record<MapKind, string> = {
+  sensor: "#8fa89d",
+  detection: "#efa93a",
+  mission: "#5fae86",
+};
+const KIND_LABEL: Record<MapKind, string> = {
+  sensor: "Sensors",
+  detection: "Detections",
+  mission: "UAS missions",
+};
+
+// Air-gap: no tiles, no glyphs, no sprites. The base map is a flat background plus a
+// lat/lon graticule drawn from local GeoJSON; labels live in the side panel.
+function graticule(bounds: [number, number, number, number]) {
+  const [w, s, e, n] = bounds;
+  const step = 0.02;
+  const features = [];
+  for (let x = Math.floor(w / step) * step; x <= e; x += step)
+    features.push({
+      type: "Feature" as const,
+      properties: {},
+      geometry: { type: "LineString" as const, coordinates: [[x, s], [x, n]] },
+    });
+  for (let y = Math.floor(s / step) * step; y <= n; y += step)
+    features.push({
+      type: "Feature" as const,
+      properties: {},
+      geometry: { type: "LineString" as const, coordinates: [[w, y], [e, y]] },
+    });
+  return { type: "FeatureCollection" as const, features };
+}
+
+function boundsOf(features: MapFeature[]): [number, number, number, number] | null {
+  let w = 180, s = 90, e = -180, n = -90;
+  for (const f of features) {
+    const pts = f.geometry.type === "Point" ? [f.geometry.coordinates] : f.geometry.coordinates;
+    for (const [lon, lat] of pts) {
+      w = Math.min(w, lon);
+      e = Math.max(e, lon);
+      s = Math.min(s, lat);
+      n = Math.max(n, lat);
+    }
+  }
+  return w > e ? null : [w, s, e, n];
+}
+
+export default function MapPage() {
+  const { me } = useSession();
+  const [data, setData] = useState<ConnectedMap | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [hidden, setHidden] = useState<Set<MapKind>>(new Set());
+  const container = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<MlMap | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!me) return;
+    api
+      .connectedMap()
+      .then(setData)
+      .catch(() => setError("The map data could not be loaded."));
+  }, [me]);
+
+  const visible = useMemo(
+    () => (data?.features ?? []).filter((f) => !hidden.has(f.properties.kind)),
+    [data, hidden],
+  );
+  const counts = useMemo(() => {
+    const c: Record<MapKind, number> = { sensor: 0, detection: 0, mission: 0 };
+    for (const f of data?.features ?? []) c[f.properties.kind] += 1;
+    return c;
+  }, [data]);
+  const picked = data?.features.find((f) => f.properties.ref === selected) ?? null;
+
+  // Create the map once the data (and so the extent) is known.
+  useEffect(() => {
+    if (!data || !container.current || mapRef.current) return;
+    let disposed = false;
+    const box = boundsOf(data.features) ?? [3.0, 6.3, 3.6, 6.8];
+    const pad = 0.05;
+    const extent: [number, number, number, number] = [
+      box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad,
+    ];
+    import("maplibre-gl").then(({ default: maplibregl }) => {
+      if (disposed || !container.current) return;
+      const map = new maplibregl.Map({
+        container: container.current,
+        style: {
+          version: 8,
+          sources: {
+            grid: { type: "geojson", data: graticule(extent) },
+            features: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+          },
+          layers: [
+            { id: "bg", type: "background", paint: { "background-color": "#091017" } },
+            { id: "grid", type: "line", source: "grid", paint: { "line-color": "#16252c", "line-width": 1 } },
+            {
+              id: "missions",
+              type: "line",
+              source: "features",
+              filter: ["==", ["geometry-type"], "LineString"],
+              paint: { "line-color": COLOURS.mission, "line-width": 2.5, "line-dasharray": [2, 1] },
+            },
+            {
+              id: "points",
+              type: "circle",
+              source: "features",
+              filter: ["==", ["geometry-type"], "Point"],
+              paint: {
+                "circle-radius": ["case", ["==", ["get", "kind"], "sensor"], 7, 6],
+                "circle-color": ["match", ["get", "kind"], "sensor", COLOURS.sensor, COLOURS.detection],
+                "circle-stroke-color": "#cfdcd5",
+                "circle-stroke-width": 1,
+              },
+            },
+          ],
+        },
+        bounds: extent,
+        fitBoundsOptions: { padding: 40, maxZoom: 14 },
+        attributionControl: false,
+      });
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+      for (const layer of ["points", "missions"]) {
+        map.on("click", layer, (e) => {
+          const ref = e.features?.[0]?.properties?.ref;
+          if (typeof ref === "string") setSelected(ref);
+        });
+        map.on("mouseenter", layer, () => (map.getCanvas().style.cursor = "pointer"));
+        map.on("mouseleave", layer, () => (map.getCanvas().style.cursor = ""));
+      }
+      map.on("load", () => setReady(true));
+      mapRef.current = map;
+    });
+    return () => {
+      disposed = true;
+    };
+  }, [data]);
+
+  useEffect(() => () => {
+    mapRef.current?.remove();
+    mapRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    (map.getSource("features") as GeoJSONSource).setData({
+      type: "FeatureCollection",
+      features: visible,
+    } as never);
+  }, [visible, ready]);
+
+  const toggle = (k: MapKind) =>
+    setHidden((h) => {
+      const next = new Set(h);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+
+  return (
+    <Shell>
+      <div className="flex h-full">
+        <div className="relative min-w-0 flex-1">
+          <div ref={container} data-testid="map-canvas" data-ready={ready}
+            style={{ position: "absolute", inset: 0 }} />
+          <div className="absolute left-3 top-3 border border-rule bg-surface/90 px-3 py-1 text-[0.75rem] tracking-[0.12em] text-sage">
+            SYNTHETIC DATA · NO BASEMAP (AIR-GAPPED)
+          </div>
+          {error && (
+            <p role="alert" data-testid="map-error" className="absolute left-3 top-12 border border-rule bg-surface p-3">
+              {error}
+            </p>
+          )}
+        </div>
+        <aside className="w-80 shrink-0 overflow-y-auto border-l border-rule bg-surface p-4">
+          <h1 className="label">Connected sensors and UAS</h1>
+          <p className="mt-1 text-[0.75rem] text-mute">
+            Only what your clearance and compartments allow is returned by the API.
+          </p>
+          <div className="mt-3 flex flex-col gap-1.5" data-testid="map-legend">
+            {(Object.keys(KIND_LABEL) as MapKind[]).map((k) => (
+              <label key={k} className="flex cursor-pointer items-center gap-2 text-[0.85rem]">
+                <input type="checkbox" checked={!hidden.has(k)} onChange={() => toggle(k)} />
+                <span className="inline-block h-2.5 w-2.5" style={{ background: COLOURS[k] }} />
+                {KIND_LABEL[k]}
+                <span data-testid={`count-${k}`} className="ml-auto font-mono text-mute">
+                  {counts[k]}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          {picked && (
+            <div data-testid="map-detail" className="mt-4 border border-rule p-3 text-[0.85rem]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="label">{picked.properties.kind}</span>
+                <ClearanceBadge code={picked.properties.classification} />
+                {picked.properties.compartments.map((c) => (
+                  <span key={c} className="tag">
+                    {c}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-2 font-medium">{picked.properties.label}</div>
+              <dl className="mt-2 grid grid-cols-[6rem_1fr] gap-y-1 text-[0.8rem]">
+                {(
+                  [
+                    ["Unit", picked.properties.unit_path],
+                    ["Observed", picked.properties.observed_at],
+                    ["Date", picked.properties.mission_date],
+                    ["Status", picked.properties.status],
+                    ["Track", picked.properties.track_kind],
+                    ["Area", picked.properties.area],
+                    ["Reason", picked.properties.reason],
+                    ["Confidence", picked.properties.confidence?.toString()],
+                  ] as [string, string | null | undefined][]
+                )
+                  .filter(([, v]) => v)
+                  .map(([k, v]) => (
+                    <div key={k} className="contents">
+                      <dt className="text-mute">{k}</dt>
+                      <dd className="break-words">{v}</dd>
+                    </div>
+                  ))}
+              </dl>
+              <Link
+                href={`/records/${encodeURIComponent(picked.properties.ref)}`}
+                data-testid="map-record-link"
+                className="btn mt-3 inline-block"
+              >
+                Open {picked.properties.ref}
+              </Link>
+            </div>
+          )}
+
+          <ul className="mt-4 flex flex-col gap-1" data-testid="map-list">
+            {visible.map((f) => (
+              <li key={f.properties.ref}>
+                <button
+                  type="button"
+                  onClick={() => setSelected(f.properties.ref)}
+                  data-testid={`map-item-${f.properties.ref}`}
+                  className={`flex w-full items-center gap-2 border-l-[3px] px-2 py-1 text-left text-[0.8rem] ${
+                    f.properties.ref === selected ? "border-amber bg-raised" : "border-transparent hover:bg-raised"
+                  }`}
+                >
+                  <span className="inline-block h-2 w-2 shrink-0" style={{ background: COLOURS[f.properties.kind] }} />
+                  <span className="truncate">{f.properties.label}</span>
+                  <span className="ml-auto font-mono text-mute">{f.properties.ref}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {data && data.features.length === 0 && !error && (
+            <p data-testid="map-empty" className="mt-4 text-sage">
+              Nothing to show for your access level.
+            </p>
+          )}
+        </aside>
+      </div>
+    </Shell>
+  );
+}

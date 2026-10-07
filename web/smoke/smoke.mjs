@@ -68,7 +68,7 @@ try {
   check((await page.textContent('[data-testid="clearance-badge"]')).includes("SECRET"), "a.bello clearance badge is SECRET");
   check((await page.locator("text=UAS-OPS").count()) > 0, "compartment tags shown");
   check((await page.locator('a[href="/audit"]').count()) === 0, "audit nav hidden without read_audit");
-  check((await page.locator('[data-testid="nav-not-in-demo"]').count()) === 4, "four greyed 'Not in demo' nav items");
+  check((await page.locator('[data-testid="nav-not-in-demo"]').count()) === 3, "three greyed 'Not in demo' nav items");
 
   // dashboard: login lands here; every stub tile is tagged; the Secret finding is shown
   await page.waitForSelector('[data-testid="tile-recent_findings"]');
@@ -112,6 +112,20 @@ try {
   await page.waitForSelector('[data-testid="record-detail"]');
   check(true, "a result-table row link opens the record detail");
   await shot("15-record-detail");
+
+  // map: sensors, detections and missions from the connected-data endpoint
+  await page.click('a[href="/map"]');
+  await page.waitForSelector('[data-testid="map-canvas"][data-ready="true"]');
+  check((await page.textContent('[data-testid="count-sensor"]')) === "2", "a.bello map shows 2 sensors");
+  check((await page.textContent('[data-testid="count-detection"]')) === "6", "a.bello map shows 6 detections");
+  check((await page.textContent('[data-testid="count-mission"]')) === "5", "a.bello map shows 5 missions");
+  await page.click('[data-testid="map-item-REC-060"]');
+  await page.waitForSelector('[data-testid="map-detail"]');
+  check((await page.textContent('[data-testid="map-detail"]')).includes("SECRET"), "Secret mission detail carries its classification badge");
+  await shot("17-map-bello");
+  await page.click('[data-testid="map-record-link"]');
+  await page.waitForSelector('[data-testid="record-detail"]');
+  check(true, "map detail links to the record page");
   await logout();
 
   // t.adeyemi: same questions -> fewer results
@@ -141,6 +155,11 @@ try {
   await page.waitForSelector('[data-testid="record-error"]');
   check(true, "t.adeyemi gets 'not found' for a Secret UAS record, same as a missing one");
   await shot("16-record-hidden-adeyemi");
+  await page.goto(BASE + "/map");
+  await page.waitForSelector('[data-testid="map-canvas"][data-ready="true"]');
+  check((await page.textContent('[data-testid="count-mission"]')) === "0", "t.adeyemi map shows no missions");
+  check((await page.locator('[data-testid="map-item-REC-060"]').count()) === 0, "t.adeyemi map never lists the Secret mission");
+  await shot("18-map-adeyemi");
   await logout();
 
   // f.danjuma: audit -> verify chain
