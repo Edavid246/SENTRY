@@ -45,6 +45,7 @@ uv sync
 # 3. Schema + demo corpus (idempotent)
 cd backend && uv run alembic upgrade head && cd ..
 uv run python -m app.seed
+uv run python scripts/ingest_documents.py   # parses DOC-201..204, embeds locally (first run downloads the model)
 
 # 4. Run the API (http://localhost:8001, docs at /docs)
 uv run uvicorn app.main:app --reload --port 8001
