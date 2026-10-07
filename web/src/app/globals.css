@@ -1,0 +1,60 @@
+@import "@fontsource/jetbrains-mono/latin-400.css";
+@import "@fontsource/jetbrains-mono/latin-500.css";
+@import "@fontsource/jetbrains-mono/latin-700.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-size: 15px;
+    background: #091017;
+  }
+  body {
+    @apply bg-ground font-mono text-ink antialiased;
+    letter-spacing: 0.01em;
+  }
+  ::selection {
+    background: #efa93a;
+    color: #091017;
+  }
+  :focus-visible {
+    outline: 2px solid #efa93a;
+    outline-offset: 2px;
+  }
+  /* thin, flat scrollbars to match the reference screens */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #22343b #0d161e;
+  }
+}
+
+@layer components {
+  /* The faint instrument grid behind the login screen: hard 1px lines in an
+     SVG tile, so no gradient is involved. */
+  .grid-ground {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='204' height='204'%3E%3Cpath d='M0 .5H204M.5 0V204' stroke='%2322343b' stroke-opacity='.45' fill='none'/%3E%3C/svg%3E");
+  }
+  .label {
+    @apply text-[0.8rem] uppercase tracking-[0.12em] text-sage;
+  }
+  .field {
+    @apply w-full border border-rule bg-ground px-3 py-2.5 text-ink placeholder:text-mute;
+  }
+  .btn {
+    @apply border border-rule bg-surface px-4 py-2 text-[0.85rem] uppercase tracking-[0.12em] text-ink hover:border-sage disabled:cursor-not-allowed disabled:text-mute disabled:hover:border-rule;
+  }
+  .btn-amber {
+    @apply border border-amber bg-amber px-4 py-2.5 text-[0.9rem] font-bold uppercase tracking-[0.16em] text-ground hover:bg-[#f6b955] disabled:cursor-not-allowed disabled:border-rule disabled:bg-raised disabled:text-mute;
+  }
+  .tag {
+    @apply inline-block border border-rule px-2 py-0.5 text-[0.75rem] uppercase tracking-[0.1em] text-ink;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+  }
+}

@@ -30,7 +30,7 @@ cleared for — never `user → LLM → database` with "don't reveal" instructio
 ## Stack
 
 Python 3.12 · FastAPI · SQLAlchemy 2 · Alembic · PostgreSQL 16 + pgvector ·
-Docker Compose · Next.js + TypeScript + MapLibre (UI lands in a later step) ·
+Docker Compose · Next.js + TypeScript + Tailwind (MapLibre lands later) ·
 `uv` for dependency management.
 
 ## Quick start
@@ -62,10 +62,26 @@ docker compose -f infra/compose.yaml up -d --build   # db on :5434, api on :8001
 > back to the committed response cache and retrieval still runs keyword-only
 > (`degraded: true`). Never commit `.env`.
 
+## Start the UI
+
+The browser only calls same-origin `/api/*`; Next.js rewrites it to the API
+(`API_URL`, default `http://localhost:8001`). No CORS, no CDN, no telemetry.
+
+```bash
+cd web && npm ci && npm run dev      # http://localhost:3000 (API on :8001)
+# or, with everything in containers:
+docker compose -f infra/compose.yaml up -d --build   # adds web on :3000
+npm run gen:api                       # regenerate src/lib/api-types.ts from /openapi.json
+```
+
+Sign in as any demo user below. The JWT is held in memory and `sessionStorage`
+only; logout clears it in the browser (the token stays valid until expiry, see
+docs/PRODUCTION_DEBT.md).
+
 ## Run the checks
 
 ```bash
-./scripts/check.sh   # ruff lint + format, pytest, air-gap scan
+./scripts/check.sh   # ruff lint + format, pytest, web eslint + tsc, air-gap scan
 ```
 
 The suite includes the authorization layers (RLS-only and filter-only against a
@@ -112,7 +128,7 @@ backend/          FastAPI app: api/ authz/ audit/ knowledge/ ai_gateway/ connect
   alembic/        Schema migrations (RLS policies included)
 data/             Fictitious demo corpus, seed inputs, demo questions
 docs/             SPEC.md (source of truth), DEMO_SCOPE, STUBS, PRODUCTION_DEBT
-frontend/         Next.js UI (landing in a later step)
+web/              Next.js UI: login, assistant chat, audit viewer
 infra/            Docker Compose, Postgres init, RLS guards
 scripts/          check.sh, seeding, document generation, gateway smoke test
 tests/            authz (RLS-only/filter-only oracles), api, audit, knowledge

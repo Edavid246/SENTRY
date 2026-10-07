@@ -266,3 +266,21 @@ end-of-step report. Never silently log it.
   Access never depends on it: authorization decides before the model.
 - **Production needs:** a classifier-based detector plus an adversarial evaluation set
   (SPEC 16).
+
+## Web UI
+
+### 2026-10-07 — JWT held in sessionStorage; logout is client-only
+- **Issue:** the UI keeps the bearer token in React state and `sessionStorage`, readable by
+  any script that runs in the page. Logout only clears it in the browser; the token stays
+  valid until expiry (see "No logout or token revocation").
+- **Why acceptable:** demo data only, no third-party scripts (air-gap scan), short sessions.
+- **Production needs:** Keycloak OIDC with HttpOnly, SameSite cookies or a BFF session,
+  server-side revocation, and a strict Content-Security-Policy.
+
+### 2026-10-07 — Web container runs the Next.js dev server
+- **Issue:** the compose `web` service runs `npm ci && npm run dev` against the mounted
+  source (hot reload, unminified, installs on every start); `npm audit` reports advisories
+  in dev dependencies.
+- **Why acceptable:** local demo only, on a developer machine.
+- **Production needs:** a multi-stage image with `next build`, pinned lockfile install,
+  non-root user, dependency audit in CI, and a reverse proxy in front.

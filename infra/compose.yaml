@@ -91,6 +91,23 @@ services:
       start_period: 10s
     mem_limit: 1g
 
+  web:
+    image: node:20-slim
+    container_name: defence-gateway-web
+    working_dir: /app
+    environment:
+      API_URL: http://api:8001
+      NEXT_TELEMETRY_DISABLED: "1"
+    command: ["sh", "-c", "npm ci && npm run dev"]
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../web:/app
+      - /app/node_modules
+    depends_on:
+      - api
+    mem_limit: 1g
+
 volumes:
   pgdata:
     name: defence-gateway-pgdata
