@@ -35,7 +35,7 @@ RLS_KEYS: tuple[str, ...] = (
 )
 
 
-def format_array(values: list[str] | tuple[str, ...] | set[str]) -> str:
+def format_array(values: list[str] | tuple[str, ...] | set[str] | frozenset[str]) -> str:
     """Format a compartment list as a PostgreSQL text[] literal string.
 
     Compartment codes are configuration data ([A-Za-z0-9_-]); assert that so
@@ -52,7 +52,7 @@ def rls_context_statements(
     *,
     user_id: UUID | str,
     clearance_rank: int,
-    compartments: list[str] | tuple[str, ...] | set[str],
+    compartments: list[str] | tuple[str, ...] | set[str] | frozenset[str],
     unit_path: str,
     data_scope: str,
     session_id: str,
@@ -82,7 +82,7 @@ def set_rls_context(
     *,
     user_id: UUID | str,
     clearance_rank: int,
-    compartments: list[str] | tuple[str, ...] | set[str],
+    compartments: list[str] | tuple[str, ...] | set[str] | frozenset[str],
     unit_path: str,
     data_scope: str,
     session_id: str,

@@ -39,8 +39,9 @@ class Settings(BaseSettings):
     )
 
     # Stubbed identity (Keycloak is stubbed for the demo — docs/STUBS.md).
-    # Dev-only signing secret; the real deployment uses Keycloak's keys.
-    dev_jwt_secret: str = "dev-only-secret-change-me"
+    # Dev-only signing secret (>= 32 bytes per RFC 7518); the real deployment
+    # uses Keycloak's keys.
+    dev_jwt_secret: str = "dev-only-secret-change-me-0123456789abcdef"
     dev_jwt_ttl_seconds: int = 7200
 
     # AI gateway — provider/model from config, never hardcoded (AGENTS.md).
