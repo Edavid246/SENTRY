@@ -10,6 +10,7 @@ export type Finding = Schemas["FindingOut"];
 export type RunResult = Schemas["RunResult"];
 export type RecordDetail = Schemas["RecordDetail"];
 export type DashboardSummary =Schemas["DashboardSummary"];
+export type ReportInfo = Schemas["ReportInfo"];
 export type DashboardTile = Schemas["DashboardTile"];
 export type DashboardItem = Schemas["DashboardItem"];
 

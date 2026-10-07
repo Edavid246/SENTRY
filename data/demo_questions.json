@@ -84,8 +84,8 @@
       "pathway": "reporting",
       "asked_by": "a.bello",
       "question": "Prepare a summary of training activity for this command over the last quarter.",
-      "expected": "Draft report built from records and documents, with citations.",
-      "status": "not-built"
+      "expected": "Draft report over the training_activity rows and retrieved training documents, with citations. Carries a DRAFT banner and the highest classification and union of compartments of its inputs, and lists its source records and documents. a.bello gets REC-002, REC-043 and REC-044 (UAS-OPS label); t.adeyemi gets REC-002 only and no UAS-OPS label.",
+      "status": "built"
     },
     {
       "id": "connected-systems-cancelled-uas",
@@ -128,8 +128,8 @@
       "spec_step": "18.4",
       "pathway": "data",
       "asked_by": "a.bello",
-      "question": "Prepare a summary of training activity for this command over the last quarter",
-      "expected": "Typed tool training_activity (last 90 days): a.bello sees REC-002, REC-043 and REC-044; t.adeyemi sees only REC-002; a result table with row links plus a short explanation. This is the data half of SPEC 18.4; the drafted report document is not built.",
+      "question": "Show me the training activity for this command over the last quarter",
+      "expected": "Typed tool training_activity (last 90 days): a.bello sees REC-002, REC-043 and REC-044; t.adeyemi sees only REC-002; a result table with row links plus a short explanation. The data half of SPEC 18.4; the drafted report is reporting-training-summary.",
       "status": "built"
     }
   ]

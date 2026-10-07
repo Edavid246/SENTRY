@@ -13,6 +13,7 @@ const { chromium } = createRequire(import.meta.url)(pwDir);
 const BASE = process.env.WEB_URL || "http://localhost:3000";
 const PASSWORD = "Demo!Gateway2026";
 const POLICY = "Find the documents relating to the vehicle maintenance policy and summarize the key requirements.";
+const REPORT = "Prepare a summary of training activity for this command over the last quarter.";
 const EQUIPMENT = "Show me the equipment currently awaiting maintenance.";
 const shots = path.resolve("smoke/screenshots");
 mkdirSync(shots, { recursive: true });
@@ -102,6 +103,12 @@ try {
   check(true, "citation opens the passage in the side panel");
   await shot("05-bello-citation-panel");
 
+  // reporting: a draft over records and documents, marked and labelled
+  await ask(REPORT);
+  await page.waitForSelector('[data-testid="draft-banner"]');
+  check((await page.textContent('[data-testid="draft-banner"]')).includes("UAS-OPS"), "a.bello draft carries the derived UAS-OPS label");
+  check((await page.locator('[data-testid="msg-assistant"]').last().textContent()).includes("REC-044"), "a.bello draft covers the UAS training event");
+  await shot("20-report-bello");
   // a.bello: equipment question -> table
   await ask(EQUIPMENT);
   await page.waitForSelector('[data-testid="result-table"]');
@@ -150,6 +157,11 @@ try {
   await page.waitForSelector('[data-testid="user-name"]');
   await ask(POLICY);
   const adeyemiCites = await page.locator('[data-testid="citation-badge"]').count();
+  await ask(REPORT);
+  await page.waitForSelector('[data-testid="draft-banner"]');
+  const draftText = await page.locator('[data-testid="msg-assistant"]').last().textContent();
+  check(!draftText.includes("REC-044") && !draftText.includes("UAS-OPS"), "t.adeyemi draft has no UAS record and no UAS-OPS label");
+  await shot("21-report-adeyemi");
   await ask(EQUIPMENT);
   await page.waitForSelector('[data-testid="result-table"]');
   const adeyemiRows = await page.locator('[data-testid="result-table"] tbody tr').count();

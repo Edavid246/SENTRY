@@ -512,7 +512,7 @@ def test_stock_tool_out_of_scope_unit_and_no_scope_users(client, app_engine, exp
 
 # --- training_activity ------------------------------------------------------
 
-TRAINING_QUESTION = "Prepare a summary of training activity for this command over the last quarter"
+TRAINING_QUESTION = "Show me the training activity for this command over the last quarter"
 TRAINING_COLUMNS = ["id", "course", "start_date", "attendees", "unit_path"]
 
 

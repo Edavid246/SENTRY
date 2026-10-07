@@ -133,10 +133,22 @@ profile. Map tiles are cut too (MapLibre renders GeoJSON without them).
 1. Login lands on the dashboard (permission-aware tiles) — **works**.
 2. Knowledge pathway with citations + open a cited page — **works against the API today**.
 3. Data pathway — **works against the API today** (equipment due for maintenance, expired certifications; more tools to come). Needs a live or cached model for the explanation; the table is deterministic.
-4. Reporting — the data half works (`training_activity`: "summary of training activity over the last quarter" returns the table and an explanation); the drafted report document is **not built**.
+4. Reporting — built. "Prepare a summary of training activity for this command over the last quarter" drafts a report (`app/reporting/training.py`) from the `training_activity` rows plus retrieved training documents, both under the caller's row filter + RLS. The draft is bannered DRAFT FOR HUMAN REVIEW, carries the highest classification and union of compartments of every input (also stored on the conversation), cites passages, lists its source records and documents, and is blocked if it cites anything outside its inputs. Plain "show me the training activity" stays a data query. Audited as pathway `report` with record ids, chunk ids and provider. The wording is cached like other answers: run the prefill (user step) for it to work without a live model.
 5. Connected systems — pending.
 6. Correlation finding — **works**: commander clicks "Run correlation" on the dashboard (or `POST /api/v1/correlation/run`), opens the finding, follows evidence links; ask "Why are maintenance faults rising in one battalion?".
 7. Security moment (same question, lower clearance) — **works against the API today**.
 8. Manipulation attempt — **works against the API today**.
 9. Audit trail + chain verification — **works against the API today**.
 10. Sovereignty — **do not claim**: dev profile uses the hosted model.
+
+### 2026-10-07 — Draft report label covers every retrieved passage, retrieval is a fixed keyword
+- **Issue:** the training-summary draft retrieves document passages with the fixed query
+  "training" (not model-chosen) and labels the draft with the highest classification and
+  union of compartments of *all* records and passages supplied to the model, not only the
+  ones it cited. The label can therefore be higher than the cited material needs. The
+  report is plain text, one template, one report type; no editing, export or approval flow.
+- **Why acceptable:** over-labelling is the safe direction (AGENTS.md derived items), and a
+  fixed query keeps the prompt, and so the recorded answer, stable for the demo.
+- **Production needs:** model- or user-selected sources with an explicit evidence list,
+  label from the sources actually used, report templates, export, and a human review and
+  approval step recorded in the audit log.

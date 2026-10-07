@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, type Citation, type ConversationSummary, type ResultTable } from "@/lib/api";
+import { api, ApiError, type Citation, type ConversationSummary, type ReportInfo, type ResultTable } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { CitedAnswer } from "@/components/CitedAnswer";
+import { ClearanceBadge } from "@/components/ClearanceBadge";
 import { ResultTableView } from "@/components/ResultTableView";
 import { PassagePanel, type PanelState } from "@/components/PassagePanel";
 import { IconArrow, IconPlus } from "@/components/Icons";
 
 interface Meta {
+  report?: ReportInfo | null;
   found: boolean;
   degraded: boolean;
   refused: boolean;
@@ -40,6 +42,7 @@ const ASK_TIMEOUT_MS = 30_000;
 const STARTERS = [
   "Find the documents relating to the vehicle maintenance policy and summarize the key requirements.",
   "Show me the equipment currently awaiting maintenance.",
+  "Prepare a summary of training activity for this command over the last quarter.",
 ];
 
 let counter = 0;
@@ -126,6 +129,20 @@ function Thread({
               )}
             </div>
             <div className="px-4 py-3">
+              {m.meta?.report && (
+                <div
+                  data-testid="draft-banner"
+                  className="mb-3 flex flex-wrap items-center gap-2 border border-amber bg-amber/10 px-3 py-2 text-[0.85rem] font-medium uppercase tracking-[0.1em] text-amber"
+                >
+                  Draft for human review
+                  <ClearanceBadge code={m.meta.report.classification_code} />
+                  {m.meta.report.compartments.map((c) => (
+                    <span key={c} className="tag">
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              )}
               {m.meta?.refused && (
                 <div
                   role="alert"
@@ -286,6 +303,7 @@ export default function ChatPage() {
             degraded: res.degraded,
             refused: res.refused,
             table: res.result_table ?? null,
+            report: res.report ?? null,
             auditEventId: res.audit_event_id,
           },
         },

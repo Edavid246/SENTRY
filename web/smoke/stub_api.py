@@ -25,6 +25,7 @@ from app.api import assistant  # noqa: E402
 from app.data_queries.explain import Explanation  # noqa: E402
 from app.knowledge.answer import CitedAnswer  # noqa: E402
 from app.main import app  # noqa: E402
+from app.reporting import training  # noqa: E402
 
 
 def fake_generate_answer(question, chunks, *, gateway=None, history=()):
@@ -61,6 +62,25 @@ def fake_explain_result(question, result, *, gateway=None):
     )
 
 
+class FakeReportGateway:
+    """Drafts a report from the prompt it is given: cites each record and the first passage."""
+
+    def complete(self, request):
+        import re
+
+        from app.ai_gateway.base import LLMResult
+
+        prompt = request.messages[-1].text
+        records = sorted(set(re.findall(r"REC-\d{3,6}", prompt)))
+        chunk = re.search(r"BEGIN EVIDENCE CHUNK ([0-9a-f-]{36})", prompt)
+        lines = ["SUMMARY", "STUBBED MODEL (UI smoke test).", "", "ACTIVITY IN THE PERIOD"]
+        lines += [f"Training event ({r})." for r in records]
+        lines += ["", "APPLICABLE REQUIREMENTS"]
+        if chunk:
+            lines.append(f"Directive requirement [{chunk.group(1)}: Training, page 1].")
+        return LLMResult(text="\n".join(lines), provider="stub", model="stub")
+
+
 def unavailable(*args, **kwargs):
     raise ProviderUnavailableError("cache-only mode: no cached answer (smoke stub)")
 
@@ -68,9 +88,11 @@ def unavailable(*args, **kwargs):
 if os.environ.get("STUB_MODE") == "unavailable":
     assistant.generate_answer = unavailable
     assistant.explain_result = unavailable
+    training.get_gateway = lambda: type("Down", (), {"complete": staticmethod(unavailable)})()
 else:
     assistant.generate_answer = fake_generate_answer
     assistant.explain_result = fake_explain_result
+    training.get_gateway = lambda: FakeReportGateway()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8001, log_level="warning")

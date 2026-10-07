@@ -171,6 +171,7 @@ def test_allowed_query_returns_citations_and_audits_retrieval_and_answer(
         "degraded",
         "refused",
         "result_table",
+        "report",
         "conversation_id",
         "audit_event_id",
     }

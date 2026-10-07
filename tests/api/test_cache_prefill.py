@@ -64,6 +64,7 @@ def pipeline(monkeypatch, tmp_path, ingested):
     state = {"gateway": AIGateway(fake, cache=cache, record=True)}
     monkeypatch.setattr("app.knowledge.answer.get_gateway", lambda: state["gateway"])
     monkeypatch.setattr("app.data_queries.explain.get_gateway", lambda: state["gateway"])
+    monkeypatch.setattr("app.reporting.training.get_gateway", lambda: state["gateway"])
     return state, cache, fake
 
 

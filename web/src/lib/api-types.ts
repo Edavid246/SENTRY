@@ -319,6 +319,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/connected/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Connected Replay
+         * @description STUB live feed: detections the caller may see, replayed in time order.
+         *
+         *     The synthetic detections are the "stream"; the client drives a replay clock and polls
+         *     with `after` (the last observed_at it has) and `upto` (the clock). Stateless: the
+         *     server holds no cursor. Stream and policy row filter + RLS come from the adapter, so
+         *     an event the caller may not see is never read. Only non-empty batches are audited,
+         *     with the ids delivered.
+         */
+        get: operations["connected_replay_api_v1_connected_replay_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connected/map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Connected Map
+         * @description Sensors, recent detections and mission tracks the caller may see (never more).
+         */
+        get: operations["connected_map_api_v1_connected_map_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -370,6 +416,8 @@ export interface components {
             refused: boolean;
             /** @description deterministic tool output of the data pathway, else null */
             result_table?: components["schemas"]["ResultTable"] | null;
+            /** @description set for a drafted report: draft flag and derived label */
+            report?: components["schemas"]["ReportInfo"] | null;
             /** Conversation Id */
             conversation_id: string;
             /** Audit Event Id */
@@ -559,6 +607,22 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+        };
+        /** ReportInfo */
+        ReportInfo: {
+            /**
+             * Draft
+             * @default true
+             */
+            draft: boolean;
+            /** Classification Code */
+            classification_code: string;
+            /** Compartments */
+            compartments: string[];
+            /** Record Ids */
+            record_ids: string[];
+            /** Document Refs */
+            document_refs: string[];
         };
         /** ResultTable */
         ResultTable: {
@@ -1131,6 +1195,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FindingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connected_replay_api_v1_connected_replay_get: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                upto?: string | null;
+                hours?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connected_map_api_v1_connected_map_get: {
+        parameters: {
+            query?: {
+                hours?: number;
+                mission_days?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

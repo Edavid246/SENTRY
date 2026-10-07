@@ -41,7 +41,7 @@ from app.authz.context import AccessContext
 from app.authz.policy import Decision, LocalPolicy
 from app.data_queries.explain import explain_result
 from app.data_queries.registry import ToolOutcome, execute_tool
-from app.data_queries.routing import RoutedTool, route_question
+from app.data_queries.routing import RoutedReport, RoutedTool, route_question, route_report
 from app.db import format_array, set_rls_context
 from app.knowledge.answer import CitedAnswer, generate_answer, parse_cited_chunk_ids
 from app.knowledge.retrieve import (
@@ -50,6 +50,7 @@ from app.knowledge.retrieve import (
     is_fts_only,
     retrieve_chunks,
 )
+from app.reporting.training import DOCUMENT_QUERY, DraftReport, generate_training_report
 
 POLICY = LocalPolicy()
 router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
@@ -93,6 +94,14 @@ class ResultTable(BaseModel):
     rows: list[dict[str, Any]]
 
 
+class ReportInfo(BaseModel):
+    draft: bool = True
+    classification_code: str
+    compartments: list[str]
+    record_ids: list[str]
+    document_refs: list[str]
+
+
 class AssistantQueryResponse(BaseModel):
     answer: str
     citations: list[CitationOut]
@@ -107,6 +116,9 @@ class AssistantQueryResponse(BaseModel):
     )
     result_table: ResultTable | None = Field(
         default=None, description="deterministic tool output of the data pathway, else null"
+    )
+    report: ReportInfo | None = Field(
+        default=None, description="set for a drafted report: draft flag and derived label"
     )
     conversation_id: str
     audit_event_id: str
@@ -234,6 +246,37 @@ def _data_answer_event(
         "provider": provider,
         "model": model,
         "cached": cached,
+        "timestamp": utc_now_iso(),
+    }
+
+
+def _report_answer_event(
+    ctx: AccessContext,
+    question: str,
+    conversation_id: str,
+    report: DraftReport | None,
+    tool_result: ToolOutcome,
+    chunk_ids: list[str],
+) -> dict:
+    return {
+        "actor": ctx.username,
+        "action": "answer",
+        "resource": "assistant",
+        "pathway": "report",
+        "decision": "deny" if (report is None or report.blocked) else "allow",
+        "conversation_id": conversation_id,
+        "question": question[:AUDIT_TEXT_LIMIT],
+        "tool": tool_result.tool[:64],
+        "record_ids": list(report.record_ids) if report else [],
+        "chunk_ids": chunk_ids,
+        "citations": [c.chunk_id for c in report.citations] if report else [],
+        "classification": report.classification_code if report else None,
+        "compartments": list(report.compartments) if report else [],
+        "found": bool(report and report.found),
+        "blocked": bool(report and report.blocked),
+        "provider": report.provider if report else "",
+        "model": report.model if report else "",
+        "cached": bool(report and report.cached),
         "timestamp": utc_now_iso(),
     }
 
@@ -445,6 +488,119 @@ def _query_data(
     )
 
 
+def _query_report(
+    body: AssistantQueryRequest,
+    ctx: AccessContext,
+    conn,
+    answer_decision: Decision,
+    routed: RoutedReport,
+) -> AssistantQueryResponse:
+    """Reporting pathway (SPEC 8.2 "Draft report"): records + documents -> marked draft.
+
+    Same order as the other pathways: decisions first, then the typed tool and the
+    chunk retrieval each run under the caller's row filter + RLS; the model only drafts
+    over what came back. The draft carries the highest classification and union of
+    compartments of every input, and is stored, audited and returned as a DRAFT.
+    """
+    record_decision = POLICY.decide(ctx, "query", "record")
+    decisions = [
+        _decide_event(ctx, answer_decision),
+        _decide_event(ctx, record_decision, resource="record", requested="query"),
+    ]
+    if not record_decision.allowed:
+        audit_events(decisions)
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    new_conversation = body.conversation_id is None
+    if new_conversation:
+        conversation_id = uuid4()
+    else:
+        conversation_id = body.conversation_id
+        _set_context(conn, ctx)
+        _resolve_conversation(conn, ctx, conversation_id)
+
+    audit_events(decisions)
+    outcome = execute_tool(ctx, conn, "training_activity", routed.params)
+    result = outcome.result
+    chunks: list[RetrievedChunk] = []
+    report: DraftReport | None = None
+    if result is None:
+        answer = f"That request was refused: {outcome.refusal}. No data was retrieved."
+    else:
+        _set_context(conn, ctx)
+        chunks = retrieve_chunks(conn, ctx, DOCUMENT_QUERY)
+        ranks = _rank_map(conn)
+        try:
+            report = generate_training_report(body.question, result, chunks, ranks)
+        except ProviderError as exc:
+            audit_events([_retrieval_event(ctx, DOCUMENT_QUERY, chunks)])
+            if isinstance(exc, ProviderNotConfiguredError):
+                detail = "the answer model is not configured on this server"
+            else:
+                detail = "the answer model is currently unavailable; retry later"
+            raise HTTPException(status_code=503, detail=detail) from exc
+        answer = report.text
+
+    _set_context(conn, ctx)
+    inputs = [*(result.records if result else ()), *chunks]
+    _store_turn(
+        conn,
+        ctx,
+        conversation_id,
+        body.question,
+        answer,
+        inputs,
+        _rank_map(conn),
+        new_conversation=new_conversation,
+    )
+    conn.commit()
+    written = audit_events(
+        [
+            _retrieval_event(ctx, DOCUMENT_QUERY, chunks),
+            _report_answer_event(
+                ctx,
+                body.question,
+                str(conversation_id),
+                report,
+                outcome,
+                [c.chunk_id for c in chunks],
+            ),
+        ]
+    )
+    return AssistantQueryResponse(
+        answer=answer,
+        citations=[
+            CitationOut(
+                chunk_id=c.chunk_id,
+                document_title=c.document_title,
+                document_ref=c.document_ref,
+                page=c.page,
+                section=c.section,
+                classification_code=c.classification_code,
+            )
+            for c in (report.citations if report else ())
+        ],
+        found=bool(report and report.found),
+        degraded=False,
+        refused=outcome.refused or bool(report and report.blocked),
+        result_table=(
+            ResultTable(columns=list(result.columns), rows=result.rows) if result else None
+        ),
+        report=(
+            ReportInfo(
+                classification_code=report.classification_code,
+                compartments=list(report.compartments),
+                record_ids=list(report.record_ids),
+                document_refs=list(report.document_refs),
+            )
+            if report
+            else None
+        ),
+        conversation_id=str(conversation_id),
+        audit_event_id=str(written[-1]["event_id"]),
+    )
+
+
 @router.post("/query", response_model=AssistantQueryResponse)
 def query_assistant(
     body: AssistantQueryRequest,
@@ -459,6 +615,9 @@ def query_assistant(
     manipulation = bool(_MANIPULATION_RE.search(body.question))
     # A manipulation-style request never reaches a data tool: it stays on the
     # knowledge pathway, where it is logged and changes nothing (SPEC 8.3).
+    report_routed = None if manipulation else route_report(body.question)
+    if report_routed is not None:
+        return _query_report(body, ctx, conn, decision, report_routed)
     routed = None if manipulation else route_question(body.question)
     if routed is not None:
         return _query_data(body, ctx, conn, decision, routed)

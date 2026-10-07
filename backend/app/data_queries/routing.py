@@ -62,10 +62,42 @@ _THIS_PERIOD_RE = re.compile(r"\bthis\s+(week|month)\b", re.IGNORECASE)
 _PATH_RE = re.compile(r"(?<![\w])(?:\.\.?/|/)[\w./-]+")
 
 
+_DRAFT_RE = re.compile(r"\b(prepare|draft|write|compile|produce|generate)\b", re.IGNORECASE)
+_REPORT_RE = re.compile(r"\b(report|summary)\b", re.IGNORECASE)
+
+
 @dataclass(frozen=True, slots=True)
 class RoutedTool:
     tool: str
     params: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class RoutedReport:
+    kind: str
+    params: dict[str, Any]
+
+
+def route_report(question: str) -> RoutedReport | None:
+    """A request to draft a training-summary report, or None.
+
+    Asking to prepare/draft a report or summary of training activity is the reporting
+    pathway; "show training events" stays a plain data query (route_question).
+    """
+    if not (_DRAFT_RE.search(question) and _REPORT_RE.search(question)):
+        return None
+    if not (_TRAINING_RE.search(question) and _ACTIVITY_RE.search(question)):
+        return None
+    params: dict[str, Any] = {}
+    path = _PATH_RE.search(question)
+    if path:
+        params["unit_path"] = path.group(0).rstrip(".,;:)")
+    period = _PERIOD_RE.search(question)
+    if period:
+        params["period_days"] = (
+            int(period.group(1)) if period.group(1) else _PERIOD_DAYS[period.group(2).lower()]
+        )
+    return RoutedReport("training_summary", params)
 
 
 def route_question(question: str) -> RoutedTool | None:
