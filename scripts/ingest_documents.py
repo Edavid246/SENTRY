@@ -3,7 +3,8 @@
 Runs as the database owner: ingestion is a privileged background job, and the
 runtime role has SELECT-only grants on documents/chunks. Idempotent — a
 document whose file hash is unchanged and whose chunks are all embedded is
-skipped.
+skipped. Seeded chunks with no source file are then embedded in place
+(backfill).
 
 Run:  uv run python scripts/ingest_documents.py
 """
@@ -14,7 +15,7 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.db import make_engine
-from app.knowledge.ingest import ingest_documents
+from app.knowledge.ingest import backfill_embeddings, ingest_documents
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -24,6 +25,7 @@ def main() -> None:
     engine = make_engine(settings.owner_database_url)
     try:
         results = ingest_documents(engine, REPO_ROOT / "data" / "documents")
+        results["backfilled"] = backfill_embeddings(engine)
     finally:
         engine.dispose()
     print(f"INGESTED {results}")

@@ -563,3 +563,37 @@ def test_conversation_reads_are_audited(client, ingested: dict[str, int], monkey
     assert decide["payload"]["requested"] == "read"
     assert turns["payload"]["rows"] == 2
     assert decide["seq"] < turns["seq"]
+
+
+def _failing_answer(error):
+    def fail(question, chunks, *, gateway=None, history=()):
+        raise error
+
+    return fail
+
+
+def test_model_failure_answers_503_but_still_audits_decide_and_retrieve(
+    client, ingested, monkeypatch
+) -> None:
+    """A missing key or dead provider is a clean 503, never a bare 500, and the
+    access decision and retrieval that did happen stay on the audit chain."""
+    from app.ai_gateway.base import ProviderNotConfiguredError, ProviderUnavailableError
+
+    _fts_only(monkeypatch)
+    cases = (
+        (ProviderNotConfiguredError("no key"), "not configured"),
+        (ProviderUnavailableError("down"), "unavailable"),
+    )
+    for error, expected in cases:
+        monkeypatch.setattr("app.api.assistant.generate_answer", _failing_answer(error))
+        before = _audit(client)
+        response = _ask(client, "a.bello", "maintenance")
+        assert response.status_code == 503, response.text
+        assert expected in response.json()["detail"]
+        assert "no key" not in response.text and "down" not in response.text
+
+        after = _audit(client)
+        new = [e for e in after if e["seq"] > max((b["seq"] for b in before), default=-1)]
+        mine = [e["payload"] for e in new if e["payload"].get("actor") == "a.bello"]
+        assert {"decide", "retrieve"} <= {p["action"] for p in mine}
+        assert "answer" not in {p["action"] for p in mine}

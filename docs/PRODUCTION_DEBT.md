@@ -221,7 +221,10 @@ end-of-step report. Never silently log it.
   dev machine and copied into the image at build (`COPY data/models`); the build is not
   air-gapped and the upstream source is not mirrored or verified by signature.
 - **Why acceptable:** DEMO CUT removes the air-gapped profile for now; weights are
-  gitignored, baked once, and never fetched at runtime.
+  gitignored and baked once. **Correction 2026-10-07:** they are *not* guaranteed to be
+  absent at runtime on a fresh dev machine: the first `scripts/ingest_documents.py` run
+  downloads them into `data/models` (observed ~2 min). Pre-stage the weights before any
+  run on a network-restricted host.
 - **Production needs:** internally mirrored model registry, checksum/signature
   verification at build, and a build pipeline that makes no external calls.
 

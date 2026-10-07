@@ -33,7 +33,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from app.ai_gateway.base import ChatMessage
+from app.ai_gateway.base import ChatMessage, ProviderError, ProviderNotConfiguredError
 from app.api.deps import ConnDep, CurrentContext, audit_events
 from app.audit.chain import utc_now_iso
 from app.authz.context import AccessContext
@@ -324,7 +324,22 @@ def query_assistant(
     query_vector = embed_question(body.question)
     chunks = retrieve_chunks(conn, ctx, body.question, query_vector=query_vector)
     degraded = is_fts_only(query_vector, chunks)
-    cited = generate_answer(body.question, chunks, history=history)
+    try:
+        cited = generate_answer(body.question, chunks, history=history)
+    except ProviderError as exc:
+        # Retrieval already happened: audit the decision and retrieval, then fail cleanly.
+        failed: list[dict] = [
+            _decide_event(ctx, decision),
+            _retrieval_event(ctx, body.question, chunks),
+        ]
+        if _MANIPULATION_RE.search(body.question):
+            failed.append(_notable_event(ctx, body.question))
+        audit_events(failed)
+        if isinstance(exc, ProviderNotConfiguredError):
+            detail = "the answer model is not configured on this server"
+        else:
+            detail = "the answer model is currently unavailable; retry later"
+        raise HTTPException(status_code=503, detail=detail) from exc
     ranks = _rank_map(conn)
     _store_turn(
         conn,

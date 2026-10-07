@@ -146,3 +146,29 @@ def ingest_documents(engine: Engine, docs_dir: Path) -> dict[str, int]:
             summary["documents"] += 1
             summary["chunks"] += len(chunk_rows)
     return summary
+
+
+def backfill_embeddings(engine: Engine, batch_size: int = 16) -> int:
+    """Embed every chunk whose embedding is NULL; returns the number embedded.
+
+    Covers seeded chunks that have no source file to ingest. Runs as the
+    owner (chunks are SELECT-only for the runtime role). Idempotent, and a
+    no-op when the embedder is unavailable (retrieval stays FTS-only).
+    """
+    done = 0
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text("SELECT id, text FROM chunks WHERE embedding IS NULL ORDER BY id")
+        ).all()
+        for start in range(0, len(rows), batch_size):
+            batch = rows[start : start + batch_size]
+            vectors = _embed([row.text for row in batch])
+            for row, vector in zip(batch, vectors, strict=True):
+                if vector is None:
+                    return done
+                conn.execute(
+                    text("UPDATE chunks SET embedding = CAST(:v AS vector) WHERE id = :id"),
+                    {"v": "[" + ",".join(f"{x:.7f}" for x in vector) + "]", "id": row.id},
+                )
+                done += 1
+    return done

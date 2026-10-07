@@ -82,3 +82,30 @@ def test_chunk_ids_are_deterministic(ingested: dict[str, int], owner_engine: Eng
         )
     assert _id("chunk:DOC-201:1") in chunk_ids
     assert chunk_ids == {_id(f"chunk:DOC-201:{index}") for index in range(1, len(chunk_ids) + 1)}
+
+
+def test_backfill_embeds_only_null_chunks_and_is_idempotent(
+    migrated: None, seeded: None, owner_engine: Engine, monkeypatch
+) -> None:
+    """Seeded chunks (no source file) get embedded in place; a rerun is a no-op."""
+    from app.config import get_settings
+    from app.knowledge.ingest import backfill_embeddings
+
+    dim = get_settings().embedding_dim
+    monkeypatch.setattr("app.knowledge.ingest._embed", lambda texts: [[0.5] * dim for _ in texts])
+    try:
+        with owner_engine.connect() as conn:
+            missing = conn.execute(
+                text("SELECT count(*) FROM chunks WHERE embedding IS NULL")
+            ).scalar()
+        assert missing, "seed should leave chunks unembedded"
+        assert backfill_embeddings(owner_engine) == missing
+        with owner_engine.connect() as conn:
+            assert (
+                conn.execute(text("SELECT count(*) FROM chunks WHERE embedding IS NULL")).scalar()
+                == 0
+            )
+        assert backfill_embeddings(owner_engine) == 0
+    finally:
+        with owner_engine.begin() as conn:
+            conn.execute(text("UPDATE chunks SET embedding = NULL"))
