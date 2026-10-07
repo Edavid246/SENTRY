@@ -24,6 +24,7 @@ from app.audit.chain import (
     compute_hash,
     ledger_status,
     verify_chain,
+    verify_report,
 )
 from app.config import get_settings
 from sqlalchemy import create_engine, text
@@ -116,6 +117,49 @@ def test_byte_flip_is_detected_and_restored(app_engine: Engine, owner_engine: En
                 {"hash": target["hash"], "seq": target["seq"]},
             )
     assert verify_chain(app_engine) == (True, None)
+
+
+def test_verify_report_names_the_first_bad_event(app_engine: Engine, owner_engine: Engine) -> None:
+    """The viewer-facing verify contract: a healthy report, then one that
+    pins the deep-linkable event_id of the first tampered row."""
+    healthy = verify_report(app_engine)
+    assert healthy["valid"] is True
+    assert healthy["first_bad_event_id"] is None
+    assert healthy["checked_count"] == _count(app_engine)
+
+    rows = _append(app_engine, 2, actor="report")
+    # Flip a row that is not a checkpoint/ledger tip: those layers store the
+    # tip row's hash, so tampering with the tip would (correctly) break them
+    # too. This proves a plain payload/hash edit is caught by the chain walk
+    # alone, leaving the external layers green.
+    _, checkpoint_tip = checkpoint_status(app_engine)
+    _, ledger_tip = ledger_status(app_engine)
+    tip_seqs = {tip["seq"] for tip in (checkpoint_tip, ledger_tip) if tip is not None}
+    candidates = [row for row in rows if row["seq"] not in tip_seqs]
+    target = candidates[0] if candidates else rows[-1]
+    flipped = "0" if target["hash"][-1] != "0" else "1"
+    try:
+        with owner_engine.begin() as conn:
+            conn.execute(
+                text("UPDATE audit_events SET hash = :hash WHERE seq = :seq"),
+                {"hash": target["hash"][:-1] + flipped, "seq": target["seq"]},
+            )
+        broken = verify_report(app_engine)
+        assert broken["valid"] is False
+        assert broken["first_bad_event_id"] == target["event_id"]
+        assert broken["checked_count"] == _count(app_engine)
+        if candidates:
+            assert broken["checkpoint_ok"] is healthy["checkpoint_ok"]
+            assert broken["ledger_ok"] is healthy["ledger_ok"]
+    finally:
+        with owner_engine.begin() as conn:
+            conn.execute(
+                text("UPDATE audit_events SET hash = :hash WHERE seq = :seq"),
+                {"hash": target["hash"], "seq": target["seq"]},
+            )
+    restored = verify_report(app_engine)
+    assert restored["valid"] is True
+    assert restored["first_bad_event_id"] is None
 
 
 def test_middle_delete_is_detected_and_restored(app_engine: Engine, owner_engine: Engine) -> None:

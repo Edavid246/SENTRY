@@ -1,5 +1,8 @@
 """HTTP endpoints: login, identity, classified reads, and the audit viewer.
 
+Everything is mounted under /api/v1 (one route convention; no root-level
+aliases) so the Next.js UI can proxy /api/* to this service same-origin.
+
 Authorization order is fixed: LocalPolicy.decide first (may this action run
 at all?), then set_rls_context + LocalPolicy.row_filter together inside one
 transaction (which rows?). The detail route returns 404 for anything not
@@ -14,6 +17,7 @@ itself not audited — the viewer's own read would otherwise recurse.
 """
 
 from typing import Annotated, Any
+from uuid import UUID
 
 from argon2 import PasswordHasher
 from argon2.exceptions import Argon2Error
@@ -35,7 +39,7 @@ _HASHER = PasswordHasher()
 # the two paths close in timing so the message is not the only protection.
 _DUMMY_HASH = _HASHER.hash("timing-equaliser")
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1")
 
 
 class LoginRequest(BaseModel):
@@ -130,15 +134,34 @@ def login(body: LoginRequest, conn: ConnDep) -> dict[str, str]:
 
 
 @router.get("/me", tags=["auth"])
-def me(ctx: CurrentContext) -> dict[str, str | int | list[str] | None]:
-    """UI-facing identity read: exactly the context fields the UI needs, nothing internal."""
+def me(ctx: CurrentContext, conn: ConnDep) -> dict[str, Any]:
+    """UI-facing identity read: exactly the context fields the shell needs.
+
+    `unit_breadcrumb` resolves the caller's unit path to readable unit names
+    (oldest ancestor first) so the top bar can show "Command A > Brigade 2 >
+    Battalion 4"; `permissions` is what the nav may offer — the server still
+    enforces every action itself (SPEC 7.1).
+    """
+    breadcrumb = [
+        {"path": str(row.path), "name": str(row.name)}
+        for row in conn.execute(
+            text(
+                "SELECT path, name FROM units"
+                " WHERE starts_with(:unit_path, path) ORDER BY length(path)"
+            ),
+            {"unit_path": ctx.unit_path},
+        ).all()
+    ]
     return {
         "username": ctx.username,
+        "display_name": ctx.display_name,
         "role": ctx.role,
         "unit_path": ctx.unit_path,
+        "unit_breadcrumb": breadcrumb,
         "clearance_code": ctx.clearance_code,
         "clearance_rank": ctx.clearance_rank,
         "compartments": sorted(ctx.compartments),
+        "permissions": sorted(ctx.permissions),
         "data_scope": ctx.data_scope,
     }
 
@@ -225,20 +248,94 @@ def get_document(source_ref: str, ctx: CurrentContext, conn: ConnDep) -> dict[st
     return dict(row)
 
 
+@router.get("/documents/{document_id}/chunks/{chunk_id}", tags=["data"])
+def get_document_chunk(
+    document_id: str, chunk_id: str, ctx: CurrentContext, conn: ConnDep
+) -> dict[str, Any]:
+    """Cited-passage viewer: open the exact page/section a citation points at.
+
+    Same authorization order and the same policy row filter + RLS as every
+    other classified read. Anything not visible — including a caller whose
+    action was denied, or a malformed id — answers 404 rather than 403, so a
+    probe can never confirm that a restricted passage exists. `document_id`
+    accepts the user-facing source_ref a citation carries, or the document's
+    internal uuid.
+    """
+    decision = POLICY.decide(ctx, "read", "chunk")
+    if not decision.allowed:
+        audit_events([_decide_event(ctx, decision, "read", "chunk")])
+        raise HTTPException(status_code=404, detail="not found")
+    _set_context(conn, ctx)
+    row_filter = POLICY.row_filter(ctx, "chunk")
+    try:
+        chunk_key = str(UUID(chunk_id))
+    except ValueError:
+        chunk_key = None
+    document_where = "documents.source_ref = :document_id"
+    document_value = document_id
+    try:
+        document_value = str(UUID(document_id))
+        document_where = "documents.id = :document_id"
+    except ValueError:
+        pass
+    row = None
+    if chunk_key is not None:
+        row = (
+            conn.execute(
+                text(
+                    "SELECT chunks.id AS chunk_id, documents.id AS document_id,"
+                    " documents.source_ref, documents.title, chunks.text, chunks.page,"
+                    " chunks.section, chunks.classification_code, chunks.compartments"
+                    " FROM chunks"
+                    " JOIN documents ON documents.id = chunks.document_id"
+                    f" WHERE chunks.id = :chunk_id AND {document_where}"
+                    f" AND {row_filter.where_sql}"
+                ),
+                {"chunk_id": chunk_key, "document_id": document_value, **row_filter.params},
+            )
+            .mappings()
+            .first()
+        )
+    audit_events(
+        [
+            _decide_event(ctx, decision, "read", "chunk"),
+            _query_event(ctx, "chunks", 0 if row is None else 1),
+        ]
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="not found")
+    return {
+        "chunk_id": str(row["chunk_id"]),
+        "document_id": str(row["document_id"]),
+        "document_ref": str(row["source_ref"] or ""),
+        "document_title": str(row["title"]),
+        "text": str(row["text"]),
+        "page": row["page"],
+        "section": row["section"],
+        "classification_code": str(row["classification_code"]),
+        "compartments": [str(code) for code in (row["compartments"] or [])],
+    }
+
+
 @router.get("/audit", tags=["audit"])
 def list_audit(
     ctx: CurrentContext,
     conn: ConnDep,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    event_id: Annotated[str | None, Query(description="return only this event")] = None,
 ) -> list[dict[str, Any]]:
-    """Newest-first audit trail for the audit viewer (SPEC 14)."""
+    """Newest-first audit trail for the audit viewer (SPEC 14).
+
+    Every item carries `event_id`, so an answer's audit_event_id deep-links
+    here with `?event_id=`.
+    """
     decision = POLICY.decide(ctx, "read_audit", "audit")
     audit_events([_decide_event(ctx, decision, "read_audit", "audit")])
     if not decision.allowed:
         raise HTTPException(status_code=403, detail="forbidden")
     # The viewer's own SELECT is not audited (no recursion); the decide event
     # above already records that the read happened.
-    return recent_events(get_engine(), limit)
+    return recent_events(get_engine(), limit, event_id=event_id)
 
 
 @router.get("/audit/verify", tags=["audit"])

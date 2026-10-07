@@ -266,16 +266,28 @@ def ledger_status(engine: Engine) -> tuple[bool | None, dict[str, Any] | None]:
 
 
 def verify_report(engine: Engine) -> dict[str, Any]:
-    """Everything GET /audit/verify returns (SPEC 14.2 verification job)."""
+    """Everything GET /audit/verify returns (SPEC 14.2 verification job).
+
+    `first_bad_event_id` identifies the first event whose stored row does not
+    match the chain (payload edit, rehash or sequence break), so a viewer can
+    deep-link straight to it with GET /audit?event_id=...; `checked_count` is
+    the number of events the walk covered.
+    """
     valid, broken_seq = verify_chain(engine)
     with engine.connect() as conn:
-        event_count = int(conn.execute(text("SELECT count(*) FROM audit_events")).scalar_one())
+        checked_count = int(conn.execute(text("SELECT count(*) FROM audit_events")).scalar_one())
+        first_bad_event_id: str | None = None
+        if broken_seq is not None:
+            row = conn.execute(
+                text("SELECT event_id FROM audit_events WHERE seq = :seq"), {"seq": broken_seq}
+            ).first()
+            first_bad_event_id = str(row[0]) if row is not None else None
     checkpoint_ok, checkpoint_tip = checkpoint_status(engine)
     ledger_ok, ledger_tip = ledger_status(engine)
     return {
         "valid": valid,
-        "first_broken_seq": broken_seq,
-        "event_count": event_count,
+        "checked_count": checked_count,
+        "first_bad_event_id": first_bad_event_id,
         "checkpoint_ok": checkpoint_ok,
         "checkpoint_tip": checkpoint_tip,
         "ledger_ok": ledger_ok,
@@ -283,23 +295,34 @@ def verify_report(engine: Engine) -> dict[str, Any]:
     }
 
 
-def recent_events(engine: Engine, limit: int) -> list[dict[str, Any]]:
-    """Newest-first audit events for the viewer (SPEC 14 audit viewer API)."""
+def recent_events(engine: Engine, limit: int, event_id: str | None = None) -> list[dict[str, Any]]:
+    """Newest-first audit events for the viewer (SPEC 14 audit viewer API).
+
+    Every item carries its `event_id` so an answer's audit_event_id can
+    deep-link to its row; `event_id` narrows the read to that one event.
+    """
+    where = ""
+    params: dict[str, Any] = {"limit": limit}
+    if event_id is not None:
+        where = " WHERE event_id = :event_id"
+        params["event_id"] = event_id
     with engine.connect() as conn:
         rows = conn.execute(
             text(
-                "SELECT seq, created_at, payload, prev_hash, hash"
-                " FROM audit_events ORDER BY seq DESC LIMIT :limit"
+                "SELECT seq, event_id, created_at, payload, prev_hash, hash"
+                " FROM audit_events"
+                f"{where} ORDER BY seq DESC LIMIT :limit"
             ),
-            {"limit": limit},
+            params,
         ).all()
     return [
         {
             "seq": int(seq),
+            "event_id": str(event_id_value),
             "created_at": created_at.isoformat(),
             "payload": payload,
             "prev_hash": prev_hash,
             "hash": stored_hash,
         }
-        for seq, created_at, payload, prev_hash, stored_hash in rows
+        for seq, event_id_value, created_at, payload, prev_hash, stored_hash in rows
     ]

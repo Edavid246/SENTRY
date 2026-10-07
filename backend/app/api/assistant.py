@@ -11,17 +11,25 @@ Audit (SPEC §14): a decide event, a retrieval event carrying the authorized
 row count and chunk ids, an optional notable event for a manipulation-style
 question (SPEC §8.3), and an answer event with citation ids and gateway
 provenance; the answer event id is returned. Conversation turns are stored
-per user; a conversation id owned by another user answers 404. Derived
-conversation content inherits the highest classification and union of
-compartments of its input chunks (AGENTS.md).
+per user; a conversation id owned by another user answers 404, on the read
+routes as well as the write. Derived conversation content inherits the
+highest classification and union of compartments of its input chunks
+(AGENTS.md).
+
+Conversation reads (GET /conversations, GET /conversations/{id}) resolve the
+caller's own threads only, under the same decide + row filter + RLS order,
+and are audited like every other read. Citations for a stored turn are
+resolved from its inline citation markers, chunk by chunk, through the chunk
+row filter — a passage that is no longer visible simply drops out.
 """
 
 from __future__ import annotations
 
 import re
+from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
@@ -30,9 +38,14 @@ from app.api.deps import ConnDep, CurrentContext, audit_events
 from app.audit.chain import utc_now_iso
 from app.authz.context import AccessContext
 from app.authz.policy import Decision, LocalPolicy
-from app.db import set_rls_context
-from app.knowledge.answer import CitedAnswer, generate_answer
-from app.knowledge.retrieve import RetrievedChunk, retrieve_chunks
+from app.db import format_array, set_rls_context
+from app.knowledge.answer import CitedAnswer, generate_answer, parse_cited_chunk_ids
+from app.knowledge.retrieve import (
+    RetrievedChunk,
+    embed_question,
+    is_fts_only,
+    retrieve_chunks,
+)
 
 POLICY = LocalPolicy()
 router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
@@ -74,22 +87,63 @@ class CitationOut(BaseModel):
 class AssistantQueryResponse(BaseModel):
     answer: str
     citations: list[CitationOut]
+    found: bool = Field(
+        description="false when nothing was found in approved sources, or a refusal"
+    )
+    degraded: bool = Field(description="true when retrieval ran keyword-only (FTS only)")
     conversation_id: str
     audit_event_id: str
 
 
-def _decide_event(ctx: AccessContext, decision: Decision) -> dict[str, object]:
+class ConversationSummary(BaseModel):
+    id: str
+    title: str
+    classification_code: str
+    compartments: list[str]
+    created_at: str
+    updated_at: str
+
+
+class TurnOut(BaseModel):
+    role: str
+    content: str
+    created_at: str
+    citations: list[CitationOut] = Field(default_factory=list)
+
+
+class ConversationDetail(ConversationSummary):
+    turns: list[TurnOut]
+
+
+def _decide_event(
+    ctx: AccessContext,
+    decision: Decision,
+    *,
+    resource: str = "assistant",
+    requested: str = "answer",
+) -> dict[str, object]:
     payload: dict[str, object] = {
         "actor": ctx.username,
         "action": "decide",
-        "resource": "assistant",
-        "requested": "answer",
+        "resource": resource,
+        "requested": requested,
         "decision": "allow" if decision.allowed else "deny",
         "timestamp": utc_now_iso(),
     }
     if not decision.allowed:
         payload["reasons"] = list(decision.reasons)
     return payload
+
+
+def _query_event(ctx: AccessContext, resource: str, rows: int) -> dict[str, object]:
+    return {
+        "actor": ctx.username,
+        "action": "query",
+        "resource": resource,
+        "decision": "allow",
+        "rows": int(rows),
+        "timestamp": utc_now_iso(),
+    }
 
 
 def _retrieval_event(ctx: AccessContext, question: str, chunks: list[RetrievedChunk]) -> dict:
@@ -118,7 +172,7 @@ def _notable_event(ctx: AccessContext, question: str) -> dict:
 
 
 def _answer_event(
-    ctx: AccessContext, question: str, conversation_id: str, cited: CitedAnswer
+    ctx: AccessContext, question: str, conversation_id: str, cited: CitedAnswer, degraded: bool
 ) -> dict:
     return {
         "actor": ctx.username,
@@ -128,6 +182,7 @@ def _answer_event(
         "conversation_id": conversation_id,
         "question": question[:AUDIT_TEXT_LIMIT],
         "found": cited.found,
+        "degraded": degraded,
         "blocked": cited.blocked,
         "citations": [chunk.chunk_id for chunk in cited.citations],
         "provider": cited.provider,
@@ -135,6 +190,18 @@ def _answer_event(
         "cached": cited.cached,
         "timestamp": utc_now_iso(),
     }
+
+
+def _set_context(conn, ctx: AccessContext) -> None:
+    set_rls_context(
+        conn,
+        user_id=ctx.user_id,
+        clearance_rank=ctx.clearance_rank,
+        compartments=ctx.compartments,
+        unit_path=ctx.unit_path,
+        data_scope=ctx.data_scope,
+        session_id=ctx.session_id,
+    )
 
 
 def _rank_map(conn) -> dict[str, int]:
@@ -244,15 +311,7 @@ def query_assistant(
         audit_events([_decide_event(ctx, decision)])
         raise HTTPException(status_code=403, detail="forbidden")
 
-    set_rls_context(
-        conn,
-        user_id=ctx.user_id,
-        clearance_rank=ctx.clearance_rank,
-        compartments=ctx.compartments,
-        unit_path=ctx.unit_path,
-        data_scope=ctx.data_scope,
-        session_id=ctx.session_id,
-    )
+    _set_context(conn, ctx)
     new_conversation = body.conversation_id is None
     if new_conversation:
         conversation_id = uuid4()
@@ -262,7 +321,9 @@ def query_assistant(
         _resolve_conversation(conn, ctx, conversation_id)
         history = _load_history(conn, conversation_id)
 
-    chunks = retrieve_chunks(conn, ctx, body.question)
+    query_vector = embed_question(body.question)
+    chunks = retrieve_chunks(conn, ctx, body.question, query_vector=query_vector)
+    degraded = is_fts_only(query_vector, chunks)
     cited = generate_answer(body.question, chunks, history=history)
     ranks = _rank_map(conn)
     _store_turn(
@@ -283,7 +344,7 @@ def query_assistant(
     ]
     if _MANIPULATION_RE.search(body.question):
         events.append(_notable_event(ctx, body.question))
-    events.append(_answer_event(ctx, body.question, str(conversation_id), cited))
+    events.append(_answer_event(ctx, body.question, str(conversation_id), cited, degraded))
     written = audit_events(events)
 
     return AssistantQueryResponse(
@@ -299,6 +360,186 @@ def query_assistant(
             )
             for chunk in cited.citations
         ],
+        found=cited.found,
+        degraded=degraded,
         conversation_id=str(conversation_id),
         audit_event_id=str(written[-1]["event_id"]),
+    )
+
+
+def _citation_from_row(row) -> CitationOut:
+    return CitationOut(
+        chunk_id=str(row["id"]),
+        document_title=str(row["title"]),
+        document_ref=str(row["source_ref"] or ""),
+        page=row["page"],
+        section=row["section"],
+        classification_code=str(row["classification_code"]),
+    )
+
+
+def _visible_citations(conn, ctx: AccessContext, chunk_ids: list[str]) -> dict[str, CitationOut]:
+    """Resolve stored citation markers to the chunks the caller may still see.
+
+    Same policy row filter as retrieval: a passage whose classification,
+    compartments or unit no longer line up with the caller simply drops out.
+    """
+    if not chunk_ids:
+        return {}
+    chunk_filter = POLICY.row_filter(ctx, "chunk")
+    rows = (
+        conn.execute(
+            text(
+                "SELECT chunks.id, documents.source_ref, documents.title, chunks.page,"
+                " chunks.section, chunks.classification_code"
+                " FROM chunks"
+                " JOIN documents ON documents.id = chunks.document_id"
+                " WHERE chunks.id::text = ANY(CAST(:ids AS text[]))"
+                f" AND {chunk_filter.where_sql}"
+            ),
+            {"ids": format_array(chunk_ids), **chunk_filter.params},
+        )
+        .mappings()
+        .all()
+    )
+    return {str(row["id"]): _citation_from_row(row) for row in rows}
+
+
+@router.get("/conversations", response_model=list[ConversationSummary])
+def list_conversations(
+    ctx: CurrentContext,
+    conn: ConnDep,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[ConversationSummary]:
+    """The caller's own conversations, newest first (SPEC §10.1).
+
+    Another user's conversations are never in scope: the ownership predicate
+    is part of the SQL, alongside the policy row filter and RLS.
+    """
+    decision = POLICY.decide(ctx, "read", "conversation")
+    if not decision.allowed:
+        audit_events([_decide_event(ctx, decision, resource="conversation", requested="read")])
+        raise HTTPException(status_code=403, detail="forbidden")
+    _set_context(conn, ctx)
+    row_filter = POLICY.row_filter(ctx, "conversation")
+    rows = (
+        conn.execute(
+            text(
+                "SELECT id, title, classification_code, compartments, created_at, updated_at"
+                " FROM conversations"
+                " WHERE user_id = :user_id"
+                f" AND {row_filter.where_sql}"
+                " ORDER BY updated_at DESC, id DESC LIMIT :limit"
+            ),
+            {"user_id": ctx.user_id, "limit": limit, **row_filter.params},
+        )
+        .mappings()
+        .all()
+    )
+    results = [
+        ConversationSummary(
+            id=str(row["id"]),
+            title=str(row["title"]),
+            classification_code=str(row["classification_code"]),
+            compartments=[str(code) for code in (row["compartments"] or [])],
+            created_at=row["created_at"].isoformat(),
+            updated_at=row["updated_at"].isoformat(),
+        )
+        for row in rows
+    ]
+    audit_events(
+        [
+            _decide_event(ctx, decision, resource="conversation", requested="read"),
+            _query_event(ctx, "conversations", len(results)),
+        ]
+    )
+    return results
+
+
+@router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
+def get_conversation(
+    conversation_id: UUID, ctx: CurrentContext, conn: ConnDep
+) -> ConversationDetail:
+    """One of the caller's conversations with its turns and resolved citations.
+
+    A conversation owned by anyone else — or one the caller's action is not
+    allowed to read — answers 404, exactly like the POST that appends to it,
+    so an id can never be probed for existence.
+    """
+    decision = POLICY.decide(ctx, "read", "conversation")
+    if not decision.allowed:
+        audit_events([_decide_event(ctx, decision, resource="conversation", requested="read")])
+        raise HTTPException(status_code=404, detail="not found")
+    _set_context(conn, ctx)
+    conversation_filter = POLICY.row_filter(ctx, "conversation")
+    row = (
+        conn.execute(
+            text(
+                "SELECT id, title, classification_code, compartments, created_at, updated_at"
+                " FROM conversations"
+                " WHERE id = :id AND user_id = :user_id"
+                f" AND {conversation_filter.where_sql}"
+            ),
+            {"id": conversation_id, "user_id": ctx.user_id, **conversation_filter.params},
+        )
+        .mappings()
+        .first()
+    )
+    if row is None:
+        audit_events(
+            [
+                _decide_event(ctx, decision, resource="conversation", requested="read"),
+                _query_event(ctx, "conversations", 0),
+            ]
+        )
+        raise HTTPException(status_code=404, detail="not found")
+
+    message_filter = POLICY.row_filter(ctx, "message")
+    messages = (
+        conn.execute(
+            text(
+                "SELECT role, content, created_at FROM messages"
+                " WHERE conversation_id = :id"
+                f" AND {message_filter.where_sql}"
+                " ORDER BY created_at, CASE role WHEN 'user' THEN 0 ELSE 1 END, id"
+            ),
+            {"id": conversation_id, **message_filter.params},
+        )
+        .mappings()
+        .all()
+    )
+
+    wanted: list[str] = []
+    for message in messages:
+        if str(message["role"]) == "assistant":
+            wanted.extend(parse_cited_chunk_ids(str(message["content"])))
+    citations = _visible_citations(conn, ctx, list(dict.fromkeys(wanted)))
+
+    turns = [
+        TurnOut(
+            role=str(message["role"]),
+            content=str(message["content"]),
+            created_at=message["created_at"].isoformat(),
+            citations=[
+                citations[chunk_id]
+                for chunk_id in parse_cited_chunk_ids(str(message["content"]))
+                if chunk_id in citations
+            ],
+        )
+        for message in messages
+    ]
+    audit_events(
+        [
+            _decide_event(ctx, decision, resource="conversation", requested="read"),
+            _query_event(ctx, "messages", len(turns)),
+        ]
+    )
+    return ConversationDetail(
+        id=str(row["id"]),
+        title=str(row["title"]),
+        classification_code=str(row["classification_code"]),
+        compartments=[str(code) for code in (row["compartments"] or [])],
+        created_at=row["created_at"].isoformat(),
+        updated_at=row["updated_at"].isoformat(),
+        turns=turns,
     )

@@ -31,6 +31,9 @@ end-of-step report. Never silently log it.
 ### 2026-10-07 — No logout or token revocation
 - **Issue:** tokens are stateless bearer tokens valid until expiry; there is no logout
   endpoint and no revocation list.
+- **Update 2026-10-07:** the demo UI's logout button (Part B) will only drop the token
+  in browser storage — the token itself stays valid until expiry. Call this out in the
+  step report whenever the UI logout lands; do not present it as server-side logout.
 - **Why acceptable:** demo sessions are short-lived page reloads.
 - **Production needs:** revocation (denylist or introspection), logout, and session
   management via the real IdP.
@@ -109,9 +112,13 @@ end-of-step report. Never silently log it.
   it from a full hybrid run. The API tests always take this path (no weights).
 - **Why acceptable:** the demo must run without network/model weights, and tests
   must not depend on them.
-- **Production needs:** fail closed or label the answer as degraded, require
-  embeddings at ingestion time, and monitor embedder health so a missing vector
-  channel raises an alert instead of quietly lowering recall.
+- **Update 2026-10-07 (Part A):** the answer now carries a code-path `degraded` flag
+  (`true` when the query vector or every chunk embedding is missing) and the answer
+  audit event stores it, so the UI can label a keyword-only run. The API tests still
+  take this path by design.
+- **Production needs:** fail closed or label the answer as degraded (the flag is the
+  label), require embeddings at ingestion time, and monitor embedder health so a
+  missing vector channel raises an alert instead of quietly lowering recall.
 
 ### 2026-10-07 — Conversation/message RLS policies do not bind rows to the session user
 - **Issue:** the SELECT and INSERT (WITH CHECK) policies on `conversations` and

@@ -11,9 +11,21 @@ from app.seed import DEMO_PASSWORD
 from test_filter_only import ROLES
 from test_rls_only import CONTEXTS, USERNAMES
 
+# SPEC 7.1 permissions per organizational role, hand-authored here so the
+# /me response is checked against an independent oracle, not against
+# ROLE_PERMISSIONS in the code under test.
+EXPECTED_PERMISSIONS: dict[str, list[str]] = {
+    "commander": ["answer", "query", "read", "retrieve"],
+    "logistics": ["answer", "query", "read", "retrieve"],
+    "training": ["answer", "query", "read", "retrieve"],
+    "uas_ops": ["answer", "query", "read", "retrieve"],
+    "sysadmin": ["manage", "read_audit"],
+    "auditor": ["read_audit"],
+}
+
 
 def login(client, username: str, password: str = DEMO_PASSWORD):
-    return client.post("/auth/login", json={"username": username, "password": password})
+    return client.post("/api/v1/auth/login", json={"username": username, "password": password})
 
 
 def auth_header(client, username: str) -> dict[str, str]:
@@ -53,17 +65,20 @@ def test_wrong_password_and_unknown_username_are_indistinguishable(client) -> No
 
 @pytest.mark.parametrize("username", USERNAMES)
 def test_me_matches_hand_authored_context(client, username: str) -> None:
-    response = client.get("/me", headers=auth_header(client, username))
+    response = client.get("/api/v1/me", headers=auth_header(client, username))
     assert response.status_code == 200
     body = response.json()
-    # Exact key set: no permissions, no token_id, no internal ids.
+    # Exact key set: no token_id and no internal ids.
     assert set(body) == {
         "username",
+        "display_name",
         "role",
         "unit_path",
+        "unit_breadcrumb",
         "clearance_code",
         "clearance_rank",
         "compartments",
+        "permissions",
         "data_scope",
     }
     hand = CONTEXTS[username]
@@ -73,10 +88,23 @@ def test_me_matches_hand_authored_context(client, username: str) -> None:
     assert body["clearance_rank"] == hand["clearance_rank"]
     assert body["compartments"] == sorted(hand["compartments"])
     assert body["data_scope"] == hand["data_scope"]
+    # The shell's identity strip: readable name, permissions and a breadcrumb
+    # of unit names from the oldest ancestor down to the caller's own unit.
+    assert body["display_name"]
+    assert body["display_name"] != username
+    assert body["permissions"] == EXPECTED_PERMISSIONS[ROLES[username]]
+    breadcrumb = body["unit_breadcrumb"]
+    assert breadcrumb
+    assert breadcrumb[-1]["path"] == hand["unit_path"]
+    assert all(entry["name"] for entry in breadcrumb)
+    paths = [entry["path"] for entry in breadcrumb]
+    assert paths == sorted(paths, key=len)
+    for ancestor in paths:
+        assert hand["unit_path"].startswith(ancestor)
 
 
 def test_me_without_authorization_header_401(client) -> None:
-    response = client.get("/me")
+    response = client.get("/api/v1/me")
     assert response.status_code == 401
     assert response.json() == {"detail": "not authenticated"}
 
@@ -87,13 +115,13 @@ def test_me_without_authorization_header_401(client) -> None:
     ids=["no-scheme", "bearer-no-token", "bearer-blank-token", "other-scheme", "no-space"],
 )
 def test_me_malformed_authorization_header_401(client, header_value: str) -> None:
-    response = client.get("/me", headers={"Authorization": header_value})
+    response = client.get("/api/v1/me", headers={"Authorization": header_value})
     assert response.status_code == 401
     assert response.json() == {"detail": "not authenticated"}
 
 
 def test_me_garbage_token_401(client) -> None:
-    response = client.get("/me", headers={"Authorization": "Bearer not.a.jwt"})
+    response = client.get("/api/v1/me", headers={"Authorization": "Bearer not.a.jwt"})
     assert response.status_code == 401
     assert response.json() == {"detail": "not authenticated"}
 
@@ -106,6 +134,6 @@ def test_me_forged_token_401(client) -> None:
         "wrong-secret-deliberately-long-enough",
         algorithm="HS256",
     )
-    response = client.get("/me", headers={"Authorization": f"Bearer {forged}"})
+    response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {forged}"})
     assert response.status_code == 401
     assert response.json() == {"detail": "not authenticated"}

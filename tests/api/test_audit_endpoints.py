@@ -19,7 +19,7 @@ DATA_USERS = ["a.bello", "a.okafor", "t.adeyemi", "k.musa"]
 
 
 def _audit(client, username: str = AUDITOR, limit: int = 200) -> list[dict]:
-    response = client.get(f"/audit?limit={limit}", headers=auth_header(client, username))
+    response = client.get(f"/api/v1/audit?limit={limit}", headers=auth_header(client, username))
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -46,27 +46,27 @@ def test_login_success_and_failure_are_both_audited(client) -> None:
 
 @pytest.mark.parametrize("username", DATA_USERS)
 def test_operational_roles_may_not_read_the_audit_trail(client, username: str) -> None:
-    response = client.get("/audit", headers=auth_header(client, username))
+    response = client.get("/api/v1/audit", headers=auth_header(client, username))
     assert response.status_code == 403
-    verify = client.get("/audit/verify", headers=auth_header(client, username))
+    verify = client.get("/api/v1/audit/verify", headers=auth_header(client, username))
     assert verify.status_code == 403
 
 
 def test_auditor_and_sysadmin_may_read_the_audit_trail(client) -> None:
     for username in (AUDITOR, SYSADMIN):
-        response = client.get("/audit?limit=5", headers=auth_header(client, username))
+        response = client.get("/api/v1/audit?limit=5", headers=auth_header(client, username))
         assert response.status_code == 200, response.text
-        verify = client.get("/audit/verify", headers=auth_header(client, username))
+        verify = client.get("/api/v1/audit/verify", headers=auth_header(client, username))
         assert verify.status_code == 200, verify.text
 
 
 def test_audit_requires_authentication(client) -> None:
-    assert client.get("/audit").status_code == 401
-    assert client.get("/audit/verify").status_code == 401
+    assert client.get("/api/v1/audit").status_code == 401
+    assert client.get("/api/v1/audit/verify").status_code == 401
 
 
 def test_rejected_token_is_audited(client) -> None:
-    response = client.get("/audit", headers={"Authorization": "Bearer not-a-real-token"})
+    response = client.get("/api/v1/audit", headers={"Authorization": "Bearer not-a-real-token"})
     assert response.status_code == 401
     rejected = _latest(_audit(client), action="authenticate", decision="deny")
     assert rejected is not None
@@ -75,7 +75,7 @@ def test_rejected_token_is_audited(client) -> None:
 
 def test_allowed_data_request_records_decide_then_query(client) -> None:
     headers = auth_header(client, "a.bello")
-    response = client.get("/documents", headers=headers)
+    response = client.get("/api/v1/documents", headers=headers)
     assert response.status_code == 200
     events = _audit(client)
     decide = _latest(
@@ -91,7 +91,7 @@ def test_allowed_data_request_records_decide_then_query(client) -> None:
 
 def test_denied_data_request_records_a_single_denied_decide(client) -> None:
     headers = auth_header(client, SYSADMIN)
-    assert client.get("/documents", headers=headers).status_code == 403
+    assert client.get("/api/v1/documents", headers=headers).status_code == 403
     events = _audit(client)
     decide = _latest(events, actor=SYSADMIN, action="decide", resource="document")
     assert decide is not None
@@ -117,21 +117,21 @@ def test_verify_reports_healthy_chain_and_both_layers(client) -> None:
             for i in range(10)
         ],
     )
-    response = client.get("/audit/verify", headers=auth_header(client, AUDITOR))
+    response = client.get("/api/v1/audit/verify", headers=auth_header(client, AUDITOR))
     assert response.status_code == 200, response.text
     body = response.json()
     assert set(body) == {
         "valid",
-        "first_broken_seq",
-        "event_count",
+        "checked_count",
+        "first_bad_event_id",
         "checkpoint_ok",
         "checkpoint_tip",
         "ledger_ok",
         "ledger_tip",
     }
     assert body["valid"] is True
-    assert body["first_broken_seq"] is None
-    assert isinstance(body["event_count"], int) and body["event_count"] >= 10
+    assert body["first_bad_event_id"] is None
+    assert isinstance(body["checked_count"], int) and body["checked_count"] >= 10
     assert body["checkpoint_ok"] is True
     assert body["ledger_ok"] is True
     for tip_key in ("checkpoint_tip", "ledger_tip"):
@@ -145,7 +145,8 @@ def test_audit_items_have_the_viewer_shape(client) -> None:
     seqs = [event["seq"] for event in events]
     assert seqs == sorted(seqs, reverse=True)
     for event in events:
-        assert set(event) == {"seq", "created_at", "payload", "prev_hash", "hash"}
+        assert set(event) == {"seq", "event_id", "created_at", "payload", "prev_hash", "hash"}
+        assert len(event["event_id"]) == 32
         assert len(event["prev_hash"]) == 64
         assert len(event["hash"]) == 64
         payload = event["payload"]
@@ -167,4 +168,4 @@ def test_audit_write_failure_blocks_the_request(client, monkeypatch) -> None:
 
     monkeypatch.setattr("app.api.endpoints.audit_events", boom)
     with pytest.raises(RuntimeError, match="audit storage down"):
-        client.get("/documents", headers=headers)
+        client.get("/api/v1/documents", headers=headers)

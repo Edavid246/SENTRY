@@ -28,6 +28,7 @@ from app.config import get_settings
 
 POLICY = LocalPolicy()
 RRF_K = 60.0
+_UNSET: Any = object()
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +68,27 @@ def _query_embedding(question: str) -> list[float] | None:
         return None
 
 
+def embed_question(question: str) -> list[float] | None:
+    """The query embedding, or None when the embedder is unavailable.
+
+    Public so the caller can embed once, hand the vector to retrieve_chunks
+    and still know (via is_fts_only) which retrieval channel actually ran.
+    """
+    return _query_embedding(question)
+
+
+def is_fts_only(query_vector: list[float] | None, chunks: list[RetrievedChunk]) -> bool:
+    """True when the run had no working vector channel (SPEC §8.2 hybrid search).
+
+    Either the embedder was unavailable (no query vector) or no retrieved
+    chunk could be compared against it (corpus not embedded) — both mean the
+    result is keyword-only, which the API reports as `degraded`.
+    """
+    if query_vector is None:
+        return True
+    return bool(chunks) and all(chunk.vector_similarity is None for chunk in chunks)
+
+
 def retrieve_chunks(
     conn: Connection,
     ctx: AccessContext,
@@ -74,13 +96,19 @@ def retrieve_chunks(
     *,
     top_k: int | None = None,
     min_similarity: float | None = None,
-    query_vector: list[float] | None = None,
+    query_vector: Any = _UNSET,
 ) -> list[RetrievedChunk]:
-    """Return the authorized chunks most relevant to the question, best first."""
+    """Return the authorized chunks most relevant to the question, best first.
+
+    `query_vector=_UNSET` embeds the question here; an explicit list (or an
+    explicit None for "no vector channel") is used as given.
+    """
     settings = get_settings()
     limit = top_k if top_k is not None else settings.retrieval_top_k
     floor = min_similarity if min_similarity is not None else settings.retrieval_min_similarity
-    vector = query_vector if query_vector is not None else _query_embedding(question)
+    vector: list[float] | None = (
+        _query_embedding(question) if query_vector is _UNSET else query_vector
+    )
     row_filter = POLICY.row_filter(ctx, "chunk")
     params: dict[str, Any] = {
         **row_filter.params,
