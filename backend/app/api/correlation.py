@@ -70,7 +70,8 @@ def run_correlation(ctx: CurrentContext, conn: ConnDep) -> RunResult:
         names = unit_names(conn)
         drafts = run_rising_faults(scope, Labels.load(conn), names)
         stored = set(save_findings(scope, drafts))  # committed once the audit batch is written
-        rows = list_findings(scope)
+        rows = list_findings(scope)  # returned to the caller, so audited as a read
+        scope.read("finding", len(rows), item_ids=[r.key for r in rows])
         scope.record(
             event(
                 ctx.username,

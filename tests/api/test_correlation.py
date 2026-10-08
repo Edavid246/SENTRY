@@ -222,16 +222,20 @@ def test_a_key_held_by_a_hidden_finding_stores_nothing_and_raises_nothing(
 
 
 def test_run_audits_the_decision_before_its_tool_queries_and_commits_after(client) -> None:
-    """The run's evidence queries follow the decide event that allowed them, and the
-    findings are committed only once the batch (ending in correlation_run) is written."""
+    """The run's evidence queries follow the decide event that allowed them, the findings
+    it returns are audited as a read, and the findings are committed only once the batch
+    (ending in correlation_run) is written."""
     tip = max(event["seq"] for event in _audit(client))
-    _run(client)
-    mine = [
-        e["payload"]["action"]
+    returned = [f["id"] for f in _run(client).json()["findings"]]
+    events = [
+        e["payload"]
         for e in sorted(_audit(client), key=lambda e: e["seq"])
         if e["seq"] > tip
         and e["payload"]["actor"] == "a.bello"
         and e["payload"]["action"] != "login"
     ]
-    assert mine[0] == "decide" and mine[-1] == "correlation_run"
-    assert set(mine[1:-1]) == {"data_query"}
+    mine = [e["action"] for e in events]
+    assert mine[0] == "decide" and mine[-2:] == ["query", "correlation_run"]
+    assert set(mine[1:-2]) == {"data_query"}
+    read = events[-2]
+    assert read["resource"] == "finding" and read["item_ids"] == returned
