@@ -58,3 +58,11 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* MapLibre attribution (OpenStreetMap credit, required by the ODbL) in the app palette. */
+.maplibregl-ctrl.maplibregl-ctrl-attrib {
+  @apply bg-surface/90 text-mute;
+}
+.maplibregl-ctrl-attrib a {
+  @apply text-sage;
+}

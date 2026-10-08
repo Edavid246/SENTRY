@@ -355,3 +355,20 @@ end-of-step report. Never silently log it.
   window is applied; the pinned instant keeps recorded model answers valid.
 - **Production needs:** real per-system adapters pushing windows (time, area, sensor) into
   the source query or an indexed store, `TrackPoint`/telemetry storage, and live `stream()`.
+
+### 2026-10-08 — Offline basemap is one static extract of the demo area
+- **Issue:** the `/map` street basemap is a single 2 MB OpenStreetMap extract
+  (`web/public/basemap/demo-area.pmtiles`, Protomaps build 2026-10-08, zoom 0-15) of one
+  rural area, plus Latin-only label fonts and one sprite set, committed into the web app and
+  served as static files. The browser reads the whole archive into memory. The map cannot
+  be panned outside the extract. There is no update process, no imagery or terrain, and the
+  map data is as complete as OpenStreetMap is for that area (sparse). The demo sites were
+  moved from central Abuja to this area so that fictitious military activity is not drawn
+  over a real city.
+- **Why acceptable:** nothing leaves the machine (smoke test asserts no external request),
+  SPEC §6 asks for locally hosted tiles, and the demo only needs one area. OpenStreetMap
+  attribution is shown on the map as the ODbL requires.
+- **Production needs:** a tile service inside the enclave covering the real area of
+  operations (vector tiles, ideally imagery and elevation from accredited sources), a
+  controlled update and import process, Range-request serving instead of whole-file reads,
+  fonts for every script in use, and a review of which basemap sources are cleared for use.

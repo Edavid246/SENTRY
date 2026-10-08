@@ -35,7 +35,8 @@ component slots in. **Demo build only; never claim the dev profile is sovereign.
 Workflows, OCR (Tesseract), reranker (`RerankerProvider` — retrieval uses
 reciprocal rank fusion instead), observability
 (OpenTelemetry/Prometheus/Grafana/Loki), Kubernetes profile, air-gapped
-deployment profile, map tiles (map = MapLibre + GeoJSON only, no tiles).
+deployment profile. Map tiles are not cut but reduced: one small offline OpenStreetMap
+extract of the demo area, served by the web app (`web/public/basemap/README.md`).
 
 ## Demo-only tooling
 

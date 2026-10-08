@@ -581,12 +581,14 @@ RECORDS += [
 # like ONVIF analytics events, MAVLink/MISB ST 0601 mission logs and CASE/UCO evidence records;
 # the adapter's translation layer is the only place that shape matters (SPEC 11.2). Detection
 # times are hour offsets from demo_now() (noon on the demo date); mission dates are day offsets.
-# Coordinates are fictitious demo positions. Visibility follows the SPEC 7.1 rule and is pinned
-# in tests/authz/expected.py.
+# Coordinates are fictitious demo positions on open rural land (Niger State), chosen against the
+# local OpenStreetMap extract: no buildings within ~1 km and no military or airfield features
+# in the area, so no real place reads as a demo site (web/public/basemap/README.md).
+# Visibility follows the SPEC 7.1 rule and is pinned in tests/authz/expected.py.
 _SITES = {
-    "DEP-B4": (7.480, 9.080),
-    "DEP-B2": (7.420, 9.040),
-    "UAS-HANGAR": (7.510, 9.120),
+    "DEP-B4": (5.460, 9.350),
+    "DEP-B2": (5.400, 9.310),
+    "UAS-HANGAR": (5.490, 9.390),
 }
 _CT = "connected-tech-demo"
 _UAS_WING = "/command-a/uas-wing/"
@@ -635,8 +637,8 @@ def _mission(ref, classification, offset, mission, platform, status, area, reaso
     return (ref, "Mission", _CT, classification, ["UAS-OPS"], _UAS_WING, data)
 
 
-_ROUTE_B4 = ((7.510, 9.120, 120), (7.495, 9.100, 150), (7.480, 9.080, 150), (7.470, 9.090, 130))
-_ROUTE_B2 = ((7.510, 9.120, 120), (7.470, 9.080, 140), (7.420, 9.040, 140), (7.440, 9.060, 120))
+_ROUTE_B4 = ((5.490, 9.390, 120), (5.475, 9.370, 150), (5.460, 9.350, 150), (5.450, 9.360, 130))
+_ROUTE_B2 = ((5.490, 9.390, 120), (5.450, 9.350, 140), (5.400, 9.310, 140), (5.420, 9.330, 120))
 RECORDS += [
     _sensor("REC-046", "restricted", [], _BN4, "SEN-B4-01", "DEP-B4"),
     _sensor("REC-047", "restricted", [], _BDE2, "SEN-B2-01", "DEP-B2"),

@@ -8,6 +8,7 @@ import { api, type ConnectedMap, type MapFeature, type MapKind } from "@/lib/api
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { ClearanceBadge } from "@/components/ClearanceBadge";
+import { BASEMAP_BOUNDS, basemapStyle, registerBasemap } from "@/lib/basemap";
 
 const COLOURS: Record<MapKind, string> = {
   sensor: "#8fa89d",
@@ -22,27 +23,6 @@ const KIND_LABEL: Record<MapKind, string> = {
   detection: "Detections",
   mission: "UAS missions",
 };
-
-// Air-gap: no tiles, no glyphs, no sprites. The base map is a flat background plus a
-// lat/lon graticule drawn from local GeoJSON; labels live in the side panel.
-function graticule(bounds: [number, number, number, number]) {
-  const [w, s, e, n] = bounds;
-  const step = 0.02;
-  const features = [];
-  for (let x = Math.floor(w / step) * step; x <= e; x += step)
-    features.push({
-      type: "Feature" as const,
-      properties: {},
-      geometry: { type: "LineString" as const, coordinates: [[x, s], [x, n]] },
-    });
-  for (let y = Math.floor(s / step) * step; y <= n; y += step)
-    features.push({
-      type: "Feature" as const,
-      properties: {},
-      geometry: { type: "LineString" as const, coordinates: [[w, y], [e, y]] },
-    });
-  return { type: "FeatureCollection" as const, features };
-}
 
 function boundsOf(features: MapFeature[]): [number, number, number, number] | null {
   let w = 180, s = 90, e = -180, n = -90;
@@ -138,24 +118,27 @@ export default function MapPage() {
   useEffect(() => {
     if (!data || !container.current || mapRef.current) return;
     let disposed = false;
-    const box = boundsOf(data.features) ?? [3.0, 6.3, 3.6, 6.8];
+    const box = boundsOf(data.features) ?? BASEMAP_BOUNDS;
     const pad = 0.05;
     const extent: [number, number, number, number] = [
       box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad,
     ];
     import("maplibre-gl").then(({ default: maplibregl }) => {
       if (disposed || !container.current) return;
+      registerBasemap(maplibregl);
+      const base = basemapStyle();
       const map = new maplibregl.Map({
         container: container.current,
         style: {
           version: 8,
+          glyphs: base.glyphs,
+          sprite: base.sprite,
           sources: {
-            grid: { type: "geojson", data: graticule(extent) },
+            ...base.sources,
             features: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
           },
           layers: [
-            { id: "bg", type: "background", paint: { "background-color": "#091017" } },
-            { id: "grid", type: "line", source: "grid", paint: { "line-color": "#16252c", "line-width": 1 } },
+            ...base.layers,
             {
               id: "missions",
               type: "line",
@@ -179,7 +162,9 @@ export default function MapPage() {
         },
         bounds: extent,
         fitBoundsOptions: { padding: 40, maxZoom: 14 },
-        attributionControl: false,
+        // Keep the view on the offline extract; outside it there is no map data.
+        maxBounds: BASEMAP_BOUNDS,
+        attributionControl: { compact: true },
       });
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
       for (const layer of ["points", "missions"]) {
@@ -227,7 +212,7 @@ export default function MapPage() {
           <div ref={container} data-testid="map-canvas" data-ready={ready}
             style={{ position: "absolute", inset: 0 }} />
           <div className="absolute left-3 top-3 border border-rule bg-surface/90 px-3 py-1 text-[0.75rem] tracking-[0.12em] text-sage">
-            SYNTHETIC DATA · NO BASEMAP (AIR-GAPPED)
+            SYNTHETIC DATA · OFFLINE BASEMAP (NO EXTERNAL TILES)
           </div>
           {error && (
             <p role="alert" data-testid="map-error" className="absolute left-3 top-12 border border-rule bg-surface p-3">

@@ -22,6 +22,14 @@ const saved = [];
 const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || "msedge" });
 const page = await (await browser.newContext({ viewport: { width: 1920, height: 1080 } })).newPage();
 page.setDefaultTimeout(60000);
+// Air-gap: record every request that leaves this machine (the basemap included).
+const external = [];
+const local = new Set(["localhost", "127.0.0.1"]);
+page.on("request", (r) => {
+  const u = new URL(r.url());
+  if (/^https?:$/.test(u.protocol) && !local.has(u.hostname)) external.push(r.url());
+});
+const basemapLoaded = page.waitForResponse((r) => r.url().endsWith("/basemap/demo-area.pmtiles") && r.ok());
 
 async function shot(name) {
   const file = path.join(shots, `${name}.png`);
@@ -125,6 +133,8 @@ try {
   check((await page.textContent('[data-testid="count-sensor"]')) === "2", "a.bello map shows 2 sensors");
   check((await page.textContent('[data-testid="count-detection"]')) === "6", "a.bello map shows 6 detections");
   check((await page.textContent('[data-testid="count-mission"]')) === "5", "a.bello map shows 5 missions");
+  await basemapLoaded;
+  check(true, "offline basemap archive is served by this app");
   await page.click('[data-testid="map-item-REC-060"]');
   await page.waitForSelector('[data-testid="map-detail"]');
   check((await page.textContent('[data-testid="map-detail"]')).includes("SECRET"), "Secret mission detail carries its classification badge");
@@ -192,6 +202,7 @@ try {
   await page.waitForSelector('[data-testid="verify-modal"]');
   check((await page.textContent('[data-testid="verify-valid"]')) === "true", "Verify chain reports valid");
   await shot("09-audit-verify-modal");
+  check(external.length === 0, `no request left the machine${external.length ? ": " + external.join(" ") : ""}`);
 } catch (err) {
   await shot("zz-failure").catch(() => {});
   console.error(String(err));
