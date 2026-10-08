@@ -16,6 +16,7 @@ from typing import Annotated, Any
 from fastapi import Depends, Header, HTTPException
 from sqlalchemy.engine import Connection
 
+from app.ai_gateway.port import ModelPort
 from app.audit.chain import append_events, utc_now_iso
 from app.authz.context import AccessContext
 from app.authz.policy import Decision
@@ -30,6 +31,17 @@ def get_conn() -> Iterator[Connection]:
 
 
 ConnDep = Annotated[Connection, Depends(get_conn)]
+
+
+def get_models() -> ModelPort:
+    """The model seam for this request: the configured AI gateway + local embedder.
+
+    Tests and scripts replace it with `app.dependency_overrides[get_models]`.
+    """
+    return ModelPort()
+
+
+ModelsDep = Annotated[ModelPort, Depends(get_models)]
 
 
 def audit_events(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:

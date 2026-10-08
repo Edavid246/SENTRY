@@ -28,7 +28,6 @@ from app.config import get_settings
 
 POLICY = LocalPolicy()
 RRF_K = 60.0
-_UNSET: Any = object()
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,24 +58,6 @@ def _vector_literal(vector: list[float]) -> str:
     return "[" + ",".join(f"{value:.7f}" for value in vector) + "]"
 
 
-def _query_embedding(question: str) -> list[float] | None:
-    try:
-        from app.ai_gateway.embeddings import get_embedder
-
-        return list(get_embedder().embed([question])[0])
-    except Exception:  # noqa: BLE001 - degrade to full-text search
-        return None
-
-
-def embed_question(question: str) -> list[float] | None:
-    """The query embedding, or None when the embedder is unavailable.
-
-    Public so the caller can embed once, hand the vector to retrieve_chunks
-    and still know (via is_fts_only) which retrieval channel actually ran.
-    """
-    return _query_embedding(question)
-
-
 def is_fts_only(query_vector: list[float] | None, chunks: list[RetrievedChunk]) -> bool:
     """True when the run had no working vector channel (SPEC §8.2 hybrid search).
 
@@ -96,19 +77,17 @@ def retrieve_chunks(
     *,
     top_k: int | None = None,
     min_similarity: float | None = None,
-    query_vector: Any = _UNSET,
+    query_vector: list[float] | None,
 ) -> list[RetrievedChunk]:
     """Return the authorized chunks most relevant to the question, best first.
 
-    `query_vector=_UNSET` embeds the question here; an explicit list (or an
-    explicit None for "no vector channel") is used as given.
+    `query_vector` is the question's embedding (ModelPort.embed_query), or None
+    for "no vector channel" (full-text only).
     """
     settings = get_settings()
     limit = top_k if top_k is not None else settings.retrieval_top_k
     floor = min_similarity if min_similarity is not None else settings.retrieval_min_similarity
-    vector: list[float] | None = (
-        _query_embedding(question) if query_vector is _UNSET else query_vector
-    )
+    vector = query_vector
     row_filter = POLICY.row_filter(ctx, "chunk")
     params: dict[str, Any] = {
         **row_filter.params,

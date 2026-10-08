@@ -21,7 +21,7 @@ import re
 from dataclasses import dataclass
 
 from app.ai_gateway.base import ChatMessage, LLMRequest
-from app.ai_gateway.gateway import get_gateway
+from app.ai_gateway.port import Completer
 from app.authz.labels import Labels
 from app.data_queries.tools import ToolResult
 from app.knowledge.answer import build_evidence, parse_cited_chunk_ids
@@ -94,7 +94,7 @@ def generate_training_report(
     chunks: list[RetrievedChunk],
     labels: Labels,
     *,
-    gateway=None,
+    gateway: Completer,
 ) -> DraftReport:
     inputs = [*result.records, *chunks]
     label = labels.derive(inputs, empty_ok=True)
@@ -128,8 +128,7 @@ def generate_training_report(
         f"{table}\n\nEVIDENCE:\n{build_evidence(ordered) if ordered else '(none)'}\n\n"
         "Draft the report."
     )
-    client = gateway if gateway is not None else get_gateway()
-    llm = client.complete(
+    llm = gateway.complete(
         LLMRequest(messages=(ChatMessage(role="user", text=prompt),), system=_SYSTEM)
     )
     body = llm.text.strip()

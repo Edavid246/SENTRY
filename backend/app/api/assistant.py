@@ -1,20 +1,10 @@
-"""Assistant endpoint (SPEC §8.2, §9.2): POST /api/v1/assistant/query.
+"""Assistant endpoints (SPEC §8.2, §9.2, §10.1).
 
-Authorization order is fixed and identical to the other data endpoints:
-LocalPolicy.decide first (may this user ask at all?), then set_rls_context +
-the policy row filter inside the retrieval SQL (which chunks?). Only the
-authorized chunks reach the model, so content inside a document (including a
-prompt-injection attempt) can never change access — access was decided before
-the model ran (SPEC §8.3, Principle Zero).
-
-Audit (SPEC §14): a decide event, a retrieval event carrying the authorized
-row count and chunk ids, an optional notable event for a manipulation-style
-question (SPEC §8.3), and an answer event with citation ids and gateway
-provenance; the answer event id is returned. Conversation turns are stored
-per user; a conversation id owned by another user answers 404, on the read
-routes as well as the write. Derived conversation content inherits the
-highest classification and union of compartments of its input chunks
-(AGENTS.md).
+POST /api/v1/assistant/query maps HTTP onto `app.assistant.service.answer`,
+which owns the authorization order, the pathways (knowledge, data, report),
+labelling, conversation storage and the audit trail. This module only turns
+requests into calls and outcomes into responses: AssistantForbidden -> 403,
+ConversationNotFound -> 404, ModelUnavailable -> 503.
 
 Conversation reads (GET /conversations, GET /conversations/{id}) resolve the
 caller's own threads only, under the same decide + row filter + RLS order,
@@ -25,54 +15,33 @@ row filter — a passage that is no longer visible simply drops out.
 
 from __future__ import annotations
 
-import re
 from typing import Annotated, Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from app.ai_gateway.base import ChatMessage, ProviderError, ProviderNotConfiguredError
-from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
-from app.audit.chain import utc_now_iso
-from app.authz.context import AccessContext
-from app.authz.labels import Label, Labels
-from app.authz.policy import Decision, LocalPolicy
-from app.data_queries.explain import explain_result
-from app.data_queries.registry import ToolOutcome, execute_tool
-from app.data_queries.routing import RoutedReport, RoutedTool, route_question, route_report
-from app.db import format_array, set_rls_context_for
-from app.knowledge.answer import CitedAnswer, generate_answer, parse_cited_chunk_ids
-from app.knowledge.retrieve import (
-    RetrievedChunk,
-    embed_question,
-    is_fts_only,
-    retrieve_chunks,
+from app.api.deps import (
+    ConnDep,
+    CurrentContext,
+    ModelsDep,
+    audit_events,
+    decide_event,
+    query_event,
 )
-from app.reporting.training import DOCUMENT_QUERY, DraftReport, generate_training_report
+from app.assistant.conversations import ConversationNotFound
+from app.assistant.service import AssistantForbidden, ModelUnavailable, answer
+from app.authz.context import AccessContext
+from app.authz.policy import LocalPolicy
+from app.db import format_array, set_rls_context_for
+from app.knowledge.answer import parse_cited_chunk_ids
+from app.knowledge.retrieve import RetrievedChunk
 
 POLICY = LocalPolicy()
 router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
 
 MAX_QUESTION_CHARS = 2000
-HISTORY_TURNS = 6
-AUDIT_TEXT_LIMIT = 300
-
-# SPEC §8.3: requests to ignore permissions, reveal restricted sources or act
-# as another user have no effect on retrieval and are logged as notable events.
-_MANIPULATION_PATTERNS = (
-    r"ignore (all |your |my |the )?(previous |prior )?(instructions?|permissions?)",
-    r"disregard (the |all )?(classification|restriction|permission)",
-    r"reveal (the |all )?(secret|restricted|classified)",
-    r"show me (the |all )?(secret|restricted|classified)",
-    r"act as (a |another |the )?(user|admin|commander)",
-    r"pretend (you are|to be)",
-    r"bypass (the |all )?(rule|restriction|permission|control)",
-    r"system notice",
-    r"you are now",
-)
-_MANIPULATION_RE = re.compile("|".join(_MANIPULATION_PATTERNS), re.IGNORECASE)
 
 
 class AssistantQueryRequest(BaseModel):
@@ -144,357 +113,29 @@ class ConversationDetail(ConversationSummary):
     turns: list[TurnOut]
 
 
-def _retrieval_event(ctx: AccessContext, question: str, chunks: list[RetrievedChunk]) -> dict:
-    return {
-        "actor": ctx.username,
-        "action": "retrieve",
-        "resource": "chunk",
-        "decision": "allow",
-        "question": question[:AUDIT_TEXT_LIMIT],
-        "rows": len(chunks),
-        "chunk_ids": [chunk.chunk_id for chunk in chunks],
-        "timestamp": utc_now_iso(),
-    }
-
-
-def _notable_event(ctx: AccessContext, question: str) -> dict:
-    return {
-        "actor": ctx.username,
-        "action": "notable",
-        "resource": "assistant",
-        "decision": "deny",
-        "reasons": ["manipulation-style request; access unchanged"],
-        "question": question[:AUDIT_TEXT_LIMIT],
-        "timestamp": utc_now_iso(),
-    }
-
-
-def _answer_event(
-    ctx: AccessContext, question: str, conversation_id: str, cited: CitedAnswer, degraded: bool
-) -> dict:
-    return {
-        "actor": ctx.username,
-        "action": "answer",
-        "resource": "assistant",
-        "decision": "deny" if cited.blocked else "allow",
-        "conversation_id": conversation_id,
-        "question": question[:AUDIT_TEXT_LIMIT],
-        "found": cited.found,
-        "degraded": degraded,
-        "blocked": cited.blocked,
-        "citations": [chunk.chunk_id for chunk in cited.citations],
-        "provider": cited.provider,
-        "model": cited.model,
-        "cached": cited.cached,
-        "timestamp": utc_now_iso(),
-    }
-
-
-def _data_answer_event(
-    ctx: AccessContext,
-    question: str,
-    conversation_id: str,
-    outcome: ToolOutcome,
-    *,
-    provider: str,
-    model: str,
-    cached: bool,
-) -> dict:
-    return {
-        "actor": ctx.username,
-        "action": "answer",
-        "resource": "assistant",
-        "pathway": "data",
-        "decision": "deny" if outcome.refused else "allow",
-        "conversation_id": conversation_id,
-        "question": question[:AUDIT_TEXT_LIMIT],
-        "tool": outcome.tool[:64],
-        "found": bool(outcome.result and outcome.result.rows),
-        "refused": outcome.refused,
-        "rows": len(outcome.result.rows) if outcome.result else 0,
-        "provider": provider,
-        "model": model,
-        "cached": cached,
-        "timestamp": utc_now_iso(),
-    }
-
-
-def _report_answer_event(
-    ctx: AccessContext,
-    question: str,
-    conversation_id: str,
-    report: DraftReport | None,
-    tool_result: ToolOutcome,
-    chunk_ids: list[str],
-) -> dict:
-    return {
-        "actor": ctx.username,
-        "action": "answer",
-        "resource": "assistant",
-        "pathway": "report",
-        "decision": "deny" if (report is None or report.blocked) else "allow",
-        "conversation_id": conversation_id,
-        "question": question[:AUDIT_TEXT_LIMIT],
-        "tool": tool_result.tool[:64],
-        "record_ids": list(report.record_ids) if report else [],
-        "chunk_ids": chunk_ids,
-        "citations": [c.chunk_id for c in report.citations] if report else [],
-        "classification": report.classification_code if report else None,
-        "compartments": list(report.compartments) if report else [],
-        "found": bool(report and report.found),
-        "blocked": bool(report and report.blocked),
-        "provider": report.provider if report else "",
-        "model": report.model if report else "",
-        "cached": bool(report and report.cached),
-        "timestamp": utc_now_iso(),
-    }
-
-
-def _resolve_conversation(conn, ctx: AccessContext, requested: UUID) -> str:
-    row = conn.execute(
-        text("SELECT id FROM conversations WHERE id = :id AND user_id = :user_id"),
-        {"id": requested, "user_id": ctx.user_id},
-    ).first()
-    if row is None:
-        raise HTTPException(status_code=404, detail="not found")
-    return str(row.id)
-
-
-def _provider_unavailable(exc: ProviderError) -> HTTPException:
-    if isinstance(exc, ProviderNotConfiguredError):
-        detail = "the answer model is not configured on this server"
-    else:
-        detail = "the answer model is currently unavailable; retry later"
-    return HTTPException(status_code=503, detail=detail)
-
-
-def _open_conversation(conn, ctx: AccessContext, requested: UUID | None) -> tuple[UUID, bool]:
-    """Return (conversation id, is_new); an id owned by anyone else answers 404."""
-    if requested is None:
-        return uuid4(), True
-    set_rls_context_for(conn, ctx)
-    _resolve_conversation(conn, ctx, requested)
-    return requested, False
-
-
-def _load_history(conn, conversation_id: UUID) -> tuple[ChatMessage, ...]:
-    rows = conn.execute(
-        text(
-            "SELECT role, content FROM messages"
-            " WHERE conversation_id = :id"
-            " ORDER BY created_at DESC, id DESC LIMIT :limit"
-        ),
-        {"id": conversation_id, "limit": HISTORY_TURNS},
-    ).all()
-    return tuple(ChatMessage(role=str(row.role), text=str(row.content)) for row in reversed(rows))
-
-
-def _store_turn(
-    conn,
-    ctx: AccessContext,
-    conversation_id: UUID,
-    question: str,
-    answer: str,
-    label: Label,
-    *,
-    new_conversation: bool,
-) -> None:
-    common = {
-        "classification": label.code,
-        "compartments": list(label.compartments),
-        "unit_id": ctx.unit_id,
-    }
-    if new_conversation:
-        conn.execute(
-            text(
-                "INSERT INTO conversations"
-                " (id, user_id, title, classification_code, compartments, unit_id)"
-                " VALUES (:id, :user_id, :title, :classification, :compartments, :unit_id)"
-            ),
-            {"id": conversation_id, "user_id": ctx.user_id, "title": question[:120], **common},
-        )
-    conn.execute(
-        text(
-            "INSERT INTO messages"
-            " (id, conversation_id, role, content, classification_code, compartments, unit_id)"
-            " VALUES (:id, :conversation_id, :role, :content, :classification, :compartments,"
-            " :unit_id)"
-        ),
-        [
-            {
-                "id": uuid4(),
-                "conversation_id": conversation_id,
-                "role": "user",
-                "content": question,
-                **common,
-            },
-            {
-                "id": uuid4(),
-                "conversation_id": conversation_id,
-                "role": "assistant",
-                "content": answer,
-                **common,
-            },
-        ],
-    )
-
-
-def _query_data(
+@router.post("/query", response_model=AssistantQueryResponse)
+def query_assistant(
     body: AssistantQueryRequest,
-    ctx: AccessContext,
-    conn,
-    answer_decision: Decision,
-    routed: RoutedTool,
+    ctx: CurrentContext,
+    conn: ConnDep,
+    models: ModelsDep,
 ) -> AssistantQueryResponse:
-    """Data pathway (SPEC 8.2): typed tool -> authorized adapter query -> explanation.
-
-    The tool and the adapter run under the caller's row filter + RLS before the
-    model sees anything; the model only explains rows already returned, and the
-    table in the response is the deterministic tool output.
-    """
-    record_decision = POLICY.decide(ctx, "query", "record")
-    decisions = [
-        decide_event(ctx, answer_decision, resource="assistant", requested="answer"),
-        decide_event(ctx, record_decision, resource="record", requested="query"),
-    ]
-    if not record_decision.allowed:
-        audit_events(decisions)
-        raise HTTPException(status_code=403, detail="forbidden")
-
-    conversation_id, new_conversation = _open_conversation(conn, ctx, body.conversation_id)
-
-    audit_events(decisions)
-    outcome = execute_tool(ctx, conn, routed.tool, routed.params)
-
-    result = outcome.result
-    provider = model = ""
-    cached = False
-    if result is None:
-        answer = f"That request was refused: {outcome.refusal}. No data was retrieved."
-    else:
-        try:
-            explanation = explain_result(body.question, result)
-        except ProviderError as exc:
-            # The tool ran and was audited; only the explanation is unavailable.
-            raise _provider_unavailable(exc) from exc
-        answer = explanation.text
-        provider, model, cached = explanation.provider, explanation.model, explanation.cached
-
-    # Derived turn inherits the highest classification and union of compartments
-    # of the records behind it (AGENTS.md); a refusal retrieved nothing.
-    set_rls_context_for(conn, ctx)
-    _store_turn(
-        conn,
-        ctx,
-        conversation_id,
-        body.question,
-        answer,
-        Labels.load(conn).derive(result.records if result else (), empty_ok=True),
-        new_conversation=new_conversation,
-    )
-    conn.commit()
-    written = audit_events(
-        [
-            _data_answer_event(
-                ctx,
-                body.question,
-                str(conversation_id),
-                outcome,
-                provider=provider,
-                model=model,
-                cached=cached,
-            )
-        ]
-    )
+    try:
+        outcome = answer(ctx, conn, body.question, body.conversation_id, models=models)
+    except AssistantForbidden:
+        raise HTTPException(status_code=403, detail="forbidden") from None
+    except ConversationNotFound:
+        raise HTTPException(status_code=404, detail="not found") from None
+    except ModelUnavailable as exc:
+        raise HTTPException(status_code=503, detail=exc.detail) from exc
+    table, report = outcome.table, outcome.report
     return AssistantQueryResponse(
-        answer=answer,
-        citations=[],
-        found=bool(result and result.rows),
-        degraded=False,
+        answer=outcome.answer,
+        citations=[_citation_from_chunk(chunk) for chunk in outcome.citations],
+        found=outcome.found,
+        degraded=outcome.degraded,
         refused=outcome.refused,
-        result_table=(
-            ResultTable(columns=list(result.columns), rows=result.rows) if result else None
-        ),
-        conversation_id=str(conversation_id),
-        audit_event_id=str(written[-1]["event_id"]),
-    )
-
-
-def _query_report(
-    body: AssistantQueryRequest,
-    ctx: AccessContext,
-    conn,
-    answer_decision: Decision,
-    routed: RoutedReport,
-) -> AssistantQueryResponse:
-    """Reporting pathway (SPEC 8.2 "Draft report"): records + documents -> marked draft.
-
-    Same order as the other pathways: decisions first, then the typed tool and the
-    chunk retrieval each run under the caller's row filter + RLS; the model only drafts
-    over what came back. The draft carries the highest classification and union of
-    compartments of every input, and is stored, audited and returned as a DRAFT.
-    """
-    record_decision = POLICY.decide(ctx, "query", "record")
-    decisions = [
-        decide_event(ctx, answer_decision, resource="assistant", requested="answer"),
-        decide_event(ctx, record_decision, resource="record", requested="query"),
-    ]
-    if not record_decision.allowed:
-        audit_events(decisions)
-        raise HTTPException(status_code=403, detail="forbidden")
-
-    conversation_id, new_conversation = _open_conversation(conn, ctx, body.conversation_id)
-
-    audit_events(decisions)
-    outcome = execute_tool(ctx, conn, "training_activity", routed.params)
-    result = outcome.result
-    chunks: list[RetrievedChunk] = []
-    report: DraftReport | None = None
-    if result is None:
-        answer = f"That request was refused: {outcome.refusal}. No data was retrieved."
-    else:
-        set_rls_context_for(conn, ctx)
-        chunks = retrieve_chunks(conn, ctx, DOCUMENT_QUERY)
-        try:
-            report = generate_training_report(body.question, result, chunks, Labels.load(conn))
-        except ProviderError as exc:
-            audit_events([_retrieval_event(ctx, DOCUMENT_QUERY, chunks)])
-            raise _provider_unavailable(exc) from exc
-        answer = report.text
-
-    set_rls_context_for(conn, ctx)
-    _store_turn(
-        conn,
-        ctx,
-        conversation_id,
-        body.question,
-        answer,
-        Labels.load(conn).derive([*(result.records if result else ()), *chunks], empty_ok=True),
-        new_conversation=new_conversation,
-    )
-    conn.commit()
-    written = audit_events(
-        [
-            _retrieval_event(ctx, DOCUMENT_QUERY, chunks),
-            _report_answer_event(
-                ctx,
-                body.question,
-                str(conversation_id),
-                report,
-                outcome,
-                [c.chunk_id for c in chunks],
-            ),
-        ]
-    )
-    return AssistantQueryResponse(
-        answer=answer,
-        citations=[_citation_from_chunk(c) for c in (report.citations if report else ())],
-        found=bool(report and report.found),
-        degraded=False,
-        refused=outcome.refused or bool(report and report.blocked),
-        result_table=(
-            ResultTable(columns=list(result.columns), rows=result.rows) if result else None
-        ),
+        result_table=(ResultTable(columns=list(table.columns), rows=table.rows) if table else None),
         report=(
             ReportInfo(
                 classification_code=report.classification_code,
@@ -505,86 +146,8 @@ def _query_report(
             if report
             else None
         ),
-        conversation_id=str(conversation_id),
-        audit_event_id=str(written[-1]["event_id"]),
-    )
-
-
-@router.post("/query", response_model=AssistantQueryResponse)
-def query_assistant(
-    body: AssistantQueryRequest,
-    ctx: CurrentContext,
-    conn: ConnDep,
-) -> AssistantQueryResponse:
-    decision = POLICY.decide(ctx, "answer", "assistant")
-    if not decision.allowed:
-        audit_events([decide_event(ctx, decision, resource="assistant", requested="answer")])
-        raise HTTPException(status_code=403, detail="forbidden")
-
-    manipulation = bool(_MANIPULATION_RE.search(body.question))
-    # A manipulation-style request never reaches a data tool: it stays on the
-    # knowledge pathway, where it is logged and changes nothing (SPEC 8.3).
-    report_routed = None if manipulation else route_report(body.question)
-    if report_routed is not None:
-        return _query_report(body, ctx, conn, decision, report_routed)
-    routed = None if manipulation else route_question(body.question)
-    if routed is not None:
-        return _query_data(body, ctx, conn, decision, routed)
-
-    set_rls_context_for(conn, ctx)
-    new_conversation = body.conversation_id is None
-    if new_conversation:
-        conversation_id = uuid4()
-        history = ()
-    else:
-        conversation_id = body.conversation_id
-        _resolve_conversation(conn, ctx, conversation_id)
-        history = _load_history(conn, conversation_id)
-
-    query_vector = embed_question(body.question)
-    chunks = retrieve_chunks(conn, ctx, body.question, query_vector=query_vector)
-    degraded = is_fts_only(query_vector, chunks)
-    try:
-        cited = generate_answer(body.question, chunks, history=history)
-    except ProviderError as exc:
-        # Retrieval already happened: audit the decision and retrieval, then fail cleanly.
-        failed: list[dict] = [
-            decide_event(ctx, decision, resource="assistant", requested="answer"),
-            _retrieval_event(ctx, body.question, chunks),
-        ]
-        if manipulation:
-            failed.append(_notable_event(ctx, body.question))
-        audit_events(failed)
-        raise _provider_unavailable(exc) from exc
-    _store_turn(
-        conn,
-        ctx,
-        conversation_id,
-        body.question,
-        cited.answer,
-        Labels.load(conn).derive(chunks, empty_ok=True),
-        new_conversation=new_conversation,
-    )
-    conn.commit()
-
-    events: list[dict] = [
-        decide_event(ctx, decision, resource="assistant", requested="answer"),
-        _retrieval_event(ctx, body.question, chunks),
-    ]
-    if manipulation:
-        events.append(_notable_event(ctx, body.question))
-    events.append(_answer_event(ctx, body.question, str(conversation_id), cited, degraded))
-    written = audit_events(events)
-
-    return AssistantQueryResponse(
-        answer=cited.answer,
-        citations=[_citation_from_chunk(chunk) for chunk in cited.citations],
-        found=cited.found,
-        degraded=degraded,
-        refused=manipulation or cited.blocked,
-        result_table=None,
-        conversation_id=str(conversation_id),
-        audit_event_id=str(written[-1]["event_id"]),
+        conversation_id=outcome.conversation_id,
+        audit_event_id=outcome.audit_event_id,
     )
 
 

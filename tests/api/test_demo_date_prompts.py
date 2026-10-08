@@ -47,9 +47,9 @@ def seed_day(owner_engine, seeded) -> date:
 
 
 @pytest.fixture
-def setup(monkeypatch, client, seed_day):
+def setup(monkeypatch, models, seed_day):
     capture = Capture()
-    monkeypatch.setattr("app.data_queries.explain.get_gateway", lambda: capture)
+    models(capture)
     state = {"today": seed_day}
     monkeypatch.setattr(clock, "real_today", lambda: state["today"])
 

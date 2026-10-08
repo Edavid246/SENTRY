@@ -34,3 +34,27 @@ def client(settings, seeded, audit_test_env):
         os.environ["APP_DATABASE_URL"] = previous
     get_settings.cache_clear()
     reset_engine()
+
+
+@pytest.fixture
+def models(client):
+    """Install a model at the seam: `models(llm=None, embed=None) -> ModelPort`.
+
+    Defaults: a FakeLLM (tests/api/fakes.py) and no embedder, so retrieval runs
+    keyword-only (no model weights, no network, no keys). Removed after the test.
+    """
+    from app.ai_gateway.port import ModelPort
+    from app.api.deps import get_models
+    from app.main import app
+    from fakes import FakeLLM
+
+    def install(llm=None, embed=None) -> ModelPort:
+        port = ModelPort(
+            llm=llm if llm is not None else FakeLLM(),
+            embed=embed if embed is not None else (lambda question: None),
+        )
+        app.dependency_overrides[get_models] = lambda: port
+        return port
+
+    yield install
+    app.dependency_overrides.pop(get_models, None)

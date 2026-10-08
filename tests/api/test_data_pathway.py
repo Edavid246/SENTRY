@@ -26,9 +26,9 @@ from app.authz.tokens import DevTokenValidator
 from app.connectors.demo import DemoReferenceAdapter
 from app.data_queries import tools as tools_module
 from app.data_queries.errors import ToolParamError
-from app.data_queries.explain import Explanation
 from app.data_queries.registry import execute_tool
 from app.data_queries.routing import route_question
+from fakes import FakeLLM
 from test_assistant_endpoints import _ask, _audit, _event_payload, _fts_only, _latest
 from test_auth_endpoints import auth_header
 
@@ -58,23 +58,11 @@ ADEYEMI_CERTS = {"REC-019", "REC-020", "REC-041", "REC-042"}
 BN4 = "/command-a/bde-2/bn-4/"
 
 
-def _stub_explain(calls: list):
-    def stub(question, result, *, gateway=None):
-        calls.append(result.tool)
-        return Explanation(
-            text=f"Stub: {len(result.rows)} record(s) from {result.tool}.",
-            provider="stub",
-            model="stub-1",
-        )
-
-    return stub
-
-
 @pytest.fixture
-def explain_calls(monkeypatch) -> list:
-    calls: list = []
-    monkeypatch.setattr("app.api.assistant.explain_result", _stub_explain(calls))
-    return calls
+def explain_calls(models) -> list:
+    llm = FakeLLM()
+    models(llm)
+    return llm.explained
 
 
 def _ids(body: dict) -> set[str]:
@@ -154,16 +142,11 @@ def test_explicit_unit_inside_scope_narrows_the_rows(client, explain_calls) -> N
     assert body.json()["refused"] is False
 
 
-def test_model_never_sees_rows_the_caller_may_not_see(client, monkeypatch) -> None:
-    seen: list[str] = []
-
-    def spy(question, result, *, gateway=None):
-        seen.extend(str(row) for row in result.rows)
-        return Explanation(text="spy", provider="stub", model="stub-1")
-
-    monkeypatch.setattr("app.api.assistant.explain_result", spy)
+def test_model_never_sees_rows_the_caller_may_not_see(client, models) -> None:
+    llm = FakeLLM()
+    models(llm)
     assert _ask(client, "t.adeyemi", EQUIPMENT_QUESTION).status_code == 200
-    blob = " ".join(seen)
+    blob = " ".join(request.messages[-1].text for request in llm.requests)
     for hidden in ("Water Purifier", "Raven-II", "Generator 40kW", "Recovery Vehicle"):
         assert hidden not in blob
 
@@ -301,8 +284,7 @@ def test_audit_order_decide_then_data_query_then_answer(client, explain_calls) -
 # --- routing ----------------------------------------------------------------
 
 
-def test_policy_question_goes_to_the_knowledge_pathway(client, monkeypatch, explain_calls) -> None:
-    _fts_only(monkeypatch)
+def test_policy_question_goes_to_the_knowledge_pathway(client, explain_calls) -> None:
     tip = _tip(client)
     body = _ask(client, "a.bello", POLICY_QUESTION).json()
     assert body["result_table"] is None
@@ -346,10 +328,7 @@ def test_record_style_requests_route_to_a_tool(question: str, tool: str) -> None
     assert routed is not None and routed.tool == tool
 
 
-def test_manipulation_attempt_is_refused_and_never_reaches_a_tool(
-    client, monkeypatch, explain_calls
-) -> None:
-    _fts_only(monkeypatch)
+def test_manipulation_attempt_is_refused_and_never_reaches_a_tool(client, explain_calls) -> None:
     tip = _tip(client)
     body = _ask(
         client,
@@ -363,8 +342,8 @@ def test_manipulation_attempt_is_refused_and_never_reaches_a_tool(
     assert _latest(_audit(client), actor="t.adeyemi", action="notable") is not None
 
 
-def test_normal_knowledge_answers_are_not_marked_refused(client, monkeypatch) -> None:
-    _fts_only(monkeypatch)
+def test_normal_knowledge_answers_are_not_marked_refused(client, models) -> None:
+    _fts_only(models)
     assert _ask(client, "a.bello", POLICY_QUESTION).json()["refused"] is False
 
 
@@ -379,7 +358,7 @@ def test_users_without_data_scope_get_no_rows(client, explain_calls, username) -
     assert explain_calls == []
 
 
-def test_zero_rows_needs_no_model_call(client, monkeypatch) -> None:
+def test_zero_rows_needs_no_model_call(client, models) -> None:
     class RecordingGateway:
         calls = 0
 
@@ -387,7 +366,7 @@ def test_zero_rows_needs_no_model_call(client, monkeypatch) -> None:
             RecordingGateway.calls += 1
             raise AssertionError("no rows means nothing to explain")
 
-    monkeypatch.setattr("app.data_queries.explain.get_gateway", RecordingGateway)
+    models(RecordingGateway())
     body = _ask(client, "k.musa", EQUIPMENT_QUESTION).json()  # UAS Wing: only secret rows
     assert body["result_table"] == {"columns": EQUIPMENT_COLUMNS, "rows": []}
     assert body["found"] is False and body["refused"] is False
@@ -395,11 +374,8 @@ def test_zero_rows_needs_no_model_call(client, monkeypatch) -> None:
     assert RecordingGateway.calls == 0
 
 
-def test_unavailable_model_is_503_but_the_tool_call_is_still_audited(client, monkeypatch) -> None:
-    def down(question, result, *, gateway=None):
-        raise ProviderNotConfiguredError("no key")
-
-    monkeypatch.setattr("app.api.assistant.explain_result", down)
+def test_unavailable_model_is_503_but_the_tool_call_is_still_audited(client, models) -> None:
+    models(FakeLLM(fail=ProviderNotConfiguredError("no key")))
     tip = _tip(client)
     response = _ask(client, "a.bello", CERT_QUESTION)
     assert response.status_code == 503
@@ -441,9 +417,9 @@ def test_only_the_adapter_reads_canonical_records_in_the_data_pathway() -> None:
     assert offenders == []
 
 
-def test_the_demo_manipulation_question_is_flagged_and_refused(client, monkeypatch) -> None:
+def test_the_demo_manipulation_question_is_flagged_and_refused(client, models) -> None:
     """data/demo_questions.json's own wording ("my permissions") must be detected."""
-    _fts_only(monkeypatch)
+    _fts_only(models)
     body = _ask(
         client,
         "t.adeyemi",

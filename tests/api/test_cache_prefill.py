@@ -57,14 +57,16 @@ class RecordingFake:
 
 
 @pytest.fixture
-def pipeline(monkeypatch, tmp_path, ingested):
-    monkeypatch.setattr("app.knowledge.retrieve._query_embedding", lambda question: None)
+def pipeline(models, tmp_path, ingested):
     cache = LLMResponseCache(tmp_path / "cache.json")
     fake = RecordingFake()
     state = {"gateway": AIGateway(fake, cache=cache, record=True)}
-    monkeypatch.setattr("app.knowledge.answer.get_gateway", lambda: state["gateway"])
-    monkeypatch.setattr("app.data_queries.explain.get_gateway", lambda: state["gateway"])
-    monkeypatch.setattr("app.reporting.training.get_gateway", lambda: state["gateway"])
+
+    class Current:  # the gateway in `state`, so a test can swap record -> cache-only
+        def complete(self, request):
+            return state["gateway"].complete(request)
+
+    models(Current())
     return state, cache, fake
 
 

@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass
 
 from app.ai_gateway.base import ChatMessage, LLMRequest, LLMResult
-from app.ai_gateway.gateway import get_gateway
+from app.ai_gateway.port import Completer
 from app.config import get_settings
 from app.knowledge.retrieve import RetrievedChunk
 
@@ -87,7 +87,7 @@ def generate_answer(
     question: str,
     chunks: list[RetrievedChunk],
     *,
-    gateway=None,
+    gateway: Completer,
     history: tuple[ChatMessage, ...] = (),
 ) -> CitedAnswer:
     settings = get_settings()
@@ -108,8 +108,7 @@ def generate_answer(
         messages=messages,
         system=build_system_prompt(insufficient),
     )
-    client = gateway if gateway is not None else get_gateway()
-    result: LLMResult = client.complete(request)
+    result: LLMResult = gateway.complete(request)
     answer_text = result.text.strip()
 
     if insufficient.lower() in answer_text.lower():

@@ -106,7 +106,7 @@ end-of-step report. Never silently log it.
   inside the query (never after it).
 
 ### 2026-10-07 — Retrieval silently degrades to full-text only
-- **Issue:** if the local embedder is unavailable, `_query_embedding()` returns
+- **Issue:** if the local embedder is unavailable, `ModelPort.embed_query()` (was `_query_embedding()`) returns
   `None` and ingestion stores NULL embeddings; hybrid retrieval then runs as
   keyword search only, with nothing on the answer or in the logs distinguishing
   it from a full hybrid run. The API tests always take this path (no weights).

@@ -7,7 +7,6 @@ query — relevance never overrides authorization (Principle Zero)."""
 
 from __future__ import annotations
 
-import pytest
 from app.authz.context import AccessContext, permissions_for_role
 from app.db import set_rls_context
 from app.knowledge.retrieve import retrieve_chunks
@@ -41,12 +40,6 @@ def _context(username: str) -> AccessContext:
     )
 
 
-@pytest.fixture(autouse=True)
-def fts_only(monkeypatch) -> None:
-    """No model weights in tests: retrieval uses the documented FTS fallback."""
-    monkeypatch.setattr("app.knowledge.retrieve._query_embedding", lambda question: None)
-
-
 def _refs(engine: Engine, username: str, question: str) -> list[str]:
     ctx = _context(username)
     with engine.connect() as conn:
@@ -59,7 +52,9 @@ def _refs(engine: Engine, username: str, question: str) -> list[str]:
             data_scope=ctx.data_scope,
             session_id=ctx.session_id,
         )
-        return [chunk.document_ref for chunk in retrieve_chunks(conn, ctx, question)]
+        return [
+            chunk.document_ref for chunk in retrieve_chunks(conn, ctx, question, query_vector=None)
+        ]
 
 
 def test_relevant_policy_is_retrieved_for_commander(

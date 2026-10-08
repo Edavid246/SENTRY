@@ -44,10 +44,9 @@ class StubGateway:
 
 
 @pytest.fixture
-def gateway(monkeypatch) -> StubGateway:
+def gateway(models) -> StubGateway:
     stub = StubGateway()
-    monkeypatch.setattr("app.knowledge.retrieve._query_embedding", lambda question: None)
-    monkeypatch.setattr("app.reporting.training.get_gateway", lambda: stub)
+    models(stub)
     return stub
 
 
@@ -86,10 +85,9 @@ def test_adeyemi_draft_is_smaller_and_the_model_never_saw_uas_ops(client, gatewa
     )
 
 
-def test_a_citation_outside_the_inputs_blocks_the_draft(client, monkeypatch) -> None:
+def test_a_citation_outside_the_inputs_blocks_the_draft(client, models) -> None:
     stub = StubGateway(cite_extra="Also (REC-999).")
-    monkeypatch.setattr("app.knowledge.retrieve._query_embedding", lambda question: None)
-    monkeypatch.setattr("app.reporting.training.get_gateway", lambda: stub)
+    models(stub)
     body = _report(client, "t.adeyemi")
     assert body["refused"] is True and body["found"] is False
     assert "Draft blocked" in body["answer"]
@@ -97,18 +95,16 @@ def test_a_citation_outside_the_inputs_blocks_the_draft(client, monkeypatch) -> 
     assert "REC-999" not in body["answer"]
 
 
-def test_a_fabricated_chunk_citation_blocks_the_draft(client, monkeypatch) -> None:
+def test_a_fabricated_chunk_citation_blocks_the_draft(client, models) -> None:
     fake = "[00000000-0000-0000-0000-000000000000: Fake, page 1]"
     stub = StubGateway(cite_extra=fake)
-    monkeypatch.setattr("app.knowledge.retrieve._query_embedding", lambda question: None)
-    monkeypatch.setattr("app.reporting.training.get_gateway", lambda: stub)
+    models(stub)
     assert _report(client, "a.bello")["refused"] is True
 
 
-def test_model_outage_is_a_503_and_nothing_is_invented(client, monkeypatch) -> None:
+def test_model_outage_is_a_503_and_nothing_is_invented(client, models) -> None:
     stub = StubGateway(fail=True)
-    monkeypatch.setattr("app.knowledge.retrieve._query_embedding", lambda question: None)
-    monkeypatch.setattr("app.reporting.training.get_gateway", lambda: stub)
+    models(stub)
     assert _ask(client, "a.bello", REPORT_QUESTION).status_code == 503
 
 

@@ -30,9 +30,9 @@ class Capture:
 
 
 @pytest.fixture
-def capture(monkeypatch, client):
+def capture(monkeypatch, models):
     gateway = Capture()
-    monkeypatch.setattr("app.data_queries.explain.get_gateway", lambda: gateway)
+    models(gateway)
     yield gateway
     monkeypatch.delenv("AUDIT_SOURCE", raising=False)
     get_settings.cache_clear()

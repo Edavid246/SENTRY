@@ -19,9 +19,9 @@ from __future__ import annotations
 import pytest
 from app.authz.tokens import DevTokenValidator
 from app.data_queries.errors import ToolParamError
-from app.data_queries.explain import Explanation
 from app.data_queries.registry import execute_tool
 from app.data_queries.routing import route_question
+from fakes import FakeLLM
 from test_assistant_endpoints import _ask
 from test_auth_endpoints import auth_header
 
@@ -51,15 +51,10 @@ DETECTION_COLUMNS = [
 
 
 @pytest.fixture
-def explain_calls(monkeypatch) -> list:
-    calls: list = []
-
-    def stub(question, result, *, gateway=None):
-        calls.append(result.tool)
-        return Explanation(text=f"Stub: {len(result.rows)} row(s).", provider="stub", model="s-1")
-
-    monkeypatch.setattr("app.api.assistant.explain_result", stub)
-    return calls
+def explain_calls(models) -> list:
+    llm = FakeLLM()
+    models(llm)
+    return llm.explained
 
 
 def _ids(body: dict) -> set[str]:

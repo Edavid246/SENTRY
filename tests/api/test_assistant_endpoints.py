@@ -15,15 +15,15 @@ question's wording can change access:
   * a manipulation-style question is logged as a notable event and changes
     nothing about what the user may retrieve.
 
-The model is stubbed (monkeypatched, no network, no keys); these tests prove
+The model is a FakeLLM installed at the model seam (no network, no keys); these tests prove
 the guard rails and the audit trail, not the wording of an answer. Retrieval
-runs FTS-only (query embedding stubbed to None).
+runs FTS-only (no embedder).
 """
 
 from __future__ import annotations
 
 from app.db import format_array
-from app.knowledge.answer import CitedAnswer
+from fakes import FakeLLM
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 from test_auth_endpoints import auth_header
@@ -36,49 +36,10 @@ NO_DATA_USERS = ("s.eze", "f.danjuma")
 FORBIDDEN_FOR_ADEYEMI = ("DOC-201", "DOC-203")
 
 
-def _stub_answer(question, chunks, *, gateway=None, history=()):
-    return CitedAnswer(
-        answer=f"Stub answer for: {question}",
-        citations=tuple(chunks[:1]),
-        found=bool(chunks),
-        blocked=False,
-        provider="stub",
-        model="stub-1",
-        cached=False,
-    )
-
-
-def _citing_stub_answer(question, chunks, *, gateway=None, history=()):
-    """Stub answer that writes a real inline citation marker, so the stored
-    turn can be re-parsed by the conversation detail endpoint."""
-    if not chunks:
-        return CitedAnswer(
-            answer="not found in approved sources",
-            citations=(),
-            found=False,
-            blocked=False,
-            provider="stub",
-            model="stub-1",
-            cached=False,
-        )
-    chunk = chunks[0]
-    return CitedAnswer(
-        answer=(
-            f"Stub answer for: {question}"
-            f" [{chunk.chunk_id}: {chunk.document_title}, page {chunk.page}]"
-        ),
-        citations=(chunk,),
-        found=True,
-        blocked=False,
-        provider="stub",
-        model="stub-1",
-        cached=False,
-    )
-
-
-def _fts_only(monkeypatch) -> None:
-    monkeypatch.setattr("app.knowledge.retrieve._query_embedding", lambda question: None)
-    monkeypatch.setattr("app.api.assistant.generate_answer", _stub_answer)
+def _fts_only(models) -> FakeLLM:
+    llm = FakeLLM()
+    models(llm)
+    return llm
 
 
 def _audit(client, username: str = "f.danjuma", limit: int = 200) -> list[dict]:
@@ -158,9 +119,9 @@ def test_users_without_a_standard_data_scope_are_refused(client) -> None:
 
 
 def test_allowed_query_returns_citations_and_audits_retrieval_and_answer(
-    client, ingested: dict[str, int], app_engine: Engine, monkeypatch
+    client, ingested: dict[str, int], app_engine: Engine, models
 ) -> None:
-    _fts_only(monkeypatch)
+    _fts_only(models)
     response = _ask(client, "a.bello", "maintenance")
     assert response.status_code == 200, response.text
     body = response.json()
@@ -179,7 +140,7 @@ def test_allowed_query_returns_citations_and_audits_retrieval_and_answer(
     assert body["answer"]
     assert body["citations"], "expected at least one authorized citation"
     # Found and degraded are set from code paths, not read out of the text:
-    # the stub cited authorized chunks, and the embedding channel was stubbed
+    # the fake cited an authorized chunk, and the embedding channel was stubbed
     # off for this test, so retrieval ran keyword-only.
     assert body["found"] is True
     assert body["degraded"] is True
@@ -213,9 +174,10 @@ def test_allowed_query_returns_citations_and_audits_retrieval_and_answer(
     assert answer["payload"]["degraded"] is True
     assert answer["payload"]["model"] == "stub-1"
     assert answer["payload"]["conversation_id"] == body["conversation_id"]
-    # The stub cites exactly the top authorized chunk; the answer event proves
-    # the model was handed only the authorized set.
-    assert answer["payload"]["citations"] == retrieval["payload"]["chunk_ids"][:1]
+    # The fake cites exactly one passage it was handed; the answer event proves
+    # the citation came from the authorized set.
+    assert len(answer["payload"]["citations"]) == 1
+    assert set(answer["payload"]["citations"]) <= set(retrieval["payload"]["chunk_ids"])
     assert decide["seq"] < retrieval["seq"] < answer["seq"]
     # And the response's citations come from that same authorized set.
     cited_ids = {citation["chunk_id"] for citation in body["citations"]}
@@ -223,12 +185,12 @@ def test_allowed_query_returns_citations_and_audits_retrieval_and_answer(
 
 
 def test_restricted_user_retrieval_contains_no_higher_classified_or_out_of_unit_chunks(
-    client, ingested: dict[str, int], owner_engine: Engine, monkeypatch
+    client, ingested: dict[str, int], owner_engine: Engine, models
 ) -> None:
     """The retrieve audit event is the proof: what the model was handed is
     exactly the authorized set — no Confidential parent-unit policy (DOC-201)
     and no out-of-unit Brigade 2 SOP (DOC-203), however relevant."""
-    _fts_only(monkeypatch)
+    _fts_only(models)
     response = _ask(client, "t.adeyemi", "maintenance servicing")
     assert response.status_code == 200, response.text
     assert response.json()["citations"], "her own unit's documents stay reachable"
@@ -249,9 +211,9 @@ def test_restricted_user_retrieval_contains_no_higher_classified_or_out_of_unit_
 
 
 def test_conversation_owned_by_another_user_answers_404(
-    client, ingested: dict[str, int], monkeypatch
+    client, ingested: dict[str, int], models
 ) -> None:
-    _fts_only(monkeypatch)
+    _fts_only(models)
     first = _ask(client, "a.bello", "maintenance")
     assert first.status_code == 200, first.text
     conversation_id = first.json()["conversation_id"]
@@ -268,12 +230,12 @@ def test_conversation_owned_by_another_user_answers_404(
 
 
 def test_manipulation_style_question_is_notable_and_changes_nothing(
-    client, ingested: dict[str, int], owner_engine: Engine, monkeypatch
+    client, ingested: dict[str, int], owner_engine: Engine, models
 ) -> None:
     """SPEC §8.3: a request to ignore permissions is logged and has no effect
     on retrieval — the same user, before and after, gets the same authorized
     set."""
-    _fts_only(monkeypatch)
+    _fts_only(models)
     authorized = _authorized_chunk_ids(owner_engine, "t.adeyemi")
 
     baseline = _ask(client, "t.adeyemi", "maintenance")
@@ -312,7 +274,7 @@ def test_manipulation_style_question_is_notable_and_changes_nothing(
     assert set(after["payload"]["chunk_ids"]) == before_set
 
 
-def test_not_found_answer_reports_found_false(client, ingested, monkeypatch) -> None:
+def test_not_found_answer_reports_found_false(client, ingested, models) -> None:
     """No authorized evidence at all: the configured refusal, found=false.
 
     found/degraded come from the code path — here generate_answer short-
@@ -320,7 +282,7 @@ def test_not_found_answer_reports_found_false(client, ingested, monkeypatch) -> 
     """
     from app.config import get_settings
 
-    monkeypatch.setattr("app.knowledge.retrieve._query_embedding", lambda question: None)
+    models()
     response = _ask(client, "a.bello", "xylophone quantum bananas")
     assert response.status_code == 200, response.text
     body = response.json()
@@ -330,24 +292,10 @@ def test_not_found_answer_reports_found_false(client, ingested, monkeypatch) -> 
     assert body["citations"] == []
 
 
-def test_refusal_answer_reports_found_false(client, ingested: dict[str, int], monkeypatch) -> None:
+def test_refusal_answer_reports_found_false(client, ingested: dict[str, int], models) -> None:
     """A blocked answer (citation outside the evidence set) is a refusal:
     found=false and the answer event is recorded as a denial."""
-
-    def _refusal(question, chunks, *, gateway=None, history=()):
-        return CitedAnswer(
-            answer=(
-                "Response blocked: the answer cited sources outside the authorized evidence set."
-            ),
-            citations=(),
-            found=False,
-            blocked=True,
-            provider="stub",
-            model="stub-1",
-            cached=False,
-        )
-
-    monkeypatch.setattr("app.api.assistant.generate_answer", _refusal)
+    models(FakeLLM(knowledge="cite_outside"))
     response = _ask(client, "a.bello", "maintenance")
     assert response.status_code == 200, response.text
     assert response.json()["found"] is False
@@ -359,7 +307,7 @@ def test_refusal_answer_reports_found_false(client, ingested: dict[str, int], mo
 
 
 def test_degraded_false_when_the_vector_channel_is_live(
-    client, ingested: dict[str, int], owner_engine, monkeypatch, settings
+    client, ingested: dict[str, int], owner_engine, models, settings
 ) -> None:
     """The other side of `degraded`: with a query vector and embedded chunks
     the run is hybrid, so the API reports degraded=false."""
@@ -374,8 +322,7 @@ def test_degraded_false_when_the_vector_channel_is_live(
             ),
             {"literal": literal},
         )
-    monkeypatch.setattr("app.knowledge.retrieve._query_embedding", lambda question: list(vector))
-    monkeypatch.setattr("app.api.assistant.generate_answer", _stub_answer)
+    models(embed=lambda question: list(vector))
     response = _ask(client, "a.bello", "maintenance")
     assert response.status_code == 200, response.text
     body = response.json()
@@ -384,10 +331,10 @@ def test_degraded_false_when_the_vector_channel_is_live(
     assert body["degraded"] is False
 
 
-def test_audit_event_id_deep_links_to_the_audit_row(client, ingested, monkeypatch) -> None:
+def test_audit_event_id_deep_links_to_the_audit_row(client, ingested, models) -> None:
     """The UI's audit reference: an answer's audit_event_id resolves to exactly
     one row of GET /audit for a reader with read_audit."""
-    _fts_only(monkeypatch)
+    _fts_only(models)
     response = _ask(client, "a.bello", "maintenance")
     assert response.status_code == 200, response.text
     event_id = response.json()["audit_event_id"]
@@ -416,10 +363,9 @@ def _conversation_ids(client, username: str) -> list[str]:
 
 
 def test_conversation_list_returns_own_threads_newest_first(
-    client, ingested: dict[str, int], monkeypatch
+    client, ingested: dict[str, int], models
 ) -> None:
-    monkeypatch.setattr("app.api.assistant.generate_answer", _citing_stub_answer)
-    monkeypatch.setattr("app.knowledge.retrieve._query_embedding", lambda question: None)
+    models()
     first = _ask(client, "a.bello", "maintenance")
     second = _ask(client, "a.bello", "servicing")
     assert first.status_code == 200 and second.status_code == 200
@@ -447,10 +393,9 @@ def test_conversation_list_returns_own_threads_newest_first(
 
 
 def test_conversation_detail_returns_turns_with_citations(
-    client, ingested: dict[str, int], monkeypatch
+    client, ingested: dict[str, int], models
 ) -> None:
-    monkeypatch.setattr("app.api.assistant.generate_answer", _citing_stub_answer)
-    monkeypatch.setattr("app.knowledge.retrieve._query_embedding", lambda question: None)
+    models()
     asked = _ask(client, "a.bello", "maintenance")
     assert asked.status_code == 200, asked.text
     conversation_id = asked.json()["conversation_id"]
@@ -480,13 +425,10 @@ def test_conversation_detail_returns_turns_with_citations(
     assert citation["document_ref"]
 
 
-def test_conversation_reads_are_isolated_per_user(
-    client, ingested: dict[str, int], monkeypatch
-) -> None:
+def test_conversation_reads_are_isolated_per_user(client, ingested: dict[str, int], models) -> None:
     """Another user's conversation answers 404 on read, exactly like the POST,
     and never appears in their list."""
-    monkeypatch.setattr("app.api.assistant.generate_answer", _citing_stub_answer)
-    monkeypatch.setattr("app.knowledge.retrieve._query_embedding", lambda question: None)
+    models()
     mine = _ask(client, "a.bello", "maintenance")
     assert mine.status_code == 200, mine.text
     my_conversation_id = mine.json()["conversation_id"]
@@ -532,9 +474,8 @@ def test_conversation_reads_require_data_access(client) -> None:
     assert unauthenticated.json() == {"detail": "not authenticated"}
 
 
-def test_conversation_reads_are_audited(client, ingested: dict[str, int], monkeypatch) -> None:
-    monkeypatch.setattr("app.api.assistant.generate_answer", _citing_stub_answer)
-    monkeypatch.setattr("app.knowledge.retrieve._query_embedding", lambda question: None)
+def test_conversation_reads_are_audited(client, ingested: dict[str, int], models) -> None:
+    models()
     asked = _ask(client, "a.bello", "maintenance")
     conversation_id = asked.json()["conversation_id"]
 
@@ -569,27 +510,19 @@ def test_conversation_reads_are_audited(client, ingested: dict[str, int], monkey
     assert decide["seq"] < turns["seq"]
 
 
-def _failing_answer(error):
-    def fail(question, chunks, *, gateway=None, history=()):
-        raise error
-
-    return fail
-
-
 def test_model_failure_answers_503_but_still_audits_decide_and_retrieve(
-    client, ingested, monkeypatch
+    client, ingested, models
 ) -> None:
     """A missing key or dead provider is a clean 503, never a bare 500, and the
     access decision and retrieval that did happen stay on the audit chain."""
     from app.ai_gateway.base import ProviderNotConfiguredError, ProviderUnavailableError
 
-    _fts_only(monkeypatch)
     cases = (
         (ProviderNotConfiguredError("no key"), "not configured"),
         (ProviderUnavailableError("down"), "unavailable"),
     )
     for error, expected in cases:
-        monkeypatch.setattr("app.api.assistant.generate_answer", _failing_answer(error))
+        models(FakeLLM(fail=error))
         before = _audit(client)
         response = _ask(client, "a.bello", "maintenance")
         assert response.status_code == 503, response.text

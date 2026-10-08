@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 
 from app.ai_gateway.base import ChatMessage, LLMRequest
-from app.ai_gateway.gateway import get_gateway
+from app.ai_gateway.port import Completer
 from app.data_queries.tools import ToolResult
 
 NO_ROWS_ANSWER = "No matching records were found within your authorization."
@@ -37,7 +37,7 @@ class Explanation:
     cached: bool = False
 
 
-def explain_result(question: str, result: ToolResult, *, gateway=None) -> Explanation:
+def explain_result(question: str, result: ToolResult, *, gateway: Completer) -> Explanation:
     if not result.rows:
         return Explanation(text=NO_ROWS_ANSWER)
     table = json.dumps(
@@ -51,8 +51,7 @@ def explain_result(question: str, result: ToolResult, *, gateway=None) -> Explan
         f"{table}\n\nExplain this result."
     )
     request = LLMRequest(messages=(ChatMessage(role="user", text=prompt),), system=_SYSTEM)
-    client = gateway if gateway is not None else get_gateway()
-    llm = client.complete(request)
+    llm = gateway.complete(request)
     return Explanation(
         text=llm.text.strip(), provider=llm.provider, model=llm.model, cached=llm.cached
     )
