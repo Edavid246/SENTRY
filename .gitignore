@@ -9,3 +9,6 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 dist/
+
+# Local design inspiration (not part of the build)
+inspo-images/
