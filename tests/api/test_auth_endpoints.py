@@ -137,3 +137,20 @@ def test_me_forged_token_401(client) -> None:
     response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {forged}"})
     assert response.status_code == 401
     assert response.json() == {"detail": "not authenticated"}
+
+
+def test_me_signed_token_without_jti_401(client, settings) -> None:
+    """A signed token missing its jti is the generic 401, never a 500."""
+    import time
+
+    import jwt
+
+    now = int(time.time())
+    token = jwt.encode(
+        {"sub": "a.bello", "iat": now, "exp": now + 3600},
+        settings.dev_jwt_secret,
+        algorithm="HS256",
+    )
+    response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401
+    assert response.json() == {"detail": "not authenticated"}

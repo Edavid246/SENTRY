@@ -78,6 +78,9 @@ class DevTokenValidator:
             raise TokenError("token has no subject claim")
         if "exp" not in claims:
             raise TokenError("token has no expiry claim")
+        token_id = claims.get("jti")
+        if not isinstance(token_id, str) or not token_id:
+            raise TokenError("token has no token id claim")
 
         row = conn.execute(text(_USER_SQL), {"username": username}).mappings().first()
         if row is None or not row["is_active"]:
@@ -99,6 +102,6 @@ class DevTokenValidator:
             data_scope=row["data_scope"],
             permissions=permissions_for_role(row["role"]),
             session_id=str(claims.get("sid", "")),
-            token_id=str(claims["jti"]),
+            token_id=token_id,
             auth_method="dev-jwt",
         )

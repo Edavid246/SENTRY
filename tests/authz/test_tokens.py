@@ -8,6 +8,7 @@ the RLS-only and filter-only layers — that equivalence is asserted here.
 
 import base64
 import json
+import time
 
 import pytest
 from app.authz.tokens import DevTokenValidator, TokenError
@@ -106,3 +107,19 @@ def test_inactive_user_rejected(
     finally:
         with owner_engine.begin() as conn:
             conn.execute(text("UPDATE users SET is_active = true WHERE username = 'f.danjuma'"))
+
+
+@pytest.mark.parametrize("jti", [None, "", 42], ids=["missing", "blank", "not-a-string"])
+def test_token_without_a_token_id_rejected(
+    app_engine: Engine, seeded: None, settings: Settings, jti: object
+) -> None:
+    """A correctly signed token still needs a jti: the audit trail names every token."""
+    import jwt
+
+    now = int(time.time())
+    claims: dict = {"sub": "a.bello", "iat": now, "exp": now + 3600}
+    if jti is not None:
+        claims["jti"] = jti
+    token = jwt.encode(claims, settings.dev_jwt_secret, algorithm="HS256")
+    with app_engine.connect() as conn, pytest.raises(TokenError, match="token id|invalid token"):
+        _validator(settings).validate(token, conn=conn)
