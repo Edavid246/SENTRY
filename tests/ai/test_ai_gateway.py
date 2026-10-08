@@ -382,3 +382,21 @@ def test_hosted_truncated_answer_raises_instead_of_returning_a_fragment() -> Non
 def test_default_output_budget_leaves_room_for_thinking() -> None:
     """Gemini 3.5 Flash used ~980 thinking tokens of a 1024 budget on demo prompts."""
     assert LLMRequest(messages=()).max_output_tokens >= 4096
+
+
+def test_record_mode_reuses_an_entry_already_recorded(tmp_path) -> None:
+    """The free tier allows 20 calls a day: a re-run of the prefill must not spend
+    one on a request whose answer is already in the cache (same key = same request)."""
+    cache = LLMResponseCache(tmp_path / "cache.json")
+    request = make_request()
+    AIGateway(FakeLLM(ok_result("first answer")), cache=cache, record=True).complete(request)
+
+    llm = FakeLLM(ok_result("second answer"))
+    gateway = AIGateway(llm, cache=cache, record=True)
+    result = gateway.complete(request)
+    assert llm.calls == []
+    assert result.text == "first answer" and result.cached
+    assert gateway.replayed_count == 1 and gateway.recorded_count == 0
+
+    gateway.complete(other_request("a new question"))
+    assert len(llm.calls) == 1 and gateway.recorded_count == 1

@@ -5,7 +5,8 @@ bounded delay, and falls back to the pre-canned demo response cache only
 after retries are exhausted. Configuration failures
 (ProviderNotConfiguredError) are never masked by the cache. The cache is
 read-only unless the dev-only record mode is on (LLM_CACHE_RECORD=1, see
-scripts/prefill_cache.py). In cache-only mode (LLM_CACHE_ONLY=1) the hosted
+scripts/prefill_cache.py); record mode replays a request already recorded
+instead of calling the provider again. In cache-only mode (LLM_CACHE_ONLY=1) the hosted
 provider is never called: a hit is replayed, a miss raises
 ProviderUnavailableError.
 
@@ -81,6 +82,10 @@ class AIGateway:
                 f"cache-only mode: no cached answer for request {key[:12]}"
             )
             return self._replay(resolved, key, started, miss)
+        if self._record and self._cache is not None and self._cache.get(key) is not None:
+            # Same key, same request: re-recording would only spend quota (20 calls a
+            # day on the free tier). Delete the cache file to record afresh.
+            return self._replay(resolved, key, started, ProviderUnavailableError("unreachable"))
         attempt = 0
         while True:
             try:

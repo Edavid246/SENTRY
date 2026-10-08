@@ -80,6 +80,15 @@ through `POST /api/v1/assistant/query` with `LLM_CACHE_RECORD=1` (refused unless
 pair with the hosted provider disabled (`LLM_CACHE_ONLY=1`, key ignored) and prints a
 pass/fail table. A failure is reported, never filled with a placeholder answer.
 
+**Quota.** The Gemini free tier allows 20 `gemini-3.5-flash` requests a day per project,
+and a full record run needs about 19 (the other pairs make no model call). A 429 with
+"limit: 20" means the day is spent: wait for the reset, then re-run. Record mode reuses
+any answer already in the cache (shown as `already recorded`, no call spent), so a
+re-run only pays for what is missing. To record everything afresh, delete
+`data/demo_llm_cache.json` first. The model's output budget is 4096 tokens because
+Gemini 3.5 Flash spends about 1000 of them thinking; an answer cut off at the limit is
+an error, never cached.
+
 ```bash
 set -a && . ./.env && set +a
 uv run python scripts/prefill_cache.py            # record (live Gemini, a few minutes)

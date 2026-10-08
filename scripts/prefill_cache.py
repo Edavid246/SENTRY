@@ -72,7 +72,7 @@ class Outcome:
     pair: Pair
     ok: bool
     http: int
-    source: str  # "recorded" | "cache" | "no model call" | "-"
+    source: str  # "recorded" | "already recorded" | "cache" | "no model call" | "-"
     found: bool | None
     refused: bool | None
     detail: str
@@ -188,6 +188,9 @@ def run(pairs: list[Pair], *, verify: bool, pause: float) -> list[Outcome]:
                     ok, source = True, "cache"
                 elif not verify and recorded:
                     ok, source = True, "recorded"
+                elif not verify and replayed:
+                    # Same request already in the cache: reused, no model call spent.
+                    ok, source = True, "already recorded"
                 elif _no_model_call(body, insufficient, NO_ROWS_ANSWER) and not (
                     recorded or replayed
                 ):
