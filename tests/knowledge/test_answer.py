@@ -78,6 +78,17 @@ def test_answer_citing_a_chunk_outside_the_evidence_is_blocked() -> None:
     assert "blocked" in result.answer.lower()
 
 
+def test_answer_without_any_citation_is_blocked_not_attributed_to_the_evidence() -> None:
+    """An uncited answer must not come back as found with every retrieved chunk as its
+    'sources': nothing ties it to the evidence, so it is withheld."""
+    gateway = StubGateway("Servicing is due every three months.")
+    result = generate_answer("when is servicing due", [_chunk()], gateway=gateway)
+    assert result.blocked is True
+    assert result.found is False
+    assert result.citations == ()
+    assert "did not cite" in result.answer
+
+
 def test_model_insufficient_phrase_is_normalised() -> None:
     gateway = StubGateway("not found in approved sources")
     result = generate_answer("unrelated question", [_chunk()], gateway=gateway)

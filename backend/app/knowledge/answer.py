@@ -6,7 +6,8 @@ use the supplied passages and must cite each claim. If the evidence is
 insufficient the model must return the exact configured message; a response
 whose citations reference chunks outside the authorized evidence set is
 blocked (SPEC §8.3: cited sources outside the evidence set are blocked and
-logged). With no evidence at all the function short-circuits to the
+logged), and so is a response that cites nothing at all (it cannot be traced
+to any passage). With no evidence at all the function short-circuits to the
 insufficient message without calling the model.
 """
 
@@ -132,10 +133,20 @@ def generate_answer(
             llm=result,
         )
 
-    citations = _citations_for(cited_ids, chunks) if cited_ids else tuple(chunks)
+    if not cited_ids:
+        # SPEC §8.2: each claim cites a passage. An uncited answer may come from outside
+        # the evidence, and no passage can be named as its source, so it is withheld.
+        return CitedAnswer(
+            answer="Response blocked: the answer did not cite the authorized evidence.",
+            citations=(),
+            found=False,
+            blocked=True,
+            llm=result,
+        )
+
     return CitedAnswer(
         answer=answer_text,
-        citations=citations,
+        citations=_citations_for(cited_ids, chunks),
         found=True,
         blocked=False,
         llm=result,
