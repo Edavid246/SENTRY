@@ -325,6 +325,28 @@ def test_follow_up_answer_inherits_the_label_of_the_history_it_was_given(
     assert turn_two == [("user", code, comps), ("assistant", code, comps)]
 
 
+def test_conversation_label_rises_with_its_turns_and_it_moves_to_the_top(
+    client, ingested: dict[str, int], owner_engine: Engine, models
+) -> None:
+    """A thread that starts unclassified and then stores a higher turn is listed under
+    the higher label (it holds that content), and continuing it moves it to the top."""
+    models()
+    older = _ask(client, "a.bello", "xylophone quantum bananas")  # no evidence: the floor
+    older_id = older.json()["conversation_id"]
+    newer_id = _ask(client, "a.bello", "xylophone quantum bananas").json()["conversation_id"]
+    assert _conversation_ids(client, "a.bello")[:2] == [newer_id, older_id]
+
+    assert _ask(client, "a.bello", "maintenance", older_id).status_code == 200
+    *_, (_, code, comps) = _message_labels(owner_engine, older_id)
+    assert code != "unclassified", "precondition: the new turn must be above the floor"
+
+    listed = client.get(
+        "/api/v1/assistant/conversations", headers=auth_header(client, "a.bello")
+    ).json()
+    assert [item["id"] for item in listed[:2]] == [older_id, newer_id]
+    assert (listed[0]["classification_code"], sorted(listed[0]["compartments"])) == (code, comps)
+
+
 def test_refusal_answer_reports_found_false(client, ingested: dict[str, int], models) -> None:
     """A blocked answer (citation outside the evidence set) is a refusal:
     found=false and the answer event is recorded as a denial."""

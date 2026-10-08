@@ -3,7 +3,8 @@
 Conversations are per user: an id owned by anyone else is reported as
 missing, never as forbidden, so ids cannot be probed. Every stored turn
 carries the derived label it was given (highest classification and union of
-compartments of its inputs, from `app.authz.labels`). Every function runs on
+compartments of its inputs, from `app.authz.labels`), and the conversation
+carries the derived label of all its turns. Every function runs on
 an authorized Scope (app.authz.scope), so none of them can run without the
 caller's RLS context; the reads also put the policy row filter in the SQL.
 """
@@ -17,7 +18,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import text
 
 from app.ai_gateway.base import ChatMessage
-from app.authz.labels import Label
+from app.authz.labels import Label, Labels
 from app.authz.scope import Scope
 
 HISTORY_TURNS = 6
@@ -149,6 +150,38 @@ def load_history(scope: Scope, conversation_id: UUID) -> tuple[HistoryMessage, .
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _Stored:
+    classification_code: str
+    compartments: tuple[str, ...]
+
+
+def _raise_conversation_label(scope: Scope, conversation_id: UUID, turn: Label) -> None:
+    """The conversation holds every turn, so it takes the derived label of all of them
+    (its current label + this turn's) and moves to the top of the list."""
+    row_filter = scope.filter("conversation")
+    params = {"id": conversation_id, "user_id": scope.ctx.user_id, **row_filter.params}
+    where = f"id = :id AND user_id = :user_id AND {row_filter.where_sql}"
+    current = scope.conn.execute(
+        text(f"SELECT classification_code, compartments FROM conversations WHERE {where}"),
+        params,
+    ).one()  # open_conversation already found it under the same filter + RLS
+    label = Labels.load(scope.conn).derive(
+        [
+            _Stored(str(current.classification_code), tuple(current.compartments or ())),
+            _Stored(turn.code, turn.compartments),
+        ]
+    )
+    scope.conn.execute(
+        text(
+            "UPDATE conversations SET classification_code = :classification,"
+            f" compartments = :new_compartments, updated_at = now() WHERE {where}"
+            " RETURNING id"
+        ),
+        {**params, "classification": label.code, "new_compartments": list(label.compartments)},
+    ).one()
+
+
 def store_turn(
     scope: Scope,
     conversation_id: UUID,
@@ -165,7 +198,9 @@ def store_turn(
         "compartments": list(label.compartments),
         "unit_id": ctx.unit_id,
     }
-    if new_conversation:
+    if not new_conversation:
+        _raise_conversation_label(scope, conversation_id, label)
+    else:
         scope.conn.execute(
             text(
                 "INSERT INTO conversations"
