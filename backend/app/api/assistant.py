@@ -26,8 +26,7 @@ row filter — a passage that is no longer visible simply drops out.
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
-from typing import Annotated, Any, Protocol
+from typing import Annotated, Any
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, Query
@@ -38,6 +37,7 @@ from app.ai_gateway.base import ChatMessage, ProviderError, ProviderNotConfigure
 from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
 from app.audit.chain import utc_now_iso
 from app.authz.context import AccessContext
+from app.authz.labels import Label, Labels
 from app.authz.policy import Decision, LocalPolicy
 from app.data_queries.explain import explain_result
 from app.data_queries.registry import ToolOutcome, execute_tool
@@ -250,34 +250,6 @@ def _report_answer_event(
     }
 
 
-def _rank_map(conn) -> dict[str, int]:
-    rows = conn.execute(text("SELECT code, rank FROM classification_levels")).all()
-    return {str(row.code): int(row.rank) for row in rows}
-
-
-class _Labelled(Protocol):
-    """Anything that carries a classification and compartments (chunks, records)."""
-
-    classification_code: str
-    compartments: Any
-
-
-def _derived_classification(chunks: Sequence[_Labelled], ranks: dict[str, int]) -> str:
-    if not chunks:
-        return "unclassified"
-    return max(
-        (chunk.classification_code for chunk in chunks),
-        key=lambda code: ranks.get(code, 0),
-    )
-
-
-def _derived_compartments(chunks: Sequence[_Labelled]) -> list[str]:
-    merged: set[str] = set()
-    for chunk in chunks:
-        merged.update(chunk.compartments)
-    return sorted(merged)
-
-
 def _resolve_conversation(conn, ctx: AccessContext, requested: UUID) -> str:
     row = conn.execute(
         text("SELECT id FROM conversations WHERE id = :id AND user_id = :user_id"),
@@ -323,16 +295,13 @@ def _store_turn(
     conversation_id: UUID,
     question: str,
     answer: str,
-    chunks: Sequence[_Labelled],
-    ranks: dict[str, int],
+    label: Label,
     *,
     new_conversation: bool,
 ) -> None:
-    classification = _derived_classification(chunks, ranks)
-    compartments = _derived_compartments(chunks)
     common = {
-        "classification": classification,
-        "compartments": compartments,
+        "classification": label.code,
+        "compartments": list(label.compartments),
         "unit_id": ctx.unit_id,
     }
     if new_conversation:
@@ -420,8 +389,7 @@ def _query_data(
         conversation_id,
         body.question,
         answer,
-        result.records if result else (),
-        _rank_map(conn),
+        Labels.load(conn).derive(result.records if result else (), empty_ok=True),
         new_conversation=new_conversation,
     )
     conn.commit()
@@ -487,24 +455,21 @@ def _query_report(
     else:
         set_rls_context_for(conn, ctx)
         chunks = retrieve_chunks(conn, ctx, DOCUMENT_QUERY)
-        ranks = _rank_map(conn)
         try:
-            report = generate_training_report(body.question, result, chunks, ranks)
+            report = generate_training_report(body.question, result, chunks, Labels.load(conn))
         except ProviderError as exc:
             audit_events([_retrieval_event(ctx, DOCUMENT_QUERY, chunks)])
             raise _provider_unavailable(exc) from exc
         answer = report.text
 
     set_rls_context_for(conn, ctx)
-    inputs = [*(result.records if result else ()), *chunks]
     _store_turn(
         conn,
         ctx,
         conversation_id,
         body.question,
         answer,
-        inputs,
-        _rank_map(conn),
+        Labels.load(conn).derive([*(result.records if result else ()), *chunks], empty_ok=True),
         new_conversation=new_conversation,
     )
     conn.commit()
@@ -591,15 +556,13 @@ def query_assistant(
             failed.append(_notable_event(ctx, body.question))
         audit_events(failed)
         raise _provider_unavailable(exc) from exc
-    ranks = _rank_map(conn)
     _store_turn(
         conn,
         ctx,
         conversation_id,
         body.question,
         cited.answer,
-        chunks,
-        ranks,
+        Labels.load(conn).derive(chunks, empty_ok=True),
         new_conversation=new_conversation,
     )
     conn.commit()

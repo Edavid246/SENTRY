@@ -18,11 +18,11 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.ai_gateway.base import ChatMessage, LLMRequest
 from app.ai_gateway.gateway import get_gateway
+from app.authz.labels import Labels
 from app.data_queries.tools import ToolResult
 from app.knowledge.answer import build_evidence, parse_cited_chunk_ids
 from app.knowledge.retrieve import RetrievedChunk
@@ -70,17 +70,6 @@ class DraftReport:
     cached: bool = False
 
 
-def derive_label(inputs: Sequence, ranks: dict[str, int]) -> tuple[str, tuple[str, ...]]:
-    """Highest classification and union of compartments over every input."""
-    if not inputs:
-        return "unclassified", ()
-    code = max((i.classification_code for i in inputs), key=lambda c: ranks.get(c, 0))
-    merged: set[str] = set()
-    for item in inputs:
-        merged.update(item.compartments)
-    return code, tuple(sorted(merged))
-
-
 def _assemble(
     body: str,
     classification: str,
@@ -103,12 +92,13 @@ def generate_training_report(
     question: str,
     result: ToolResult,
     chunks: list[RetrievedChunk],
-    ranks: dict[str, int],
+    labels: Labels,
     *,
     gateway=None,
 ) -> DraftReport:
     inputs = [*result.records, *chunks]
-    classification, compartments = derive_label(inputs, ranks)
+    label = labels.derive(inputs, empty_ok=True)
+    classification, compartments = label.code, label.compartments
     record_ids = tuple(r.source_ref for r in result.records)
     document_refs = tuple(sorted({c.document_ref for c in chunks if c.document_ref}))
 

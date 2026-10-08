@@ -19,6 +19,7 @@ from sqlalchemy import text
 
 from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
 from app.audit.chain import utc_now_iso
+from app.authz.labels import Labels
 from app.authz.policy import LocalPolicy
 from app.correlation.analysis import ANALYSIS, run_rising_faults
 from app.correlation.store import FindingRow, list_findings, save_findings
@@ -83,12 +84,8 @@ def run_correlation(ctx: CurrentContext, conn: ConnDep) -> RunResult:
     if not decision.allowed:
         audit_events([decision_event])
         raise HTTPException(status_code=403, detail="forbidden")
-    ranks = {
-        str(r["code"]): int(r["rank"])
-        for r in conn.execute(text("SELECT code, rank FROM classification_levels")).mappings()
-    }
     names = _unit_names(conn)
-    drafts = run_rising_faults(ctx, conn, ranks, names)
+    drafts = run_rising_faults(ctx, conn, Labels.load(conn), names)
     save_findings(conn, ctx, drafts)
     conn.commit()
     rows = list_findings(conn, ctx)

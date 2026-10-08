@@ -18,10 +18,10 @@ from datetime import date, timedelta
 from sqlalchemy.engine import Connection
 
 from app.authz.context import AccessContext
+from app.authz.labels import Labels
 from app.clock import demo_today
 from app.connectors.base import RecordFilter, SourceRecord
 from app.connectors.demo import DemoReferenceAdapter
-from app.correlation.derive import derive_label
 from app.correlation.types import FindingDraft
 from app.data_queries.registry import execute_tool
 
@@ -46,7 +46,7 @@ def _tool_records(ctx, conn, tool: str, unit_path: str) -> tuple[SourceRecord, .
 
 
 def run_rising_faults(
-    ctx: AccessContext, conn: Connection, ranks: dict[str, int], names: dict[str, str]
+    ctx: AccessContext, conn: Connection, labels: Labels, names: dict[str, str]
 ) -> list[FindingDraft]:
     today = demo_today()
     recent_start = today - timedelta(days=WINDOW_DAYS)
@@ -76,7 +76,7 @@ def run_rising_faults(
             continue  # a fault rise alone is not the correlation this job looks for
 
         evidence = [*recent, *certs, *stock]
-        classification, compartments = derive_label(evidence, ranks)
+        label = labels.derive(evidence)
         unit_name = names.get(unit_path, unit_path)
         slug = unit_path.strip("/").split("/")[-1].upper()
         drafts.append(
@@ -92,8 +92,8 @@ def run_rising_faults(
                     f"{len(stock)} stock line(s) are below threshold in the same unit."
                 ),
                 severity="high",
-                classification_code=classification,
-                compartments=compartments,
+                classification_code=label.code,
+                compartments=list(label.compartments),
                 unit_path=unit_path,
                 evidence_ids=sorted(r.source_ref for r in evidence),
                 details={

@@ -23,6 +23,7 @@ from sqlalchemy.engine import Connection
 from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
 from app.audit.chain import utc_now_iso
 from app.authz.context import AccessContext
+from app.authz.labels import Labels
 from app.authz.policy import LocalPolicy
 from app.correlation.store import list_findings
 from app.dashboard.fixtures import TILES, FixtureTile
@@ -66,20 +67,15 @@ class DashboardSummary(BaseModel):
     tiles: DashboardTiles
 
 
-def _lookups(conn: Connection) -> tuple[dict[str, int], dict[str, str]]:
-    ranks = {
-        str(r["code"]): int(r["rank"])
-        for r in conn.execute(text("SELECT code, rank FROM classification_levels")).mappings()
-    }
-    names = {
+def _unit_names(conn: Connection) -> dict[str, str]:
+    return {
         str(r["path"]): str(r["name"])
         for r in conn.execute(text("SELECT path, name FROM units")).mappings()
     }
-    return ranks, names
 
 
 def _build_tile(
-    ctx: AccessContext, tile: FixtureTile, ranks: dict[str, int], names: dict[str, str]
+    ctx: AccessContext, tile: FixtureTile, labels: Labels, names: dict[str, str]
 ) -> DashboardTile:
     items = [
         DashboardItem(
@@ -97,10 +93,10 @@ def _build_tile(
         )
         for item in tile.items
         # An unknown classification code has no rank: fail closed (never shown).
-        if item.classification in ranks
+        if (rank := labels.rank(item.classification)) is not None
         and POLICY.item_visible(
             ctx,
-            classification_rank=ranks[item.classification],
+            classification_rank=rank,
             compartments=item.compartments,
             unit_path=item.unit_path,
         )
@@ -132,7 +128,7 @@ def _real_tile(
     ctx: AccessContext,
     conn: Connection,
     key: str,
-    ranks: dict[str, int],
+    labels: Labels,
     names: dict[str, str],
 ) -> DashboardTile:
     """Group a typed tool's rows by owning unit, one item per unit.
@@ -153,7 +149,7 @@ def _real_tile(
     items = []
     for unit_path in sorted(groups):
         members = groups[unit_path]
-        top = max(members, key=lambda r: ranks.get(r.classification_code, 99))
+        label = labels.derive(members)
         slug = unit_path.strip("/").split("/")[-1].upper()
         items.append(
             DashboardItem(
@@ -164,8 +160,8 @@ def _real_tile(
                 detail=", ".join(sorted(r.source_ref for r in members)),
                 severity=None,
                 trend=[],
-                classification=top.classification_code,
-                compartments=sorted({c for r in members for c in r.compartments}),
+                classification=label.code,
+                compartments=list(label.compartments),
                 unit_path=unit_path,
                 unit_name=names.get(unit_path, unit_path),
             )
@@ -212,15 +208,15 @@ def dashboard_summary(ctx: CurrentContext, conn: ConnDep) -> DashboardSummary:
         audit_events([decision_event])
         raise HTTPException(status_code=403, detail="forbidden")
 
-    ranks, names = _lookups(conn)
+    labels, names = Labels.load(conn), _unit_names(conn)
     fixtures = {tile.key: tile for tile in TILES}
     built = {
         key: (
-            _real_tile(ctx, conn, key, ranks, names)
+            _real_tile(ctx, conn, key, labels, names)
             if key in _REAL_TILES
             else _findings_tile(ctx, conn, names)
             if key == "recent_findings"
-            else _build_tile(ctx, fixtures[key], ranks, names)
+            else _build_tile(ctx, fixtures[key], labels, names)
         )
         for key in DashboardTiles.model_fields
     }
