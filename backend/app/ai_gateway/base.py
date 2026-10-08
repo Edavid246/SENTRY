@@ -21,7 +21,8 @@ class LLMRequest:
     messages: tuple[ChatMessage, ...]
     model: str = ""
     temperature: float = 0.0
-    max_output_tokens: int = 1024
+    # Thinking models spend part of this before the answer (~1000 tokens on the demo prompts).
+    max_output_tokens: int = 4096
     system: str | None = None
 
 

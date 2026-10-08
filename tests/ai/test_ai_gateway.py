@@ -360,3 +360,25 @@ def test_gateway_rejects_conflicting_or_cacheless_modes(tmp_path) -> None:
         AIGateway(FakeLLM(ok_result()), cache=cache, record=True, cache_only=True)
     with pytest.raises(ValueError):
         AIGateway(FakeLLM(ok_result()), record=True)
+
+
+def test_hosted_truncated_answer_raises_instead_of_returning_a_fragment() -> None:
+    """Thinking models spend the output budget before answering; a reply cut off at
+    MAX_TOKENS is an error (a clean 503), never a fragment that could be cached."""
+    truncated = {
+        "candidates": [
+            {
+                "content": {"parts": [{"text": "The documents are DOC-201 [6465"}]},
+                "finishReason": "MAX_TOKENS",
+            }
+        ],
+        "usageMetadata": {"promptTokenCount": 11, "candidatesTokenCount": 7},
+    }
+    provider = make_provider(lambda request: httpx.Response(200, json=truncated))
+    with pytest.raises(ProviderResponseError, match="output limit"):
+        provider.complete(make_request())
+
+
+def test_default_output_budget_leaves_room_for_thinking() -> None:
+    """Gemini 3.5 Flash used ~980 thinking tokens of a 1024 budget on demo prompts."""
+    assert LLMRequest(messages=()).max_output_tokens >= 4096

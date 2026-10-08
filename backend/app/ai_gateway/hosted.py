@@ -102,6 +102,9 @@ class HostedProvider:
         text = _candidate_text(data)
         if not text:
             raise ProviderResponseError("hosted provider response contained no candidate text")
+        if _finish_reason(data) == "MAX_TOKENS":
+            # A cut-off answer is never returned (or cached) as if it were whole.
+            raise ProviderResponseError("hosted provider stopped at the output limit")
         usage_data = data.get("usageMetadata") or {}
         return LLMResult(
             text=text,
@@ -122,6 +125,11 @@ def _candidate_text(data: dict) -> str:
         return ""
     parts = (candidates[0].get("content") or {}).get("parts") or []
     return "".join(str(part.get("text") or "") for part in parts)
+
+
+def _finish_reason(data: dict) -> str:
+    candidates = data.get("candidates") or []
+    return str(candidates[0].get("finishReason") or "") if candidates else ""
 
 
 def _retry_after_seconds(response: httpx.Response) -> float | None:
