@@ -149,3 +149,25 @@ def test_report_routing_is_only_for_drafting_requests() -> None:
     assert route_report("Show me the training activity over the last quarter") is None
     assert route_report("Prepare a report on equipment awaiting maintenance") is None
     assert route_question("Show me the training activity over the last quarter") is not None
+
+
+def test_report_needs_retrieve_decided_before_any_chunk_is_read(
+    client, gateway, monkeypatch
+) -> None:
+    """The draft retrieves documents, so it needs the retrieve decision up front."""
+    from app.authz import context
+
+    monkeypatch.setitem(
+        context.ROLE_PERMISSIONS,
+        "commander",
+        context.ROLE_PERMISSIONS["commander"] - {"retrieve"},
+    )
+    before = max((e["seq"] for e in _audit(client)), default=-1)
+    assert _ask(client, "a.bello", REPORT_QUESTION).status_code == 403
+    assert gateway.prompts == []
+
+    new = [e["payload"] for e in _audit(client) if e["seq"] > before]
+    mine = [p for p in new if p.get("actor") == "a.bello"]
+    assert not {"retrieve", "query", "answer"} & {p["action"] for p in mine}
+    denied = [p for p in mine if p["action"] == "decide" and p["decision"] == "deny"]
+    assert [(p["resource"], p["requested"]) for p in denied] == [("chunk", "retrieve")]

@@ -180,7 +180,7 @@ def _refused(turn: _Turn, pathway: str, outcome: ToolOutcome) -> _Produced:
 @dataclass(frozen=True, slots=True)
 class _Knowledge:
     manipulation: bool
-    sources: tuple[Requirement, ...] = ()
+    sources: tuple[Requirement, ...] = (("retrieve", "chunk"),)
 
     def run(self, turn: _Turn) -> _Produced:
         history: tuple[HistoryMessage, ...] = ()
@@ -259,7 +259,7 @@ class _Report:
     """Records + documents -> marked DRAFT carrying the derived label of every input."""
 
     routed: RoutedTool
-    sources: tuple[Requirement, ...] = (("query", "record"),)
+    sources: tuple[Requirement, ...] = (("query", "record"), ("retrieve", "chunk"))
 
     def run(self, turn: _Turn) -> _Produced:
         outcome = execute_tool(turn.scope, self.routed.tool, self.routed.params)

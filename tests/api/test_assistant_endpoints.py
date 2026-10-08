@@ -589,3 +589,32 @@ def test_model_failure_answers_503_but_still_audits_decide_and_retrieve(
         mine = [e["payload"] for e in new if e["payload"].get("actor") == "a.bello"]
         assert {"decide", "retrieve"} <= {p["action"] for p in mine}
         assert "answer" not in {p["action"] for p in mine}
+
+
+def _without_retrieve(monkeypatch, role: str = "commander") -> None:
+    """A role that may ask the assistant but not retrieve documents."""
+    from app.authz import context
+
+    monkeypatch.setitem(
+        context.ROLE_PERMISSIONS, role, context.ROLE_PERMISSIONS[role] - {"retrieve"}
+    )
+
+
+def test_knowledge_answer_needs_retrieve_decided_before_any_chunk_is_read(
+    client, ingested, models, monkeypatch
+) -> None:
+    """`answer` alone does not cover reading chunks: the retrieve decision is made,
+    and its deny audited, before retrieval, so nothing is read and no model call."""
+    llm = _fts_only(models)
+    _without_retrieve(monkeypatch)
+    before = max((e["seq"] for e in _audit(client)), default=-1)
+    response = _ask(client, "a.bello", "maintenance")
+    assert response.status_code == 403
+    assert response.json() == {"detail": "forbidden"}
+    assert llm.requests == []
+
+    new = [e["payload"] for e in _audit(client) if e["seq"] > before]
+    mine = [p for p in new if p.get("actor") == "a.bello"]
+    assert "retrieve" not in {p["action"] for p in mine}
+    denied = [p for p in mine if p["action"] == "decide" and p["decision"] == "deny"]
+    assert [(p["resource"], p["requested"]) for p in denied] == [("chunk", "retrieve")]
