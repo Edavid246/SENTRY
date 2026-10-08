@@ -51,7 +51,7 @@ from app.authz.context import AccessContext
 from app.authz.labels import Label, Labelled, Labels
 from app.authz.scope import Requirement, Scope, authorized
 from app.data_queries.explain import explain_result
-from app.data_queries.registry import ToolOutcome, execute_tool
+from app.data_queries.registry import ToolOutcome, execute_tool, tool_requirements
 from app.data_queries.routing import RoutedTool, route_question, route_report
 from app.data_queries.tools import ToolResult
 from app.knowledge.answer import generate_answer
@@ -147,7 +147,10 @@ class _Produced:
 
 
 class _Pathway(Protocol):
-    sources: tuple[Requirement, ...]  # (action, resource) decisions beyond "answer"
+    @property
+    def sources(self) -> tuple[Requirement, ...]:
+        """(action, resource) decisions beyond "answer"."""
+        ...
 
     def run(self, turn: _Turn) -> _Produced: ...
 
@@ -229,7 +232,10 @@ class _Data:
     """Typed tool -> authorized adapter query -> explanation of the rows returned."""
 
     routed: RoutedTool
-    sources: tuple[Requirement, ...] = (("query", "record"),)
+
+    @property
+    def sources(self) -> tuple[Requirement, ...]:
+        return tool_requirements(self.routed.tool)
 
     def run(self, turn: _Turn) -> _Produced:
         outcome = execute_tool(turn.scope, self.routed.tool, self.routed.params)
@@ -259,7 +265,10 @@ class _Report:
     """Records + documents -> marked DRAFT carrying the derived label of every input."""
 
     routed: RoutedTool
-    sources: tuple[Requirement, ...] = (("query", "record"), ("retrieve", "chunk"))
+
+    @property
+    def sources(self) -> tuple[Requirement, ...]:
+        return (*tool_requirements(self.routed.tool), ("retrieve", "chunk"))
 
     def run(self, turn: _Turn) -> _Produced:
         outcome = execute_tool(turn.scope, self.routed.tool, self.routed.params)

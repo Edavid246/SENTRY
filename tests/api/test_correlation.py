@@ -239,3 +239,36 @@ def test_run_audits_the_decision_before_its_tool_queries_and_commits_after(clien
     assert set(mine[1:-2]) == {"data_query"}
     read = events[-2]
     assert read["resource"] == "finding" and read["item_ids"] == returned
+
+
+def test_assistant_reads_findings_only_under_the_read_finding_decision(
+    client,
+    explain_calls,  # noqa: F811
+    monkeypatch,
+) -> None:
+    """Findings are not source records: `query` on records does not cover them. The
+    tool needs its own read decision, made (and a deny audited) before the store is read."""
+    from app.authz import context
+
+    _run(client)
+    before = max((e["seq"] for e in _audit(client)), default=-1)
+    allowed = _ask(client, "a.bello", QUESTION)
+    assert allowed.status_code == 200, allowed.text
+    new = [e["payload"] for e in _audit(client) if e["seq"] > before]
+    decided = {(p["resource"], p["requested"]) for p in new if p["action"] == "decide"}
+    assert ("finding", "read") in decided
+
+    monkeypatch.setitem(
+        context.ROLE_PERMISSIONS, "commander", context.ROLE_PERMISSIONS["commander"] - {"read"}
+    )
+    calls = len(explain_calls)
+    before = max((e["seq"] for e in _audit(client)), default=-1)
+    response = _ask(client, "a.bello", QUESTION)
+    assert response.status_code == 403
+    assert len(explain_calls) == calls
+
+    new = [e["payload"] for e in _audit(client) if e["seq"] > before]
+    mine = [p for p in new if p.get("actor") == "a.bello"]
+    assert "data_query" not in {p["action"] for p in mine}
+    denied = [p for p in mine if p["action"] == "decide" and p["decision"] == "deny"]
+    assert [(p["resource"], p["requested"]) for p in denied] == [("finding", "read")]

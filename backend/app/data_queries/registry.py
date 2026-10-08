@@ -1,6 +1,7 @@
 """Tool registry and audited execution (SPEC 8.2, 14).
 
-name -> callable(scope, params). `execute_tool` is the only entry point: it
+name -> callable(scope, params). `tool_requirements` names the policy decisions
+a caller must make before a tool runs. `execute_tool` is the only entry point: it
 validates the tool name, runs the tool on the caller's authorized Scope, and
 records exactly one `data_query` audit event per call on that scope (written
 with the rest of the request's events, after the decision that allowed it):
@@ -15,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.audit.events import event
-from app.authz.scope import Scope
+from app.authz.scope import Requirement, Scope
 from app.connectors.base import SourceRecord
 from app.data_queries.errors import ToolParamError
 from app.data_queries.tools import (
@@ -41,7 +42,19 @@ REGISTRY: dict[str, ToolFn] = {
     "detections_near_site": detections_near_site,
 }
 
+# The policy decisions a caller needs before a tool runs. Tools read source records;
+# correlation_findings reads our own findings store, which `query` on records does not cover.
+_RECORD_QUERY: tuple[Requirement, ...] = (("query", "record"),)
+_REQUIREMENTS: dict[str, tuple[Requirement, ...]] = {
+    "correlation_findings": (("read", "finding"),),
+}
+
 _AUDIT_VALUE_LIMIT = 120
+
+
+def tool_requirements(name: str) -> tuple[Requirement, ...]:
+    """The (action, resource) decisions to make before running tool `name`."""
+    return _REQUIREMENTS.get(name, _RECORD_QUERY)
 
 
 @dataclass(frozen=True, slots=True)
