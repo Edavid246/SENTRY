@@ -9,22 +9,6 @@ import { ClearanceBadge } from "./ClearanceBadge";
 import { Emblem } from "./Emblem";
 import { IconChat, IconDashboard, IconLock, IconLog, IconLogout, IconMap, IconOrg, IconShield } from "./Icons";
 
-export function Watermark() {
-  return (
-    <div className="border-t border-rule bg-ground py-1.5 text-center text-[0.8rem] tracking-[0.3em] text-mute">
-      DEMO DATA — NOT CLASSIFIED
-    </div>
-  );
-}
-
-export function Disclaimer() {
-  return (
-    <footer className="border-t border-rule px-6 py-2 text-center text-[0.8rem] text-mute">
-      Independent prototype. All data is fictitious.
-    </footer>
-  );
-}
-
 function Segment({
   icon,
   label,
@@ -155,29 +139,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
-          {["Personnel", "Logistics", "Training"].map((label) => (
-            <div
-              key={label}
-              aria-disabled="true"
-              title="Not in demo"
-              data-testid="nav-not-in-demo"
-              className="flex cursor-not-allowed flex-col items-start border-l-[3px] border-transparent px-5 py-3 text-[0.9rem] uppercase tracking-[0.12em] text-mute opacity-60"
-            >
-              {label}
-              <span className="text-[0.6rem] tracking-[0.08em] whitespace-nowrap">Not in demo</span>
-            </div>
-          ))}
-          <div className="mt-auto px-5 text-[0.75rem] leading-relaxed text-mute">
-            Demo build
-            <br />
-            Dev profile — not sovereign
-          </div>
         </nav>
         <main className="min-h-0 min-w-0 flex-1 overflow-hidden">{children}</main>
       </div>
 
-      <Disclaimer />
-      <Watermark />
     </div>
   );
 }

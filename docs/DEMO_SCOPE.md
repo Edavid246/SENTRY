@@ -59,7 +59,7 @@ in each step's report.
 
 | Spec module | Status in the demo |
 |---|---|
-| Module workspaces (Personnel, Logistics, Training) | Nav entries shown greyed out, marked "Not in demo". |
+| Module workspaces (Personnel, Logistics, Training) | Not shown in the UI (nav entries hidden). |
 | Map and connected-systems view | Map view and timed detection replay built (MapLibre + GeoJSON, no tiles). |
 | Workflows and approvals | Cut (AGENTS.md DEMO CUT). |
 | OCR / scanned-document ingestion | Cut. |

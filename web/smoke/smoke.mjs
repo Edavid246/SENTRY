@@ -69,7 +69,6 @@ try {
   check((await page.textContent('[data-testid="clearance-badge"]')).includes("SECRET"), "a.bello clearance badge is SECRET");
   check((await page.locator("text=UAS-OPS").count()) > 0, "compartment tags shown");
   check((await page.locator('a[href="/audit"]').count()) === 0, "audit nav hidden without read_audit");
-  check((await page.locator('[data-testid="nav-not-in-demo"]').count()) === 3, "three greyed 'Not in demo' nav items");
 
   // dashboard: login lands here; every stub tile is tagged; the Secret finding is shown
   await page.waitForSelector('[data-testid="tile-recent_findings"]');

@@ -7,8 +7,7 @@ import { homePath } from "@/lib/home";
 import { useSession } from "@/lib/session";
 import { Clock } from "@/components/Clock";
 import { Emblem } from "@/components/Emblem";
-import { Watermark } from "@/components/Shell";
-import { IconArrow, IconEye, IconEyeOff, IconLock, IconUser, IconWarning } from "@/components/Icons";
+import { IconArrow, IconEye, IconEyeOff, IconLock, IconUser } from "@/components/Icons";
 
 function Crosshair({ className }: { className: string }) {
   return (
@@ -81,15 +80,6 @@ export default function LoginPage() {
         <Crosshair className="bottom-[22%] right-[14%]" />
 
         <div className="w-full max-w-[560px]">
-          <div className="mb-3 flex items-center border border-amber/60 bg-amber/10 text-amber">
-            <span className="border-r border-amber/60 px-4 py-3">
-              <IconWarning size={20} />
-            </span>
-            <span className="px-4 py-3 text-[0.85rem] tracking-[0.1em]">
-              AUTHORIZED PERSONNEL ONLY — DEMONSTRATION SYSTEM
-            </span>
-          </div>
-
           <div className="border border-rule bg-surface">
             <div className="flex items-center gap-5 border-b border-rule px-8 py-6">
               <Emblem size={52} />
@@ -165,17 +155,12 @@ export default function LoginPage() {
             </form>
 
             <div className="border-t border-rule px-8 py-4 text-center text-[0.75rem] tracking-[0.14em] text-sage">
-              ACCESS-CONTROLLED <span className="mx-3 text-mute">/</span> AUDITABLE{" "}
-              <span className="mx-3 text-mute">/</span> DEMO DATA
+              ACCESS-CONTROLLED <span className="mx-3 text-mute">/</span> AUDITABLE
             </div>
           </div>
         </div>
       </main>
 
-      <div className="px-6 pb-3 text-center text-[0.8rem] text-mute">
-        Independent prototype. All data is fictitious.
-      </div>
-      <Watermark />
     </div>
   );
 }
