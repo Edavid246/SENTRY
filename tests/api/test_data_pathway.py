@@ -26,9 +26,9 @@ from app.authz.tokens import DevTokenValidator
 from app.connectors.demo import DemoReferenceAdapter
 from app.data_queries import tools as tools_module
 from app.data_queries.errors import ToolParamError
-from app.data_queries.registry import execute_tool
 from app.data_queries.routing import route_question
 from fakes import FakeLLM
+from scoped import run_tool, scoped
 from test_assistant_endpoints import _ask, _audit, _event_payload, _fts_only, _latest
 from test_auth_endpoints import auth_header
 
@@ -213,37 +213,32 @@ def test_bad_params_are_refused_before_any_sql(client, app_engine, monkeypatch, 
 
     monkeypatch.setattr(DemoReferenceAdapter, "search", no_sql)
     ctx = _ctx(client, app_engine, "a.bello")
-    with app_engine.connect() as conn:
-        outcome = execute_tool(ctx, conn, "equipment_due_for_maintenance", params)
+    outcome, payload = run_tool(app_engine, ctx, "equipment_due_for_maintenance", params)
     assert outcome.refused and outcome.result is None
-    payload = _event_payload(app_engine, outcome.audit_event_id)
     assert payload["action"] == "data_query" and payload["decision"] == "deny"
     assert payload["rows"] == 0
 
 
 def test_certifications_tool_rejects_within_days(client, app_engine) -> None:
     ctx = _ctx(client, app_engine, "a.bello")
-    with app_engine.connect() as conn:
-        outcome = execute_tool(ctx, conn, "expired_certifications", {"within_days": 30})
+    outcome, _ = run_tool(app_engine, ctx, "expired_certifications", {"within_days": 30})
     assert outcome.refused
 
 
 def test_unknown_tool_is_refused_and_audited(client, app_engine) -> None:
     ctx = _ctx(client, app_engine, "a.bello")
-    with app_engine.connect() as conn:
-        outcome = execute_tool(ctx, conn, "drop_table", {})
+    outcome, payload = run_tool(app_engine, ctx, "drop_table", {})
     assert outcome.refused
-    payload = _event_payload(app_engine, outcome.audit_event_id)
     assert payload["tool"] == "drop_table" and payload["decision"] == "deny"
 
 
 def test_tool_raises_param_error_directly(client, app_engine) -> None:
     ctx = _ctx(client, app_engine, "t.adeyemi")
-    with app_engine.connect() as conn:
+    with scoped(app_engine, ctx) as scope:
         with pytest.raises(ToolParamError):
-            tools_module.expired_certifications(ctx, {"unit_path": "/command-a/"}, conn)
+            tools_module.expired_certifications(scope, {"unit_path": "/command-a/"})
         # equal to the caller's own unit is fine; so is a unit below it
-        assert tools_module.expired_certifications(ctx, {"unit_path": BN4}, conn).rows
+        assert tools_module.expired_certifications(scope, {"unit_path": BN4}).rows
 
 
 # --- audit ------------------------------------------------------------------
@@ -472,16 +467,14 @@ def test_stock_bad_params_are_refused_before_any_sql(
 
     monkeypatch.setattr(DemoReferenceAdapter, "search", no_sql)
     ctx = _ctx(client, app_engine, "a.bello")
-    with app_engine.connect() as conn:
-        outcome = execute_tool(ctx, conn, "stock_below_threshold", params)
+    outcome, payload = run_tool(app_engine, ctx, "stock_below_threshold", params)
     assert outcome.refused
-    assert _event_payload(app_engine, outcome.audit_event_id)["decision"] == "deny"
+    assert payload["decision"] == "deny"
 
 
 def test_stock_tool_out_of_scope_unit_and_no_scope_users(client, app_engine, explain_calls):
     ctx = _ctx(client, app_engine, "t.adeyemi")
-    with app_engine.connect() as conn:
-        outcome = execute_tool(ctx, conn, "stock_below_threshold", {"unit_path": "/command-a/"})
+    outcome, _ = run_tool(app_engine, ctx, "stock_below_threshold", {"unit_path": "/command-a/"})
     assert outcome.refused
     assert _ask(client, "s.eze", STOCK_QUESTION).status_code == 403
 
@@ -542,16 +535,14 @@ def test_training_bad_params_are_refused_before_any_sql(
 
     monkeypatch.setattr(DemoReferenceAdapter, "search", no_sql)
     ctx = _ctx(client, app_engine, "a.bello")
-    with app_engine.connect() as conn:
-        outcome = execute_tool(ctx, conn, "training_activity", params)
+    outcome, payload = run_tool(app_engine, ctx, "training_activity", params)
     assert outcome.refused
-    assert _event_payload(app_engine, outcome.audit_event_id)["decision"] == "deny"
+    assert payload["decision"] == "deny"
 
 
 def test_training_out_of_scope_unit_and_no_scope_users(client, app_engine, explain_calls) -> None:
     ctx = _ctx(client, app_engine, "t.adeyemi")
-    with app_engine.connect() as conn:
-        assert execute_tool(ctx, conn, "training_activity", {"unit_path": "/command-a/"}).refused
+    assert run_tool(app_engine, ctx, "training_activity", {"unit_path": "/command-a/"})[0].refused
     assert _ask(client, "s.eze", TRAINING_QUESTION).status_code == 403
     assert _ask(client, "f.danjuma", TRAINING_QUESTION).status_code == 403
 

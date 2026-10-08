@@ -8,7 +8,8 @@ query — relevance never overrides authorization (Principle Zero)."""
 from __future__ import annotations
 
 from app.authz.context import AccessContext, permissions_for_role
-from app.db import set_rls_context
+from app.authz.scope import Scope
+from app.db import clear_rls_context
 from app.knowledge.retrieve import retrieve_chunks
 from app.seed import _id
 from sqlalchemy import text
@@ -44,18 +45,8 @@ def _context(username: str) -> AccessContext:
 def _refs(engine: Engine, username: str, question: str) -> list[str]:
     ctx = _context(username)
     with engine.connect() as conn:
-        set_rls_context(
-            conn,
-            user_id=ctx.user_id,
-            clearance_rank=ctx.clearance_rank,
-            compartments=list(ctx.compartments),
-            unit_path=ctx.unit_path,
-            data_scope=ctx.data_scope,
-            session_id=ctx.session_id,
-        )
-        return [
-            chunk.document_ref for chunk in retrieve_chunks(conn, ctx, question, query_vector=None)
-        ]
+        scope = Scope(ctx, conn)
+        return [chunk.document_ref for chunk in retrieve_chunks(scope, question, query_vector=None)]
 
 
 def test_relevant_policy_is_retrieved_for_commander(
@@ -83,15 +74,17 @@ def test_restricted_user_cannot_retrieve_higher_classified_parent_unit_docs(
     assert "DOC-204" in refs
 
 
-def test_retrieval_sets_the_rls_context_itself(
+def test_retrieval_needs_the_scopes_rls_context_as_well_as_its_filter(
     app_engine: Engine, ingested: dict[str, int]
 ) -> None:
-    """A fresh connection with no context set: retrieval scopes it to the caller,
-    so it cannot be run unscoped and returns exactly the caller's chunks."""
-    ctx = _context("t.adeyemi")
+    """The row filter alone is not enough: with the scope's RLS context cleared,
+    the database itself returns nothing, so both layers always apply together."""
+    ctx = _context("a.bello")
     with app_engine.connect() as conn:
-        fresh = [c.document_ref for c in retrieve_chunks(conn, ctx, "servicing", query_vector=None)]
-    assert fresh == _refs(app_engine, "t.adeyemi", "servicing")
+        scope = Scope(ctx, conn)
+        assert retrieve_chunks(scope, "maintenance", query_vector=None)
+        clear_rls_context(conn)
+        assert retrieve_chunks(scope, "maintenance", query_vector=None) == []
 
 
 def test_no_rls_context_reads_no_chunks(app_engine: Engine, ingested: dict[str, int]) -> None:

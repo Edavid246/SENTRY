@@ -16,8 +16,7 @@ from fastapi import Depends, Header, HTTPException
 from sqlalchemy.engine import Connection
 
 from app.ai_gateway.port import ModelPort
-from app.audit.chain import utc_now_iso
-from app.audit.events import audit_events
+from app.audit.events import audit_events, event
 from app.authz.context import AccessContext
 from app.authz.tokens import DevTokenValidator, TokenError
 from app.db import get_engine
@@ -69,18 +68,7 @@ def current_context(
     try:
         return DevTokenValidator().validate(token.strip(), conn=conn)
     except TokenError as exc:
-        audit_events(
-            [
-                {
-                    "actor": "anonymous",
-                    "action": "authenticate",
-                    "resource": "auth",
-                    "decision": "deny",
-                    "reasons": [str(exc)],
-                    "timestamp": utc_now_iso(),
-                }
-            ]
-        )
+        audit_events([event("anonymous", "authenticate", "auth", "deny", reasons=[str(exc)])])
         raise _unauthenticated() from exc
 
 

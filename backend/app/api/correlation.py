@@ -15,14 +15,14 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import text
 
 from app.api.deps import ConnDep, CurrentContext
 from app.api.guard import guarded
-from app.audit.chain import utc_now_iso
+from app.audit.events import event
 from app.authz.labels import Labels
 from app.correlation.analysis import ANALYSIS, run_rising_faults
 from app.correlation.store import FindingRow, list_findings, save_findings
+from app.units import unit_names
 
 router = APIRouter(prefix="/api/v1/correlation", tags=["correlation"])
 
@@ -47,13 +47,6 @@ class RunResult(BaseModel):
     findings: list[FindingOut]
 
 
-def _unit_names(conn) -> dict[str, str]:
-    return {
-        str(r["path"]): str(r["name"])
-        for r in conn.execute(text("SELECT path, name FROM units")).mappings()
-    }
-
-
 def finding_out(row: FindingRow, names: dict[str, str]) -> FindingOut:
     return FindingOut(
         id=row.key,
@@ -67,26 +60,25 @@ def finding_out(row: FindingRow, names: dict[str, str]) -> FindingOut:
         unit_name=names.get(row.unit_path, row.unit_path),
         evidence_ids=row.evidence_ids,
         details=row.details,
-        created_at=row.created_at,
+        created_at=row.created_at.isoformat(),
     )
 
 
 @router.post("/run", response_model=RunResult)
 def run_correlation(ctx: CurrentContext, conn: ConnDep) -> RunResult:
     with guarded(ctx, conn, "run_correlation", "finding") as scope:
-        names = _unit_names(conn)
-        drafts = run_rising_faults(ctx, conn, Labels.load(conn), names)
-        save_findings(conn, ctx, drafts)
-        conn.commit()
-        rows = list_findings(conn, ctx)
-        scope.event(
-            {
-                "actor": ctx.username,
-                "action": "correlation_run",
-                "resource": "finding",
-                "analysis": ANALYSIS,
-                "decision": "allow",
-                "findings": [
+        names = unit_names(conn)
+        drafts = run_rising_faults(scope, Labels.load(conn), names)
+        save_findings(scope, drafts)  # committed once the audit batch is written
+        rows = list_findings(scope)
+        scope.record(
+            event(
+                ctx.username,
+                "correlation_run",
+                "finding",
+                "allow",
+                analysis=ANALYSIS,
+                findings=[
                     {
                         "id": d.key,
                         "classification": d.classification_code,
@@ -95,8 +87,7 @@ def run_correlation(ctx: CurrentContext, conn: ConnDep) -> RunResult:
                     }
                     for d in drafts
                 ],
-                "timestamp": utc_now_iso(),
-            }
+            )
         )
     return RunResult(analysis=ANALYSIS, findings=[finding_out(r, names) for r in rows])
 
@@ -104,17 +95,17 @@ def run_correlation(ctx: CurrentContext, conn: ConnDep) -> RunResult:
 @router.get("/findings", response_model=list[FindingOut])
 def findings(ctx: CurrentContext, conn: ConnDep) -> list[FindingOut]:
     with guarded(ctx, conn, "read", "finding") as scope:
-        rows = list_findings(conn, ctx)
+        rows = list_findings(scope)
         scope.read("finding", len(rows), item_ids=[r.key for r in rows])
-    names = _unit_names(conn)
+    names = unit_names(conn)
     return [finding_out(r, names) for r in rows]
 
 
 @router.get("/findings/{finding_id}", response_model=FindingOut)
 def finding(finding_id: str, ctx: CurrentContext, conn: ConnDep) -> FindingOut:
     with guarded(ctx, conn, "read", "finding", on_deny="not_found") as scope:
-        rows = list_findings(conn, ctx, key=finding_id)
+        rows = list_findings(scope, key=finding_id)
         scope.read("finding", len(rows), item_ids=[r.key for r in rows])
     if not rows:
         raise HTTPException(status_code=404, detail="not found")
-    return finding_out(rows[0], _unit_names(conn))
+    return finding_out(rows[0], unit_names(conn))

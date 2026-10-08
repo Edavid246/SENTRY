@@ -140,7 +140,7 @@ def test_stored_conversation_inherits_the_derived_label(client, gateway) -> None
 
 def test_report_routing_is_only_for_drafting_requests() -> None:
     routed = route_report(REPORT_QUESTION)
-    assert routed is not None and routed.kind == "training_summary"
+    assert routed is not None and routed.tool == "training_activity"
     assert routed.params == {"period_days": 90}
     assert route_report("Draft a summary of training activity in the last 30 days").params == {
         "period_days": 30

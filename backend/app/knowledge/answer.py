@@ -31,9 +31,7 @@ class CitedAnswer:
     citations: tuple[RetrievedChunk, ...]
     found: bool
     blocked: bool
-    model: str = ""
-    provider: str = ""
-    cached: bool = False
+    llm: LLMResult | None = None  # the model call behind it (None: no call was made)
 
 
 def build_system_prompt(insufficient_message: str) -> str:
@@ -117,9 +115,7 @@ def generate_answer(
             citations=(),
             found=False,
             blocked=False,
-            model=result.model,
-            provider=result.provider,
-            cached=result.cached,
+            llm=result,
         )
 
     cited_ids = parse_cited_chunk_ids(answer_text)
@@ -133,9 +129,7 @@ def generate_answer(
             citations=(),
             found=False,
             blocked=True,
-            model=result.model,
-            provider=result.provider,
-            cached=result.cached,
+            llm=result,
         )
 
     citations = _citations_for(cited_ids, chunks) if cited_ids else tuple(chunks)
@@ -144,7 +138,5 @@ def generate_answer(
         citations=citations,
         found=True,
         blocked=False,
-        model=result.model,
-        provider=result.provider,
-        cached=result.cached,
+        llm=result,
     )

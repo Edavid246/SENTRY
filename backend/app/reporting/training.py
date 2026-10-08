@@ -20,9 +20,9 @@ import json
 import re
 from dataclasses import dataclass
 
-from app.ai_gateway.base import ChatMessage, LLMRequest
+from app.ai_gateway.base import ChatMessage, LLMRequest, LLMResult
 from app.ai_gateway.port import Completer
-from app.authz.labels import Labels
+from app.authz.labels import Label
 from app.data_queries.tools import ToolResult
 from app.knowledge.answer import build_evidence, parse_cited_chunk_ids
 from app.knowledge.retrieve import RetrievedChunk
@@ -61,29 +61,24 @@ class DraftReport:
     citations: tuple[RetrievedChunk, ...]
     record_ids: tuple[str, ...]
     document_refs: tuple[str, ...]
-    classification_code: str
-    compartments: tuple[str, ...]
+    label: Label  # derived from every input (highest classification, union of compartments)
     found: bool
     blocked: bool
-    provider: str = ""
-    model: str = ""
-    cached: bool = False
+    llm: LLMResult | None = None  # the model call behind it (None: no call was made)
 
 
 def _assemble(
-    body: str,
-    classification: str,
-    compartments: tuple[str, ...],
-    record_ids: tuple[str, ...],
-    document_refs: tuple[str, ...],
+    body: str, label: Label, record_ids: tuple[str, ...], document_refs: tuple[str, ...]
 ) -> str:
-    label = classification.upper() + (f" ({', '.join(compartments)})" if compartments else "")
+    marking = label.code.upper() + (
+        f" ({', '.join(label.compartments)})" if label.compartments else ""
+    )
     sources = [
         f"Records: {', '.join(record_ids) if record_ids else 'none'}",
         f"Documents: {', '.join(document_refs) if document_refs else 'none'}",
     ]
     return (
-        f"{DRAFT_BANNER}\nClassification: {label}\n\n{body}\n\n"
+        f"{DRAFT_BANNER}\nClassification: {marking}\n\n{body}\n\n"
         "SOURCES (all demo data)\n" + "\n".join(sources)
     )
 
@@ -92,29 +87,24 @@ def generate_training_report(
     question: str,
     result: ToolResult,
     chunks: list[RetrievedChunk],
-    labels: Labels,
+    label: Label,
     *,
     gateway: Completer,
 ) -> DraftReport:
-    inputs = [*result.records, *chunks]
-    label = labels.derive(inputs, empty_ok=True)
-    classification, compartments = label.code, label.compartments
+    """Draft over `result` and `chunks`; `label` is the label derived from both."""
     record_ids = tuple(r.source_ref for r in result.records)
     document_refs = tuple(sorted({c.document_ref for c in chunks if c.document_ref}))
 
     def draft(body: str, *, found: bool, blocked: bool = False, citations=(), llm=None):
         return DraftReport(
-            text=_assemble(body, classification, compartments, record_ids, document_refs),
+            text=_assemble(body, label, record_ids, document_refs),
             citations=tuple(citations),
             record_ids=record_ids,
             document_refs=document_refs,
-            classification_code=classification,
-            compartments=compartments,
+            label=label,
             found=found,
             blocked=blocked,
-            provider=llm.provider if llm else "",
-            model=llm.model if llm else "",
-            cached=llm.cached if llm else False,
+            llm=llm,
         )
 
     if not result.rows and not chunks:

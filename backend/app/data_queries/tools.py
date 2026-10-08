@@ -1,25 +1,26 @@
 """Typed, parameterized query tools (SPEC 8.2 data pathway).
 
-Each tool validates its parameters, then asks the adapter for records; it
-never builds SQL and never touches the record tables (the adapter does, with
-the authorization filter inside the query). The output is a deterministic
-table plus the source records behind it.
+Each tool validates its parameters, then asks the adapter for records on the
+caller's authorized Scope; it never builds SQL and never touches the record
+tables (the adapter does, with the authorization filter inside the query). The
+output is a deterministic table plus the source records behind it: `_table`
+projects the records through the tool's columns, so a column and its row key
+can never disagree.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
 
-from sqlalchemy.engine import Connection
-
 from app.authz.context import AccessContext
+from app.authz.scope import Scope
 from app.clock import UTC_TS_FORMAT, demo_now, demo_today
+from app.connectors import get_adapter
 from app.connectors.base import RecordFilter, SourceRecord
-from app.connectors.demo import DemoReferenceAdapter
 from app.correlation.store import list_findings
 from app.data_queries.errors import ToolParamError
 
@@ -32,7 +33,8 @@ DEFAULT_PERIOD_DAYS = 90  # one quarter
 _DEPOT_RE = re.compile(r"^DEP-[A-Z0-9]{1,8}(?:-[A-Z0-9]{1,8})?$")
 _SITE_RE = re.compile(r"^(?:DEP-[A-Z0-9]{1,8}|UAS-HANGAR)$")
 _UNIT_PATH_RE = re.compile(r"^/(?:[a-z0-9-]+/)+$")
-ADAPTER = DemoReferenceAdapter()
+
+Column = Callable[[SourceRecord], Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +44,42 @@ class ToolResult:
     columns: tuple[str, ...]
     rows: list[dict[str, Any]]
     records: tuple[SourceRecord, ...]
+
+
+def _source_ref(record: SourceRecord) -> str:
+    return record.source_ref
+
+
+def _unit_path(record: SourceRecord) -> str:
+    return record.unit_path
+
+
+def _field(name: str) -> Column:
+    return lambda record: record.data.get(name)
+
+
+def _fields(*names: str) -> dict[str, Column]:
+    return {name: _field(name) for name in names}
+
+
+def _table(
+    tool: str,
+    params: dict[str, Any],
+    records: list[SourceRecord],
+    columns: dict[str, Column],
+) -> ToolResult:
+    return ToolResult(
+        tool=tool,
+        params=params,
+        columns=tuple(columns),
+        rows=[{name: value(record) for name, value in columns.items()} for record in records],
+        records=tuple(records),
+    )
+
+
+def _given(**optional: Any) -> dict[str, Any]:
+    """The optional parameters that were actually given (for the echoed params)."""
+    return {name: value for name, value in optional.items() if value is not None}
 
 
 def _check_names(params: Mapping[str, Any], allowed: frozenset[str]) -> None:
@@ -72,96 +110,11 @@ def _bounded_int(value: Any, name: str, low: int, high: int) -> int:
     return value
 
 
-def equipment_due_for_maintenance(
-    ctx: AccessContext, params: Mapping[str, Any], conn: Connection
-) -> ToolResult:
-    _check_names(params, frozenset({"unit_path", "within_days"}))
-    unit_path = _resolve_unit_path(ctx, params.get("unit_path"))
-    within_days = _bounded_int(params.get("within_days", 30), "within_days", 0, MAX_WITHIN_DAYS)
-    cutoff = demo_today() + timedelta(days=within_days)
-    records = ADAPTER.search(
-        conn,
-        ctx,
-        RecordFilter(
-            entity_type="Equipment",
-            unit_path=unit_path,
-            date_field="maintenance_due_date",
-            on_or_before=cutoff,
-        ),
-    )
-    records.sort(key=lambda record: (record.data["maintenance_due_date"], record.source_ref))
-    columns = (
-        "id",
-        "name",
-        "type",
-        "status",
-        "maintenance_due_date",
-        "location",
-        "unit_path",
-    )
-    rows = [
-        {
-            "id": record.source_ref,
-            "name": record.data.get("name"),
-            "type": record.data.get("type"),
-            "status": record.data.get("status"),
-            "maintenance_due_date": record.data["maintenance_due_date"],
-            "location": record.data.get("location"),
-            "unit_path": record.unit_path,
-        }
-        for record in records
-    ]
-    return ToolResult(
-        tool="equipment_due_for_maintenance",
-        params={"unit_path": unit_path, "within_days": within_days},
-        columns=columns,
-        rows=rows,
-        records=tuple(records),
-    )
-
-
-def expired_certifications(
-    ctx: AccessContext, params: Mapping[str, Any], conn: Connection
-) -> ToolResult:
-    _check_names(params, frozenset({"unit_path"}))
-    unit_path = _resolve_unit_path(ctx, params.get("unit_path"))
-    records = ADAPTER.search(
-        conn,
-        ctx,
-        RecordFilter(
-            entity_type="Qualification",
-            unit_path=unit_path,
-            date_field="expires",
-            on_or_before=demo_today() - timedelta(days=1),
-        ),
-    )
-    records.sort(key=lambda record: (record.data["expires"], record.source_ref))
-    columns = ("id", "name", "rank", "certification", "expired_date", "unit_path")
-    rows = [
-        {
-            "id": record.source_ref,
-            "name": record.data.get("name"),
-            "rank": record.data.get("rank"),
-            "certification": record.data.get("certification"),
-            "expired_date": record.data["expires"],
-            "unit_path": record.unit_path,
-        }
-        for record in records
-    ]
-    return ToolResult(
-        tool="expired_certifications",
-        params={"unit_path": unit_path},
-        columns=columns,
-        rows=rows,
-        records=tuple(records),
-    )
-
-
-def _resolve_depot(value: Any) -> str | None:
+def _pattern(value: Any, pattern: re.Pattern[str], message: str) -> str | None:
     if value is None:
         return None
-    if not isinstance(value, str) or not _DEPOT_RE.match(value):
-        raise ToolParamError("depot must look like DEP-B2")
+    if not isinstance(value, str) or not pattern.match(value):
+        raise ToolParamError(message)
     return value
 
 
@@ -169,13 +122,63 @@ def _number(value: Any) -> float | None:
     return None if isinstance(value, bool) or not isinstance(value, int | float) else value
 
 
-def stock_below_threshold(
-    ctx: AccessContext, params: Mapping[str, Any], conn: Connection
-) -> ToolResult:
+def equipment_due_for_maintenance(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    _check_names(params, frozenset({"unit_path", "within_days"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    within_days = _bounded_int(params.get("within_days", 30), "within_days", 0, MAX_WITHIN_DAYS)
+    records = get_adapter().search(
+        scope,
+        RecordFilter(
+            entity_type="Equipment",
+            unit_path=unit_path,
+            date_field="maintenance_due_date",
+            on_or_before=demo_today() + timedelta(days=within_days),
+        ),
+    )
+    records.sort(key=lambda r: (r.data["maintenance_due_date"], r.source_ref))
+    return _table(
+        "equipment_due_for_maintenance",
+        {"unit_path": unit_path, "within_days": within_days},
+        records,
+        {
+            "id": _source_ref,
+            **_fields("name", "type", "status", "maintenance_due_date", "location"),
+            "unit_path": _unit_path,
+        },
+    )
+
+
+def expired_certifications(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    _check_names(params, frozenset({"unit_path"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    records = get_adapter().search(
+        scope,
+        RecordFilter(
+            entity_type="Qualification",
+            unit_path=unit_path,
+            date_field="expires",
+            on_or_before=demo_today() - timedelta(days=1),
+        ),
+    )
+    records.sort(key=lambda r: (r.data["expires"], r.source_ref))
+    return _table(
+        "expired_certifications",
+        {"unit_path": unit_path},
+        records,
+        {
+            "id": _source_ref,
+            **_fields("name", "rank", "certification"),
+            "expired_date": _field("expires"),
+            "unit_path": _unit_path,
+        },
+    )
+
+
+def stock_below_threshold(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
     _check_names(params, frozenset({"unit_path", "depot"}))
-    unit_path = _resolve_unit_path(ctx, params.get("unit_path"))
-    depot = _resolve_depot(params.get("depot"))
-    found = ADAPTER.search(conn, ctx, RecordFilter(entity_type="StockItem", unit_path=unit_path))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    depot = _pattern(params.get("depot"), _DEPOT_RE, "depot must look like DEP-B2")
+    found = get_adapter().search(scope, RecordFilter(entity_type="StockItem", unit_path=unit_path))
     # Quantities are compared here, on rows the adapter already authorized.
     records = [
         record
@@ -185,34 +188,21 @@ def stock_below_threshold(
         and qty < thr
         and (depot is None or record.data.get("depot") == depot)
     ]
-    records.sort(
-        key=lambda r: (r.data["quantity"] - r.data["threshold"], r.source_ref),
-    )
-    columns = ("id", "item", "depot", "quantity", "threshold", "shortfall", "unit_path")
-    rows = [
+    records.sort(key=lambda r: (r.data["quantity"] - r.data["threshold"], r.source_ref))
+    return _table(
+        "stock_below_threshold",
+        {"unit_path": unit_path, **_given(depot=depot)},
+        records,
         {
-            "id": record.source_ref,
-            "item": record.data.get("item"),
-            "depot": record.data.get("depot"),
-            "quantity": record.data["quantity"],
-            "threshold": record.data["threshold"],
-            "shortfall": record.data["threshold"] - record.data["quantity"],
-            "unit_path": record.unit_path,
-        }
-        for record in records
-    ]
-    return ToolResult(
-        tool="stock_below_threshold",
-        params={"unit_path": unit_path, **({"depot": depot} if depot else {})},
-        columns=columns,
-        rows=rows,
-        records=tuple(records),
+            "id": _source_ref,
+            **_fields("item", "depot", "quantity", "threshold"),
+            "shortfall": lambda r: r.data["threshold"] - r.data["quantity"],
+            "unit_path": _unit_path,
+        },
     )
 
 
-def correlation_findings(
-    ctx: AccessContext, params: Mapping[str, Any], conn: Connection
-) -> ToolResult:
+def correlation_findings(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
     """The correlation findings this caller may see (row filter + RLS in the query).
 
     Findings are produced by our own correlation job, not a source system, so this
@@ -220,8 +210,7 @@ def correlation_findings(
     record so the answer inherits its classification and compartments like any other.
     """
     _check_names(params, frozenset())
-    findings = list_findings(conn, ctx)
-    records = tuple(
+    records = [
         SourceRecord(
             source_ref=f.key,
             entity_type="Finding",
@@ -230,40 +219,35 @@ def correlation_findings(
             classification_code=f.classification_code,
             compartments=tuple(f.compartments),
             unit_path=f.unit_path,
-            retrieved_at=datetime.fromisoformat(f.created_at),
+            retrieved_at=f.created_at,
         )
-        for f in findings
-    )
-    columns = ("id", "title", "severity", "classification", "unit_path", "summary")
-    rows = [
-        {
-            "id": f.key,
-            "title": f.title,
-            "severity": f.severity,
-            "classification": f.classification_code,
-            "unit_path": f.unit_path,
-            "summary": f.summary,
-        }
-        for f in findings
+        for f in list_findings(scope)
     ]
-    return ToolResult(
-        tool="correlation_findings", params={}, columns=columns, rows=rows, records=records
+    return _table(
+        "correlation_findings",
+        {},
+        records,
+        {
+            "id": _source_ref,
+            **_fields("title", "severity"),
+            "classification": lambda r: r.classification_code,
+            "unit_path": _unit_path,
+            "summary": _field("summary"),
+        },
     )
 
 
-def training_activity(
-    ctx: AccessContext, params: Mapping[str, Any], conn: Connection
-) -> ToolResult:
+def training_activity(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
     """Training events that started in the last `period_days` (default one quarter)."""
     _check_names(params, frozenset({"unit_path", "period_days"}))
-    unit_path = _resolve_unit_path(ctx, params.get("unit_path"))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
     period_days = _bounded_int(
         params.get("period_days", DEFAULT_PERIOD_DAYS), "period_days", 1, MAX_WITHIN_DAYS
     )
     today = demo_today()
     start = today - timedelta(days=period_days)
-    found = ADAPTER.search(
-        conn, ctx, RecordFilter(entity_type="TrainingEvent", unit_path=unit_path)
+    found = get_adapter().search(
+        scope, RecordFilter(entity_type="TrainingEvent", unit_path=unit_path)
     )
 
     def started(record: SourceRecord) -> date | None:
@@ -274,30 +258,22 @@ def training_activity(
 
     records = [r for r in found if (d := started(r)) is not None and start <= d <= today]
     records.sort(key=lambda r: (r.data["start_date"], r.source_ref), reverse=True)
-    columns = ("id", "course", "start_date", "attendees", "unit_path")
-    rows = [
+    return _table(
+        "training_activity",
+        {"unit_path": unit_path, "period_days": period_days},
+        records,
         {
-            "id": r.source_ref,
-            "course": r.data.get("course"),
-            "start_date": r.data["start_date"],
-            "attendees": r.data.get("attendees"),
-            "unit_path": r.unit_path,
-        }
-        for r in records
-    ]
-    return ToolResult(
-        tool="training_activity",
-        params={"unit_path": unit_path, "period_days": period_days},
-        columns=columns,
-        rows=rows,
-        records=tuple(records),
+            "id": _source_ref,
+            **_fields("course", "start_date", "attendees"),
+            "unit_path": _unit_path,
+        },
     )
 
 
-def uas_missions(ctx: AccessContext, params: Mapping[str, Any], conn: Connection) -> ToolResult:
+def uas_missions(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
     """UAS missions dated in the last `period_days` (default 30), optionally by status."""
     _check_names(params, frozenset({"unit_path", "status", "period_days"}))
-    unit_path = _resolve_unit_path(ctx, params.get("unit_path"))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
     status = params.get("status")
     if status is not None and status not in MISSION_STATUSES:
         raise ToolParamError("status must be 'completed' or 'cancelled'")
@@ -306,9 +282,8 @@ def uas_missions(ctx: AccessContext, params: Mapping[str, Any], conn: Connection
     )
     today = demo_today()
     start = (today - timedelta(days=period_days)).isoformat()
-    records = ADAPTER.search(
-        conn,
-        ctx,
+    found = get_adapter().search(
+        scope,
         RecordFilter(
             entity_type="Mission",
             unit_path=unit_path,
@@ -318,53 +293,34 @@ def uas_missions(ctx: AccessContext, params: Mapping[str, Any], conn: Connection
     )
     records = [
         r
-        for r in records
+        for r in found
         if r.data["mission_date"] >= start and (status is None or r.data.get("status") == status)
     ]
     records.sort(key=lambda r: (r.data["mission_date"], r.source_ref), reverse=True)
-    columns = ("id", "mission", "platform", "status", "mission_date", "area", "reason", "unit_path")
-    rows = [
+    return _table(
+        "uas_missions",
+        {"unit_path": unit_path, "period_days": period_days, **_given(status=status)},
+        records,
         {
-            "id": r.source_ref,
-            "mission": r.data.get("mission"),
-            "platform": r.data.get("platform"),
-            "status": r.data.get("status"),
-            "mission_date": r.data["mission_date"],
-            "area": r.data.get("area"),
-            "reason": r.data.get("reason"),
-            "unit_path": r.unit_path,
-        }
-        for r in records
-    ]
-    return ToolResult(
-        tool="uas_missions",
-        params={
-            "unit_path": unit_path,
-            "period_days": period_days,
-            **({"status": status} if status else {}),
+            "id": _source_ref,
+            **_fields("mission", "platform", "status", "mission_date", "area", "reason"),
+            "unit_path": _unit_path,
         },
-        columns=columns,
-        rows=rows,
-        records=tuple(records),
     )
 
 
-def detections_near_site(
-    ctx: AccessContext, params: Mapping[str, Any], conn: Connection
-) -> ToolResult:
+def detections_near_site(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
     """Surveillance detections at a site (depot or facility) in the last `period_hours`."""
     _check_names(params, frozenset({"unit_path", "site", "period_hours"}))
-    unit_path = _resolve_unit_path(ctx, params.get("unit_path"))
-    site = params.get("site")
-    if site is not None and (not isinstance(site, str) or not _SITE_RE.match(site)):
-        raise ToolParamError("site must look like DEP-B4 or UAS-HANGAR")
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    site = _pattern(params.get("site"), _SITE_RE, "site must look like DEP-B4 or UAS-HANGAR")
     period_hours = _bounded_int(
         params.get("period_hours", DEFAULT_DETECTION_HOURS), "period_hours", 1, MAX_PERIOD_HOURS
     )
     now = demo_now()
     start = (now - timedelta(hours=period_hours)).strftime(UTC_TS_FORMAT)
     end = now.strftime(UTC_TS_FORMAT)
-    found = ADAPTER.search(conn, ctx, RecordFilter(entity_type="Detection", unit_path=unit_path))
+    found = get_adapter().search(scope, RecordFilter(entity_type="Detection", unit_path=unit_path))
     # Fixed-width UTC timestamps order correctly as text; compared on authorized rows only.
     records = [
         r
@@ -373,27 +329,13 @@ def detections_near_site(
         and (site is None or r.data.get("site") == site)
     ]
     records.sort(key=lambda r: (r.data["observed_at"], r.source_ref), reverse=True)
-    columns = ("id", "observed_at", "site", "sensor_id", "object_type", "confidence", "unit_path")
-    rows = [
+    return _table(
+        "detections_near_site",
+        {"unit_path": unit_path, "period_hours": period_hours, **_given(site=site)},
+        records,
         {
-            "id": r.source_ref,
-            "observed_at": r.data["observed_at"],
-            "site": r.data.get("site"),
-            "sensor_id": r.data.get("sensor_id"),
-            "object_type": r.data.get("object_type"),
-            "confidence": r.data.get("confidence"),
-            "unit_path": r.unit_path,
-        }
-        for r in records
-    ]
-    return ToolResult(
-        tool="detections_near_site",
-        params={
-            "unit_path": unit_path,
-            "period_hours": period_hours,
-            **({"site": site} if site else {}),
+            "id": _source_ref,
+            **_fields("observed_at", "site", "sensor_id", "object_type", "confidence"),
+            "unit_path": _unit_path,
         },
-        columns=columns,
-        rows=rows,
-        records=tuple(records),
     )

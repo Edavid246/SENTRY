@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from app.ai_gateway.base import ChatMessage, LLMRequest
+from app.ai_gateway.base import ChatMessage, LLMRequest, LLMResult
 from app.ai_gateway.port import Completer
 from app.data_queries.tools import ToolResult
 
@@ -32,9 +32,7 @@ _SYSTEM = (
 @dataclass(frozen=True, slots=True)
 class Explanation:
     text: str
-    provider: str = ""
-    model: str = ""
-    cached: bool = False
+    llm: LLMResult | None = None  # the model call behind it (None: no call was made)
 
 
 def explain_result(question: str, result: ToolResult, *, gateway: Completer) -> Explanation:
@@ -52,6 +50,4 @@ def explain_result(question: str, result: ToolResult, *, gateway: Completer) -> 
     )
     request = LLMRequest(messages=(ChatMessage(role="user", text=prompt),), system=_SYSTEM)
     llm = gateway.complete(request)
-    return Explanation(
-        text=llm.text.strip(), provider=llm.provider, model=llm.model, cached=llm.cached
-    )
+    return Explanation(text=llm.text.strip(), llm=llm)

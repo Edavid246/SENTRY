@@ -13,9 +13,8 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Protocol
 
-from sqlalchemy.engine import Connection
-
 from app.authz.context import AccessContext
+from app.authz.scope import Scope
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,12 +35,13 @@ class SourceRecord:
 class RecordFilter:
     """Typed search criteria. Everything here is a bound parameter downstream.
 
-    `unit_path` selects that unit and everything below it; `date_field` names
+    `entity_type` None means every type; `unit_path` selects that unit and
+    everything below it; `date_field` names
     an allow-listed ISO-date field of the record, kept when its value is on or
     before `on_or_before`.
     """
 
-    entity_type: str
+    entity_type: str | None = None
     unit_path: str | None = None
     date_field: str | None = None
     on_or_before: date | None = None
@@ -59,14 +59,10 @@ class AdapterDescription:
 class SourceAdapter(Protocol):
     def describe(self) -> AdapterDescription: ...
 
-    def search(
-        self, conn: Connection, ctx: AccessContext, record_filter: RecordFilter
-    ) -> list[SourceRecord]: ...
+    def search(self, scope: Scope, record_filter: RecordFilter) -> list[SourceRecord]: ...
 
-    def get(self, conn: Connection, ctx: AccessContext, source_ref: str) -> SourceRecord | None: ...
+    def get(self, scope: Scope, source_ref: str) -> SourceRecord | None: ...
 
-    def stream(
-        self, conn: Connection, ctx: AccessContext, since: datetime
-    ) -> Iterator[SourceRecord]: ...
+    def stream(self, scope: Scope, since: datetime) -> Iterator[SourceRecord]: ...
 
     def sync(self, ctx: AccessContext) -> int: ...

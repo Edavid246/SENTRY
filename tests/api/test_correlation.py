@@ -161,6 +161,7 @@ def test_rls_refuses_a_finding_above_the_runners_label(app_engine, client) -> No
     """The database, not the job, stops a low-cleared writer storing a Secret finding."""
     from app.correlation.store import save_findings
     from app.correlation.types import FindingDraft
+    from scoped import scoped
     from sqlalchemy.exc import DBAPIError
 
     ctx = _ctx(client, app_engine, "t.adeyemi")
@@ -176,5 +177,21 @@ def test_rls_refuses_a_finding_above_the_runners_label(app_engine, client) -> No
         evidence_ids=[],
         details={},
     )
-    with app_engine.connect() as conn, pytest.raises(DBAPIError):
-        save_findings(conn, ctx, [draft])
+    with pytest.raises(DBAPIError), scoped(app_engine, ctx) as scope:
+        save_findings(scope, [draft])
+
+
+def test_run_audits_the_decision_before_its_tool_queries_and_commits_after(client) -> None:
+    """The run's evidence queries follow the decide event that allowed them, and the
+    findings are committed only once the batch (ending in correlation_run) is written."""
+    tip = max(event["seq"] for event in _audit(client))
+    _run(client)
+    mine = [
+        e["payload"]["action"]
+        for e in sorted(_audit(client), key=lambda e: e["seq"])
+        if e["seq"] > tip
+        and e["payload"]["actor"] == "a.bello"
+        and e["payload"]["action"] != "login"
+    ]
+    assert mine[0] == "decide" and mine[-1] == "correlation_run"
+    assert set(mine[1:-1]) == {"data_query"}

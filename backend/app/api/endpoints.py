@@ -13,8 +13,8 @@ single login events. The SELECT inside GET /audit is itself not audited — the
 viewer's own read would otherwise recurse.
 """
 
+from dataclasses import asdict
 from typing import Annotated, Any
-from uuid import UUID
 
 from argon2 import PasswordHasher
 from argon2.exceptions import Argon2Error
@@ -23,12 +23,14 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from app.api.deps import ConnDep, CurrentContext
-from app.api.guard import guarded
-from app.audit.chain import recent_events, utc_now_iso, verify_report
-from app.audit.events import audit_events
+from app.api.guard import guarded, permitted
+from app.audit.chain import recent_events, verify_report
+from app.audit.events import audit_events, event
 from app.authz.tokens import DevTokenValidator
-from app.connectors.demo import DemoReferenceAdapter
+from app.connectors import get_adapter
+from app.connectors.base import RecordFilter
 from app.db import get_engine
+from app.knowledge import passages
 
 _HASHER = PasswordHasher()
 # Same generic 401 for unknown user and wrong password; a dummy verify keeps
@@ -58,34 +60,14 @@ def login(body: LoginRequest, conn: ConnDep) -> dict[str, str]:
         password_ok = False
     if not password_ok:
         audit_events(
-            [
-                {
-                    "actor": body.username,
-                    "action": "login",
-                    "resource": "auth",
-                    "decision": "deny",
-                    "reasons": ["invalid credentials"],
-                    "timestamp": utc_now_iso(),
-                }
-            ]
+            [event(body.username, "login", "auth", "deny", reasons=["invalid credentials"])]
         )
         raise HTTPException(
             status_code=401,
             detail="invalid credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    audit_events(
-        [
-            {
-                "actor": body.username,
-                "action": "login",
-                "resource": "auth",
-                "decision": "allow",
-                "user_id": str(row.id),
-                "timestamp": utc_now_iso(),
-            }
-        ]
-    )
+    audit_events([event(body.username, "login", "auth", "allow", user_id=str(row.id))])
     return {
         "access_token": DevTokenValidator().issue_token(body.username),
         "token_type": "bearer",
@@ -128,33 +110,24 @@ def me(ctx: CurrentContext, conn: ConnDep) -> dict[str, Any]:
 @router.get("/documents", tags=["data"])
 def list_documents(ctx: CurrentContext, conn: ConnDep) -> list[dict[str, str | None]]:
     with guarded(ctx, conn, "read", "document") as scope:
-        row_filter = scope.filter("document")
-        rows = conn.execute(
-            text(
-                "SELECT source_ref, title, classification_code FROM documents"
-                f" WHERE {row_filter.where_sql} ORDER BY source_ref"
-            ),
-            row_filter.params,
-        ).mappings()
-        results = [dict(row) for row in rows]
-        scope.read("documents", len(results))
-    return results
+        documents = passages.list_documents(scope)
+        scope.read("document", len(documents))
+    return [asdict(document) for document in documents]
 
 
 @router.get("/records", tags=["data"])
 def list_records(ctx: CurrentContext, conn: ConnDep) -> list[dict[str, str]]:
     with guarded(ctx, conn, "retrieve", "record") as scope:
-        row_filter = scope.filter("record")
-        rows = conn.execute(
-            text(
-                "SELECT source_ref, entity_type, classification_code FROM canonical_records"
-                f" WHERE {row_filter.where_sql} ORDER BY source_ref"
-            ),
-            row_filter.params,
-        ).mappings()
-        results = [dict(row) for row in rows]
-        scope.read("canonical_records", len(results))
-    return results
+        records = get_adapter().search(scope, RecordFilter())
+        scope.read("record", len(records))
+    return [
+        {
+            "source_ref": record.source_ref,
+            "entity_type": record.entity_type,
+            "classification_code": record.classification_code,
+        }
+        for record in records
+    ]
 
 
 class RecordDetail(BaseModel):
@@ -172,8 +145,8 @@ class RecordDetail(BaseModel):
 def get_record(source_ref: str, ctx: CurrentContext, conn: ConnDep) -> RecordDetail:
     """One record, through the adapter (policy row filter + RLS). 404 when not visible."""
     with guarded(ctx, conn, "retrieve", "record", on_deny="not_found") as scope:
-        record = DemoReferenceAdapter().get(conn, ctx, source_ref)
-        scope.read("canonical_records", 0 if record is None else 1)
+        record = get_adapter().get(scope, source_ref)
+        scope.read("record", 0 if record is None else 1)
     if record is None:
         raise HTTPException(status_code=404, detail="not found")
     return RecordDetail(
@@ -193,22 +166,11 @@ def get_document(source_ref: str, ctx: CurrentContext, conn: ConnDep) -> dict[st
     # 404 — not 403 — whenever the row is not visible, including a denied
     # action: never confirm that a restricted document exists.
     with guarded(ctx, conn, "read", "document", on_deny="not_found") as scope:
-        row_filter = scope.filter("document")
-        row = (
-            conn.execute(
-                text(
-                    "SELECT source_ref, title, classification_code FROM documents"
-                    f" WHERE source_ref = :source_ref AND {row_filter.where_sql}"
-                ),
-                {"source_ref": source_ref, **row_filter.params},
-            )
-            .mappings()
-            .first()
-        )
-        scope.read("documents", 0 if row is None else 1)
-    if row is None:
+        found = passages.list_documents(scope, source_ref)
+        scope.read("document", len(found))
+    if not found:
         raise HTTPException(status_code=404, detail="not found")
-    return dict(row)
+    return asdict(found[0])
 
 
 @router.get("/documents/{document_id}/chunks/{chunk_id}", tags=["data"])
@@ -225,54 +187,11 @@ def get_document_chunk(
     internal uuid.
     """
     with guarded(ctx, conn, "read", "chunk", on_deny="not_found") as scope:
-        row = _visible_chunk(conn, scope.filter("chunk"), document_id, chunk_id)
-        scope.read("chunks", 0 if row is None else 1)
-    if row is None:
+        passage = passages.visible_passage(scope, document_id, chunk_id)
+        scope.read("chunk", 0 if passage is None else 1)
+    if passage is None:
         raise HTTPException(status_code=404, detail="not found")
-    return {
-        "chunk_id": str(row["chunk_id"]),
-        "document_id": str(row["document_id"]),
-        "document_ref": str(row["source_ref"] or ""),
-        "document_title": str(row["title"]),
-        "text": str(row["text"]),
-        "page": row["page"],
-        "section": row["section"],
-        "classification_code": str(row["classification_code"]),
-        "compartments": [str(code) for code in (row["compartments"] or [])],
-    }
-
-
-def _visible_chunk(conn, row_filter, document_id: str, chunk_id: str):
-    """The chunk, if visible under `row_filter`; None for a malformed id or no match."""
-    try:
-        chunk_key = str(UUID(chunk_id))
-    except ValueError:
-        chunk_key = None
-    document_where = "documents.source_ref = :document_id"
-    document_value = document_id
-    try:
-        document_value = str(UUID(document_id))
-        document_where = "documents.id = :document_id"
-    except ValueError:
-        pass
-    if chunk_key is None:
-        return None
-    return (
-        conn.execute(
-            text(
-                "SELECT chunks.id AS chunk_id, documents.id AS document_id,"
-                " documents.source_ref, documents.title, chunks.text, chunks.page,"
-                " chunks.section, chunks.classification_code, chunks.compartments"
-                " FROM chunks"
-                " JOIN documents ON documents.id = chunks.document_id"
-                f" WHERE chunks.id = :chunk_id AND {document_where}"
-                f" AND {row_filter.where_sql}"
-            ),
-            {"chunk_id": chunk_key, "document_id": document_value, **row_filter.params},
-        )
-        .mappings()
-        .first()
-    )
+    return {**asdict(passage), "compartments": list(passage.compartments)}
 
 
 @router.get("/audit", tags=["audit"])
@@ -289,14 +208,12 @@ def list_audit(
     """
     # The viewer's own SELECT is not audited (no recursion); the decide event
     # already records that the read happened.
-    with guarded(ctx, None, "read_audit", "audit"):
-        pass
+    permitted(ctx, "read_audit", "audit")
     return recent_events(get_engine(), limit, event_id=event_id)
 
 
 @router.get("/audit/verify", tags=["audit"])
 def audit_verify(ctx: CurrentContext) -> dict[str, Any]:
     """Chain verification plus both tamper-evidence layers (SPEC 14.2)."""
-    with guarded(ctx, None, "read_audit", "audit"):
-        pass
+    permitted(ctx, "read_audit", "audit")
     return verify_report(get_engine())

@@ -15,13 +15,12 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app.api.deps import ConnDep, CurrentContext
-from app.api.guard import guarded
+from app.api.guard import guarded_or_empty
 from app.audit.chain import utc_now_iso
+from app.authz.scope import Scope
 from app.clock import UTC_TS_FORMAT, demo_now, demo_today
+from app.connectors import get_adapter
 from app.connectors.base import RecordFilter, SourceRecord
-from app.connectors.demo import DemoReferenceAdapter
-
-ADAPTER = DemoReferenceAdapter()
 
 router = APIRouter(prefix="/api/v1/connected", tags=["connected"])
 
@@ -93,19 +92,14 @@ def connected_replay(
         "window_end": now.strftime(UTC_TS_FORMAT),
         "events": [],
     }
-    with guarded(
-        ctx,
-        conn,
-        "retrieve",
-        "record",
-        on_deny="empty",
-        audit_resource="connected_replay",
+    with guarded_or_empty(
+        ctx, conn, "retrieve", "record", audit_resource="connected_replay"
     ) as scope:
-        if not scope.allowed:
+        if scope is None:
             return out
         events = [
             r
-            for r in ADAPTER.stream(conn, ctx, max(since, window_start - timedelta(seconds=1)))
+            for r in get_adapter().stream(scope, max(since, window_start - timedelta(seconds=1)))
             if r.data["observed_at"] <= limit.strftime(UTC_TS_FORMAT)
         ]
         scope.read("connected_replay", len(events), record_ids=[r.source_ref for r in events])
@@ -121,28 +115,27 @@ def connected_map(
     mission_days: Annotated[int, Query(ge=1, le=365)] = 30,
 ) -> dict[str, Any]:
     """Sensors, recent detections and mission tracks the caller may see (never more)."""
-    with guarded(
-        ctx, conn, "retrieve", "record", on_deny="empty", audit_resource="connected_map"
-    ) as scope:
-        if not scope.allowed:
+    with guarded_or_empty(ctx, conn, "retrieve", "record", audit_resource="connected_map") as scope:
+        if scope is None:
             # Roles without data access get an empty map, not a hint about what exists.
             return {"type": "FeatureCollection", "features": [], "generated_at": utc_now_iso()}
-        features, refs = _map_features(conn, ctx, hours, mission_days)
+        features, refs = _map_features(scope, hours, mission_days)
         scope.read("connected_map", len(refs), record_ids=refs)
     return {"type": "FeatureCollection", "features": features, "generated_at": utc_now_iso()}
 
 
 def _map_features(
-    conn, ctx, hours: int, mission_days: int
+    scope: Scope, hours: int, mission_days: int
 ) -> tuple[list[dict[str, Any]], list[str]]:
     now = demo_now()
     start = (now - timedelta(hours=hours)).strftime(UTC_TS_FORMAT)
     end = now.strftime(UTC_TS_FORMAT)
     mission_start = (demo_today() - timedelta(days=mission_days)).isoformat()
 
+    adapter = get_adapter()
     features: list[dict[str, Any]] = []
     refs: list[str] = []
-    for sensor in ADAPTER.search(conn, ctx, RecordFilter(entity_type="Sensor")):
+    for sensor in adapter.search(scope, RecordFilter(entity_type="Sensor")):
         features.append(
             _point(
                 sensor,
@@ -152,15 +145,14 @@ def _map_features(
             )
         )
         refs.append(sensor.source_ref)
-    detections = ADAPTER.search(conn, ctx, RecordFilter(entity_type="Detection"))
+    detections = adapter.search(scope, RecordFilter(entity_type="Detection"))
     for det in sorted(detections, key=lambda r: r.data["observed_at"]):
         if not start <= det.data["observed_at"] <= end:
             continue
         features.append(_detection_feature(det))
         refs.append(det.source_ref)
-    missions = ADAPTER.search(
-        conn,
-        ctx,
+    missions = adapter.search(
+        scope,
         RecordFilter(
             entity_type="Mission",
             date_field="mission_date",

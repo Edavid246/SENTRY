@@ -1,18 +1,16 @@
-"""Findings store: writes and reads through RLS + the policy row filter."""
+"""Findings store: writes and reads on an authorized Scope (RLS + the policy row filter)."""
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import text
-from sqlalchemy.engine import Connection
 
-from app.authz.context import AccessContext
-from app.authz.policy import get_policy
+from app.authz.scope import Scope
 from app.correlation.types import FindingDraft
-from app.db import set_rls_context_for
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,12 +25,15 @@ class FindingRow:
     unit_path: str
     evidence_ids: list[str]
     details: dict[str, Any]
-    created_at: str
+    created_at: datetime
 
 
-def save_findings(conn: Connection, ctx: AccessContext, drafts: list[FindingDraft]) -> None:
-    """Insert or update by key. RLS WITH CHECK refuses anything above the runner's label."""
-    set_rls_context_for(conn, ctx)
+def save_findings(scope: Scope, drafts: list[FindingDraft]) -> None:
+    """Insert or update by key. RLS WITH CHECK refuses anything above the runner's label.
+
+    The scope commits after its audit batch is written.
+    """
+    conn = scope.conn
     for draft in drafts:
         unit_id = conn.execute(
             text("SELECT id FROM units WHERE path = :path"), {"path": draft.unit_path}
@@ -62,22 +63,22 @@ def save_findings(conn: Connection, ctx: AccessContext, drafts: list[FindingDraf
                 "unit_id": unit_id,
                 "evidence": json.dumps(draft.evidence_ids),
                 "details": json.dumps(draft.details),
-                "created_by": ctx.user_id,
+                "created_by": scope.ctx.user_id,
             },
         )
+    scope.commit()
 
 
-def list_findings(conn: Connection, ctx: AccessContext, key: str | None = None) -> list[FindingRow]:
+def list_findings(scope: Scope, key: str | None = None) -> list[FindingRow]:
     """The findings this caller may see; the row filter is inside the query."""
-    set_rls_context_for(conn, ctx)
-    row_filter = get_policy().row_filter(ctx, "finding")
+    row_filter = scope.filter("finding")
     where = row_filter.where_sql
     params: dict[str, Any] = dict(row_filter.params)
     if key is not None:
         where += " AND findings.key = :key"
         params["key"] = key
     rows = (
-        conn.execute(
+        scope.conn.execute(
             text(
                 "SELECT findings.key, findings.analysis, findings.title, findings.summary,"
                 " findings.severity, findings.classification_code, findings.compartments,"
@@ -102,7 +103,7 @@ def list_findings(conn: Connection, ctx: AccessContext, key: str | None = None) 
             unit_path=str(r["unit_path"]),
             evidence_ids=[str(e) for e in r["evidence_ids"]],
             details=dict(r["details"]),
-            created_at=r["created_at"].isoformat(),
+            created_at=r["created_at"],
         )
         for r in rows
     ]

@@ -116,5 +116,5 @@ def test_record_detail_no_data_roles_and_audit(client) -> None:
         == 404
     )
     client.get("/api/v1/records/REC-011", headers=auth_header(client, "a.okafor"))
-    event = _latest(_audit(client), actor="a.okafor", action="query", resource="canonical_records")
+    event = _latest(_audit(client), actor="a.okafor", action="query", resource="record")
     assert event["payload"]["rows"] == 1

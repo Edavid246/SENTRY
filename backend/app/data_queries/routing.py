@@ -84,14 +84,8 @@ class RoutedTool:
     params: dict[str, Any]
 
 
-@dataclass(frozen=True, slots=True)
-class RoutedReport:
-    kind: str
-    params: dict[str, Any]
-
-
-def route_report(question: str) -> RoutedReport | None:
-    """A request to draft a training-summary report, or None.
+def route_report(question: str) -> RoutedTool | None:
+    """A request to draft a training-summary report (the tool it drafts from), or None.
 
     Asking to prepare/draft a report or summary of training activity is the reporting
     pathway; "show training events" stays a plain data query (route_question).
@@ -104,7 +98,7 @@ def route_report(question: str) -> RoutedReport | None:
     period_days = _period_days(question)
     if period_days is not None:
         params["period_days"] = period_days
-    return RoutedReport("training_summary", params)
+    return RoutedTool("training_activity", params)
 
 
 def route_question(question: str) -> RoutedTool | None:

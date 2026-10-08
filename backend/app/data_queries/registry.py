@@ -1,9 +1,11 @@
 """Tool registry and audited execution (SPEC 8.2, 14).
 
-name -> callable(ctx, params, conn). `execute_tool` is the only entry point
-the API uses: it validates the tool name, runs the tool, and writes exactly
-one `data_query` audit event per call: an allow with the row count, or a
-deny when the call was refused with a ToolParamError (no SQL ran).
+name -> callable(scope, params). `execute_tool` is the only entry point: it
+validates the tool name, runs the tool on the caller's authorized Scope, and
+records exactly one `data_query` audit event per call on that scope (written
+with the rest of the request's events, after the decision that allowed it):
+an allow with the row count, or a deny when the call was refused with a
+ToolParamError (no SQL ran).
 """
 
 from __future__ import annotations
@@ -12,10 +14,9 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy.engine import Connection
-
-from app.audit.chain import append_events, utc_now_iso
-from app.authz.context import AccessContext
+from app.audit.events import event
+from app.authz.scope import Scope
+from app.connectors.base import SourceRecord
 from app.data_queries.errors import ToolParamError
 from app.data_queries.tools import (
     ToolResult,
@@ -27,9 +28,8 @@ from app.data_queries.tools import (
     training_activity,
     uas_missions,
 )
-from app.db import get_engine
 
-ToolFn = Callable[[AccessContext, Mapping[str, Any], Connection], ToolResult]
+ToolFn = Callable[[Scope, Mapping[str, Any]], ToolResult]
 
 REGISTRY: dict[str, ToolFn] = {
     "equipment_due_for_maintenance": equipment_due_for_maintenance,
@@ -49,11 +49,15 @@ class ToolOutcome:
     tool: str
     result: ToolResult | None
     refusal: str | None
-    audit_event_id: str
 
     @property
     def refused(self) -> bool:
         return self.refusal is not None
+
+    @property
+    def records(self) -> tuple[SourceRecord, ...]:
+        """The source records behind the result (none for a refusal)."""
+        return self.result.records if self.result else ()
 
 
 def sanitize_params(params: Mapping[str, Any]) -> dict[str, Any]:
@@ -67,37 +71,36 @@ def sanitize_params(params: Mapping[str, Any]) -> dict[str, Any]:
     return clean
 
 
-def execute_tool(
-    ctx: AccessContext, conn: Connection, name: str, params: Mapping[str, Any]
-) -> ToolOutcome:
-    result: ToolResult | None = None
-    refusal: str | None = None
+def execute_tool(scope: Scope, name: str, params: Mapping[str, Any]) -> ToolOutcome:
+    tool = REGISTRY.get(name)
     try:
-        tool = REGISTRY.get(name)
         if tool is None:
             raise ToolParamError("unknown tool")
-        result = tool(ctx, params, conn)
+        result = tool(scope, params)
     except ToolParamError as exc:
-        refusal = str(exc)
-
-    payload: dict[str, Any] = {
-        "actor": ctx.username,
-        "action": "data_query",
-        "resource": "record",
-        "tool": name[:64],
-        "params": sanitize_params(result.params if result else params),
-        "decision": "deny" if refusal else "allow",
-        "rows": len(result.rows) if result else 0,
-        "timestamp": utc_now_iso(),
-    }
-    if refusal:
-        payload["reasons"] = [refusal]
-    else:
-        payload["record_ids"] = [record.source_ref for record in result.records]
-    written = append_events(get_engine(), [payload])
-    return ToolOutcome(
-        tool=name,
-        result=result,
-        refusal=refusal,
-        audit_event_id=str(written[-1]["event_id"]),
+        scope.record(
+            event(
+                scope.ctx.username,
+                "data_query",
+                "record",
+                "deny",
+                tool=name[:64],
+                params=sanitize_params(params),
+                rows=0,
+                reasons=[str(exc)],
+            )
+        )
+        return ToolOutcome(tool=name, result=None, refusal=str(exc))
+    scope.record(
+        event(
+            scope.ctx.username,
+            "data_query",
+            "record",
+            "allow",
+            tool=name[:64],
+            params=sanitize_params(result.params),
+            rows=len(result.rows),
+            record_ids=[record.source_ref for record in result.records],
+        )
     )
+    return ToolOutcome(tool=name, result=result, refusal=None)

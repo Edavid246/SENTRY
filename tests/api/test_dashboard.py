@@ -171,3 +171,17 @@ def test_denied_call_is_audited(client) -> None:
     _summary(client, "s.eze")
     deny = _latest(_audit(client), actor="s.eze", action="decide", resource="dashboard")
     assert deny["payload"]["decision"] == "deny" and deny["payload"]["reasons"]
+
+
+def test_tool_queries_are_audited_after_the_decision_that_allowed_them(client) -> None:
+    """One batch per request, in causal order: decide, the tiles' data_query events, query."""
+    tip = max(event["seq"] for event in _audit(client))
+    _summary(client, "a.bello")
+    mine = [
+        e["payload"]["action"]
+        for e in sorted(_audit(client), key=lambda e: e["seq"])
+        if e["seq"] > tip
+        and e["payload"]["actor"] == "a.bello"
+        and e["payload"]["action"] != "login"
+    ]
+    assert mine == ["decide", "data_query", "data_query", "query"]

@@ -1,9 +1,9 @@
 """Demo reference adapter: the only code that reads canonical_records.
 
 It stands in for the client's logistics / personnel systems (SPEC 11.4). Every
-read applies the policy row_filter(ctx, "record") inside the SQL, together
-with the Postgres RLS context, which the adapter sets itself so it cannot be
-called without one. Read-only: no statement here writes.
+read runs on an authorized Scope (app.authz.scope: the caller's RLS context is
+already set) and applies the scope's row filter for "record" inside the SQL.
+Read-only: no statement here writes.
 """
 
 from __future__ import annotations
@@ -12,13 +12,11 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 
 from sqlalchemy import text
-from sqlalchemy.engine import Connection
 
 from app.authz.context import AccessContext
-from app.authz.policy import get_policy
+from app.authz.scope import Scope
 from app.clock import UTC_TS_FORMAT, demo_now
 from app.connectors.base import AdapterDescription, RecordFilter, SourceRecord
-from app.db import set_rls_context_for
 
 # Record fields a search may compare as an ISO date. The name is a bound
 # parameter, never interpolated; the allow-list keeps the surface explicit.
@@ -71,13 +69,13 @@ class DemoReferenceAdapter:
             notes=("demo stand-in for the client's logistics and personnel systems",),
         )
 
-    def search(
-        self, conn: Connection, ctx: AccessContext, record_filter: RecordFilter
-    ) -> list[SourceRecord]:
-        set_rls_context_for(conn, ctx)
-        row_filter = get_policy().row_filter(ctx, "record")
-        clauses = [row_filter.where_sql, "canonical_records.entity_type = :entity_type"]
-        params: dict[str, object] = {**row_filter.params, "entity_type": record_filter.entity_type}
+    def search(self, scope: Scope, record_filter: RecordFilter) -> list[SourceRecord]:
+        row_filter = scope.filter("record")
+        clauses = [row_filter.where_sql]
+        params: dict[str, object] = dict(row_filter.params)
+        if record_filter.entity_type is not None:
+            clauses.append("canonical_records.entity_type = :entity_type")
+            params["entity_type"] = record_filter.entity_type
         if record_filter.unit_path is not None:
             clauses.append("starts_with(units.path, :filter_unit_path)")
             params["filter_unit_path"] = record_filter.unit_path
@@ -95,7 +93,7 @@ class DemoReferenceAdapter:
             params["date_field"] = record_filter.date_field
             params["on_or_before"] = record_filter.on_or_before.isoformat()
         rows = (
-            conn.execute(
+            scope.conn.execute(
                 text(
                     _SELECT
                     + " WHERE "
@@ -109,11 +107,10 @@ class DemoReferenceAdapter:
         )
         return [_record(row) for row in rows]
 
-    def get(self, conn: Connection, ctx: AccessContext, source_ref: str) -> SourceRecord | None:
-        set_rls_context_for(conn, ctx)
-        row_filter = get_policy().row_filter(ctx, "record")
+    def get(self, scope: Scope, source_ref: str) -> SourceRecord | None:
+        row_filter = scope.filter("record")
         row = (
-            conn.execute(
+            scope.conn.execute(
                 text(
                     _SELECT
                     + " WHERE canonical_records.source_ref = :source_ref"
@@ -126,9 +123,7 @@ class DemoReferenceAdapter:
         )
         return None if row is None else _record(row)
 
-    def stream(
-        self, conn: Connection, ctx: AccessContext, since: datetime
-    ) -> Iterator[SourceRecord]:
+    def stream(self, scope: Scope, since: datetime) -> Iterator[SourceRecord]:
         """STUB live feed (docs/STUBS.md): replay the seeded detections in time order.
 
         Yields the Detection records the caller may see (same policy row filter + RLS as
@@ -137,9 +132,12 @@ class DemoReferenceAdapter:
         """
         cutoff = since.astimezone(UTC).strftime(UTC_TS_FORMAT)
         end = demo_now().strftime(UTC_TS_FORMAT)
-        records = self.search(conn, ctx, RecordFilter(entity_type="Detection"))
+        records = self.search(scope, RecordFilter(entity_type="Detection"))
         fresh = [r for r in records if cutoff < str(r.data["observed_at"]) <= end]
         yield from sorted(fresh, key=lambda r: (r.data["observed_at"], r.source_ref))
 
     def sync(self, ctx: AccessContext) -> int:
         return 0  # nothing to refresh: the demo data is the source of truth
+
+
+ADAPTER = DemoReferenceAdapter()

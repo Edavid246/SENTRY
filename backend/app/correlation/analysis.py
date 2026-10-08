@@ -15,21 +15,19 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from sqlalchemy.engine import Connection
-
-from app.authz.context import AccessContext
 from app.authz.labels import Labels
+from app.authz.scope import Scope
 from app.clock import demo_today
+from app.connectors import get_adapter
 from app.connectors.base import RecordFilter, SourceRecord
-from app.connectors.demo import DemoReferenceAdapter
 from app.correlation.types import FindingDraft
 from app.data_queries.registry import execute_tool
+from app.units import unit_slug
 
 ANALYSIS = "rising_faults"
 WINDOW_DAYS = 21
 MIN_INCREASE = 3
 MAINTAINER = "maintainer"
-ADAPTER = DemoReferenceAdapter()
 
 
 def _reported(record: SourceRecord) -> date | None:
@@ -40,20 +38,17 @@ def _reported(record: SourceRecord) -> date | None:
         return None
 
 
-def _tool_records(ctx, conn, tool: str, unit_path: str) -> tuple[SourceRecord, ...]:
-    outcome = execute_tool(ctx, conn, tool, {"unit_path": unit_path})
-    return outcome.result.records if outcome.result else ()
+def _tool_records(scope: Scope, tool: str, unit_path: str) -> tuple[SourceRecord, ...]:
+    return execute_tool(scope, tool, {"unit_path": unit_path}).records
 
 
-def run_rising_faults(
-    ctx: AccessContext, conn: Connection, labels: Labels, names: dict[str, str]
-) -> list[FindingDraft]:
+def run_rising_faults(scope: Scope, labels: Labels, names: dict[str, str]) -> list[FindingDraft]:
     today = demo_today()
     recent_start = today - timedelta(days=WINDOW_DAYS)
     prior_start = today - timedelta(days=2 * WINDOW_DAYS)
 
     by_unit: dict[str, list[SourceRecord]] = {}
-    for record in ADAPTER.search(conn, ctx, RecordFilter(entity_type="FaultReport")):
+    for record in get_adapter().search(scope, RecordFilter(entity_type="FaultReport")):
         by_unit.setdefault(record.unit_path, []).append(record)
 
     drafts: list[FindingDraft] = []
@@ -68,20 +63,19 @@ def run_rising_faults(
             continue
         certs = [
             r
-            for r in _tool_records(ctx, conn, "expired_certifications", unit_path)
+            for r in _tool_records(scope, "expired_certifications", unit_path)
             if MAINTAINER in str(r.data.get("certification", "")).lower()
         ]
-        stock = list(_tool_records(ctx, conn, "stock_below_threshold", unit_path))
+        stock = list(_tool_records(scope, "stock_below_threshold", unit_path))
         if not certs or not stock:
             continue  # a fault rise alone is not the correlation this job looks for
 
         evidence = [*recent, *certs, *stock]
         label = labels.derive(evidence)
         unit_name = names.get(unit_path, unit_path)
-        slug = unit_path.strip("/").split("/")[-1].upper()
         drafts.append(
             FindingDraft(
-                key=f"FND-RISING-FAULTS-{slug}",
+                key=f"FND-RISING-FAULTS-{unit_slug(unit_path)}",
                 analysis=ANALYSIS,
                 title=f"Rising faults in {unit_name} linked to lapsed maintainer "
                 "certifications and a spare-part shortage",

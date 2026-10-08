@@ -19,9 +19,9 @@ from __future__ import annotations
 import pytest
 from app.authz.tokens import DevTokenValidator
 from app.data_queries.errors import ToolParamError
-from app.data_queries.registry import execute_tool
 from app.data_queries.routing import route_question
 from fakes import FakeLLM
+from scoped import run_tool, scoped
 from test_assistant_endpoints import _ask
 from test_auth_endpoints import auth_header
 
@@ -91,8 +91,7 @@ def test_users_without_uas_ops_get_no_missions(client, explain_calls, username) 
 
 def test_missions_default_window_is_thirty_days(client, app_engine) -> None:
     ctx = _ctx(client, app_engine, "a.bello")
-    with app_engine.connect() as conn:
-        outcome = execute_tool(ctx, conn, "uas_missions", {})
+    outcome, _ = run_tool(app_engine, ctx, "uas_missions", {})
     assert {row["id"] for row in outcome.result.rows} == {
         "REC-055",
         "REC-056",
@@ -100,8 +99,7 @@ def test_missions_default_window_is_thirty_days(client, app_engine) -> None:
         "REC-058",
         "REC-060",
     }  # REC-059 is 40 days old
-    with app_engine.connect() as conn:
-        wide = execute_tool(ctx, conn, "uas_missions", {"period_days": 60, "status": "completed"})
+    wide, _ = run_tool(app_engine, ctx, "uas_missions", {"period_days": 60, "status": "completed"})
     assert {row["id"] for row in wide.result.rows} == {"REC-055", "REC-058"}
 
 
@@ -146,14 +144,13 @@ def test_detections_near_a_site_and_window(client, explain_calls) -> None:
 )
 def test_bad_params_are_refused_with_a_denied_audit_event(client, app_engine, tool, params) -> None:
     ctx = _ctx(client, app_engine, "t.adeyemi")
-    with app_engine.connect() as conn:
-        outcome = execute_tool(ctx, conn, tool, params)
+    outcome, _ = run_tool(app_engine, ctx, tool, params)
     assert outcome.refused and outcome.result is None
     with pytest.raises(ToolParamError):
         from app.data_queries.registry import REGISTRY
 
-        with app_engine.connect() as conn:
-            REGISTRY[tool](ctx, params, conn)
+        with scoped(app_engine, ctx) as scope:
+            REGISTRY[tool](scope, params)
 
 
 # --- routing ----------------------------------------------------------------

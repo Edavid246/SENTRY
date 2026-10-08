@@ -3,33 +3,32 @@
 POST /api/v1/assistant/query maps HTTP onto `app.assistant.service.answer`,
 which owns the authorization order, the pathways (knowledge, data, report),
 labelling, conversation storage and the audit trail. This module only turns
-requests into calls and outcomes into responses: AssistantForbidden -> 403,
+requests into calls and outcomes into responses: Forbidden -> 403,
 ConversationNotFound -> 404, ModelUnavailable -> 503.
 
 Conversation reads (GET /conversations, GET /conversations/{id}) resolve the
-caller's own threads only, as guarded reads (app.api.guard): decide, then
-row filter + RLS inside the query, audited on the way out. Citations for a stored turn are
-resolved from its inline citation markers, chunk by chunk, through the chunk
-row filter — a passage that is no longer visible simply drops out.
+caller's own threads only, as guarded reads (app.api.guard) over
+app.assistant.conversations. Citations for a stored turn are resolved from its
+inline citation markers through the chunk row filter
+(app.knowledge.passages) — a passage that is no longer visible simply drops out.
 """
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Protocol
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import text
 
 from app.api.deps import ConnDep, CurrentContext, ModelsDep
 from app.api.guard import guarded
-from app.assistant.conversations import ConversationNotFound
-from app.assistant.service import AssistantForbidden, ModelUnavailable, answer
-from app.authz.policy import RowFilter
-from app.db import format_array
+from app.assistant import conversations
+from app.assistant.conversations import Conversation, ConversationNotFound
+from app.assistant.service import ModelUnavailable, answer
+from app.authz.scope import Forbidden
 from app.knowledge.answer import parse_cited_chunk_ids
-from app.knowledge.retrieve import RetrievedChunk
+from app.knowledge.passages import visible_passages
 
 router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
 
@@ -114,7 +113,7 @@ def query_assistant(
 ) -> AssistantQueryResponse:
     try:
         outcome = answer(ctx, conn, body.question, body.conversation_id, models=models)
-    except AssistantForbidden:
+    except Forbidden:
         raise HTTPException(status_code=403, detail="forbidden") from None
     except ConversationNotFound:
         raise HTTPException(status_code=404, detail="not found") from None
@@ -123,15 +122,15 @@ def query_assistant(
     table, report = outcome.table, outcome.report
     return AssistantQueryResponse(
         answer=outcome.answer,
-        citations=[_citation_from_chunk(chunk) for chunk in outcome.citations],
+        citations=[_citation(chunk) for chunk in outcome.citations],
         found=outcome.found,
         degraded=outcome.degraded,
         refused=outcome.refused,
         result_table=(ResultTable(columns=list(table.columns), rows=table.rows) if table else None),
         report=(
             ReportInfo(
-                classification_code=report.classification_code,
-                compartments=list(report.compartments),
+                classification_code=report.label.code,
+                compartments=list(report.label.compartments),
                 record_ids=list(report.record_ids),
                 document_refs=list(report.document_refs),
             )
@@ -143,7 +142,16 @@ def query_assistant(
     )
 
 
-def _citation_from_chunk(chunk: RetrievedChunk) -> CitationOut:
+class _Cited(Protocol):
+    chunk_id: str
+    document_title: str
+    document_ref: str
+    page: int | None
+    section: str | None
+    classification_code: str
+
+
+def _citation(chunk: _Cited) -> CitationOut:
     return CitationOut(
         chunk_id=chunk.chunk_id,
         document_title=chunk.document_title,
@@ -154,55 +162,15 @@ def _citation_from_chunk(chunk: RetrievedChunk) -> CitationOut:
     )
 
 
-def _citation_from_row(row) -> CitationOut:
-    return CitationOut(
-        chunk_id=str(row["id"]),
-        document_title=str(row["title"]),
-        document_ref=str(row["source_ref"] or ""),
-        page=row["page"],
-        section=row["section"],
-        classification_code=str(row["classification_code"]),
-    )
-
-
-def _visible_citations(conn, row_filter: RowFilter, chunk_ids: list[str]) -> dict[str, CitationOut]:
-    """Resolve stored citation markers to the chunks the caller may still see.
-
-    Same policy row filter as retrieval: a passage whose classification,
-    compartments or unit no longer line up with the caller simply drops out.
-    """
-    if not chunk_ids:
-        return {}
-    rows = (
-        conn.execute(
-            text(
-                "SELECT chunks.id, documents.source_ref, documents.title, chunks.page,"
-                " chunks.section, chunks.classification_code"
-                " FROM chunks"
-                " JOIN documents ON documents.id = chunks.document_id"
-                " WHERE chunks.id::text = ANY(CAST(:ids AS text[]))"
-                f" AND {row_filter.where_sql}"
-            ),
-            {"ids": format_array(chunk_ids), **row_filter.params},
-        )
-        .mappings()
-        .all()
-    )
-    return {str(row["id"]): _citation_from_row(row) for row in rows}
-
-
-def _summary(row) -> ConversationSummary:
+def _summary(conversation: Conversation) -> ConversationSummary:
     return ConversationSummary(
-        id=str(row["id"]),
-        title=str(row["title"]),
-        classification_code=str(row["classification_code"]),
-        compartments=[str(code) for code in (row["compartments"] or [])],
-        created_at=row["created_at"].isoformat(),
-        updated_at=row["updated_at"].isoformat(),
+        id=conversation.id,
+        title=conversation.title,
+        classification_code=conversation.classification_code,
+        compartments=list(conversation.compartments),
+        created_at=conversation.created_at.isoformat(),
+        updated_at=conversation.updated_at.isoformat(),
     )
-
-
-_CONVERSATION_COLUMNS = "id, title, classification_code, compartments, created_at, updated_at"
 
 
 @router.get("/conversations", response_model=list[ConversationSummary])
@@ -211,28 +179,11 @@ def list_conversations(
     conn: ConnDep,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> list[ConversationSummary]:
-    """The caller's own conversations, newest first (SPEC §10.1).
-
-    Another user's conversations are never in scope: the ownership predicate
-    is part of the SQL, alongside the policy row filter and RLS.
-    """
+    """The caller's own conversations, newest first (SPEC §10.1)."""
     with guarded(ctx, conn, "read", "conversation") as scope:
-        row_filter = scope.filter("conversation")
-        rows = (
-            conn.execute(
-                text(
-                    f"SELECT {_CONVERSATION_COLUMNS} FROM conversations"
-                    " WHERE user_id = :user_id"
-                    f" AND {row_filter.where_sql}"
-                    " ORDER BY updated_at DESC, id DESC LIMIT :limit"
-                ),
-                {"user_id": ctx.user_id, "limit": limit, **row_filter.params},
-            )
-            .mappings()
-            .all()
-        )
-        scope.read("conversations", len(rows))
-    return [_summary(row) for row in rows]
+        found = conversations.list_conversations(scope, limit=limit)
+        scope.read("conversation", len(found))
+    return [_summary(conversation) for conversation in found]
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
@@ -246,56 +197,25 @@ def get_conversation(
     so an id can never be probed for existence.
     """
     with guarded(ctx, conn, "read", "conversation", on_deny="not_found") as scope:
-        conversation_filter = scope.filter("conversation")
-        row = (
-            conn.execute(
-                text(
-                    f"SELECT {_CONVERSATION_COLUMNS} FROM conversations"
-                    " WHERE id = :id AND user_id = :user_id"
-                    f" AND {conversation_filter.where_sql}"
-                ),
-                {"id": conversation_id, "user_id": ctx.user_id, **conversation_filter.params},
-            )
-            .mappings()
-            .first()
-        )
-        if row is None:
-            scope.read("conversations", 0)
+        found = conversations.list_conversations(scope, limit=1, conversation_id=conversation_id)
+        if not found:
+            scope.read("conversation", 0)
             raise HTTPException(status_code=404, detail="not found")
-
-        message_filter = scope.filter("message")
-        messages = (
-            conn.execute(
-                text(
-                    "SELECT role, content, created_at FROM messages"
-                    " WHERE conversation_id = :id"
-                    f" AND {message_filter.where_sql}"
-                    " ORDER BY created_at, CASE role WHEN 'user' THEN 0 ELSE 1 END, id"
-                ),
-                {"id": conversation_id, **message_filter.params},
-            )
-            .mappings()
-            .all()
-        )
-        scope.read("messages", len(messages))
-
-        wanted: list[str] = []
-        for message in messages:
-            if str(message["role"]) == "assistant":
-                wanted.extend(parse_cited_chunk_ids(str(message["content"])))
-        citations = _visible_citations(conn, scope.filter("chunk"), list(dict.fromkeys(wanted)))
+        messages = conversations.list_messages(scope, conversation_id)
+        scope.read("message", len(messages))
+        cited = [
+            parse_cited_chunk_ids(message.content) if message.role == "assistant" else []
+            for message in messages
+        ]
+        passages = visible_passages(scope, list(dict.fromkeys(i for ids in cited for i in ids)))
 
     turns = [
         TurnOut(
-            role=str(message["role"]),
-            content=str(message["content"]),
-            created_at=message["created_at"].isoformat(),
-            citations=[
-                citations[chunk_id]
-                for chunk_id in parse_cited_chunk_ids(str(message["content"]))
-                if chunk_id in citations
-            ],
+            role=message.role,
+            content=message.content,
+            created_at=message.created_at.isoformat(),
+            citations=[_citation(passages[i]) for i in chunk_ids if i in passages],
         )
-        for message in messages
+        for message, chunk_ids in zip(messages, cited, strict=True)
     ]
-    return ConversationDetail(**_summary(row).model_dump(), turns=turns)
+    return ConversationDetail(**_summary(found[0]).model_dump(), turns=turns)

@@ -489,7 +489,7 @@ def test_conversation_reads_are_audited(client, ingested: dict[str, int], models
     )
     assert decide is not None
     assert decide["payload"]["requested"] == "read"
-    query = _latest(listed, actor="a.bello", action="query", resource="conversations")
+    query = _latest(listed, actor="a.bello", action="query", resource="conversation")
     assert query is not None and query["payload"]["rows"] >= 1
     assert decide["seq"] < query["seq"]
 
@@ -503,7 +503,7 @@ def test_conversation_reads_are_audited(client, ingested: dict[str, int], models
     decide = _latest(
         detail, actor="a.bello", action="decide", resource="conversation", decision="allow"
     )
-    turns = _latest(detail, actor="a.bello", action="query", resource="messages")
+    turns = _latest(detail, actor="a.bello", action="query", resource="message")
     assert decide is not None and turns is not None
     assert decide["payload"]["requested"] == "read"
     assert turns["payload"]["rows"] == 2

@@ -81,7 +81,7 @@ def test_allowed_data_request_records_decide_then_query(client) -> None:
     decide = _latest(
         events, actor="a.bello", action="decide", resource="document", decision="allow"
     )
-    query = _latest(events, actor="a.bello", action="query", resource="documents")
+    query = _latest(events, actor="a.bello", action="query", resource="document")
     assert decide is not None and query is not None
     assert decide["payload"]["requested"] == "read"
     assert query["payload"]["rows"] == len(response.json())

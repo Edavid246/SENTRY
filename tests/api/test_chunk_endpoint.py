@@ -71,7 +71,7 @@ def test_passage_above_the_callers_clearance_is_404_not_403(client) -> None:
     decide = _latest(events, actor="t.adeyemi", action="decide", resource="chunk", decision="allow")
     assert decide is not None
     assert decide["payload"]["requested"] == "read"
-    rows = _latest(events, actor="t.adeyemi", action="query", resource="chunks")
+    rows = _latest(events, actor="t.adeyemi", action="query", resource="chunk")
     assert rows is not None
     assert rows["payload"]["rows"] == 0
 
@@ -87,7 +87,7 @@ def test_caller_without_data_scope_is_denied_before_any_row_read(client) -> None
     reasons = decide["payload"]["reasons"]
     assert "data_scope 'none' does not permit data actions" in reasons
     assert any("not granted by role 'sysadmin'" in reason for reason in reasons)
-    assert _latest(events, actor="s.eze", action="query", resource="chunks") is None
+    assert _latest(events, actor="s.eze", action="query", resource="chunk") is None
 
 
 def test_a_caller_missing_the_compartment_gets_404(client) -> None:
@@ -126,7 +126,7 @@ def test_viewer_reads_are_audited(client) -> None:
     decide = _latest(events, actor="a.bello", action="decide", resource="chunk", decision="allow")
     assert decide is not None
     assert decide["payload"]["requested"] == "read"
-    rows = _latest(events, actor="a.bello", action="query", resource="chunks")
+    rows = _latest(events, actor="a.bello", action="query", resource="chunk")
     assert rows is not None
     assert rows["payload"]["rows"] == 1
     assert decide["seq"] < rows["seq"]
