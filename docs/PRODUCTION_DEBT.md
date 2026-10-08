@@ -311,6 +311,18 @@ end-of-step report. Never silently log it.
   thresholds under change control, finding lifecycle (acknowledge, dismiss, history), and
   the findings table's UPDATE grant narrowed to the worker role.
 
+### 2026-10-08 — Correlation: finding keys are per unit, not per label
+- **Issue:** a finding's key is `FND-<ANALYSIS>-<UNIT>`, so runners with different
+  clearances produce the same key for the same unit. When the key already belongs to a
+  finding the runner cannot see, `save_findings` now stores nothing (no error, so no
+  500-vs-200 oracle; audited as `stored: false`). The runner's own lower-level view of
+  that unit is then lost, and a runner who expected a finding from their draft and finds
+  it missing from the response can still infer a hidden one exists.
+- **Why acceptable:** only one demo user (`a.bello`) holds `run_correlation`, so no
+  second, differently cleared runner exists in the demo.
+- **Production needs:** findings keyed by (analysis, unit, label), so each clearance tier
+  keeps its own finding, or a single worker identity running at a fixed label (see above).
+
 ### 2026-10-07 — Dashboard placeholders and a second copy of the visibility rule
 - **Issue:** the readiness dashboard tile is a hard-coded fixture, not
   module data, and they are authorized by `LocalPolicy.item_visible`, a Python re-statement of the SQL row filter

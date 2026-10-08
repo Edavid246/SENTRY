@@ -28,45 +28,60 @@ class FindingRow:
     created_at: datetime
 
 
-def save_findings(scope: Scope, drafts: list[FindingDraft]) -> None:
-    """Insert or update by key. RLS WITH CHECK refuses anything above the runner's label.
+def save_findings(scope: Scope, drafts: list[FindingDraft]) -> list[str]:
+    """Insert, or update a stored finding the runner may see; returns the keys written.
 
-    The scope commits after its audit batch is written.
+    RLS WITH CHECK refuses anything above the runner's label. A key already held by
+    a finding the runner may NOT see is left untouched and nothing is stored for it:
+    a single upsert would hit the UPDATE USING policy and raise, and that error would
+    tell the runner a hidden finding exists. The scope commits after its audit batch.
     """
     conn = scope.conn
+    row_filter = scope.filter("finding")
+    stored: list[str] = []
     for draft in drafts:
         unit_id = conn.execute(
             text("SELECT id FROM units WHERE path = :path"), {"path": draft.unit_path}
         ).scalar_one()
-        conn.execute(
+        values = {
+            "key": draft.key,
+            "title": draft.title,
+            "summary": draft.summary,
+            "severity": draft.severity,
+            "classification": draft.classification_code,
+            "new_compartments": draft.compartments,
+            "unit_id": unit_id,
+            "evidence": json.dumps(draft.evidence_ids),
+            "details": json.dumps(draft.details),
+        }
+        written = conn.execute(
             text(
                 "INSERT INTO findings (id, key, analysis, title, summary, severity,"
                 " classification_code, compartments, unit_id, evidence_ids, details, created_by)"
                 " VALUES (gen_random_uuid(), :key, :analysis, :title, :summary, :severity,"
-                " :classification, :compartments, :unit_id,"
+                " :classification, :new_compartments, :unit_id,"
                 " CAST(:evidence AS jsonb), CAST(:details AS jsonb), :created_by)"
-                " ON CONFLICT (key) DO UPDATE SET title = EXCLUDED.title,"
-                " summary = EXCLUDED.summary, severity = EXCLUDED.severity,"
-                " classification_code = EXCLUDED.classification_code,"
-                " compartments = EXCLUDED.compartments, unit_id = EXCLUDED.unit_id,"
-                " evidence_ids = EXCLUDED.evidence_ids, details = EXCLUDED.details,"
-                " updated_at = now()"
+                " ON CONFLICT (key) DO NOTHING RETURNING key"
             ),
-            {
-                "key": draft.key,
-                "analysis": draft.analysis,
-                "title": draft.title,
-                "summary": draft.summary,
-                "severity": draft.severity,
-                "classification": draft.classification_code,
-                "compartments": draft.compartments,
-                "unit_id": unit_id,
-                "evidence": json.dumps(draft.evidence_ids),
-                "details": json.dumps(draft.details),
-                "created_by": scope.ctx.user_id,
-            },
-        )
+            {**values, "analysis": draft.analysis, "created_by": scope.ctx.user_id},
+        ).scalar_one_or_none()
+        if written is None:
+            # The key exists: update it only if it is visible (filter + RLS USING).
+            written = conn.execute(
+                text(
+                    "UPDATE findings SET title = :title, summary = :summary,"
+                    " severity = :severity, classification_code = :classification,"
+                    " compartments = :new_compartments, unit_id = :unit_id,"
+                    " evidence_ids = CAST(:evidence AS jsonb),"
+                    " details = CAST(:details AS jsonb), updated_at = now()"
+                    f" WHERE findings.key = :key AND {row_filter.where_sql} RETURNING key"
+                ),
+                {**values, **row_filter.params},
+            ).scalar_one_or_none()
+        if written is not None:
+            stored.append(draft.key)
     scope.commit()
+    return stored
 
 
 def list_findings(scope: Scope, key: str | None = None) -> list[FindingRow]:

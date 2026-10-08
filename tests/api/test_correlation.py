@@ -151,6 +151,7 @@ def test_run_and_reads_are_audited(client) -> None:
     run = _latest(events, actor="a.bello", action="correlation_run")
     assert run["payload"]["findings"][0]["classification"] == "secret"
     assert "REC-036" in run["payload"]["findings"][0]["evidence"]
+    assert run["payload"]["findings"][0]["stored"] is True
     deny = _latest(events, actor="t.adeyemi", action="decide", resource="finding")
     assert deny["payload"]["decision"] == "deny"
     read = _latest(events, actor="a.bello", action="query", resource="finding")
@@ -179,6 +180,45 @@ def test_rls_refuses_a_finding_above_the_runners_label(app_engine, client) -> No
     )
     with pytest.raises(DBAPIError), scoped(app_engine, ctx) as scope:
         save_findings(scope, [draft])
+
+
+def test_a_key_held_by_a_hidden_finding_stores_nothing_and_raises_nothing(
+    app_engine, owner_engine, client
+) -> None:
+    """A lower-cleared runner whose draft has the key of a Secret finding it cannot see:
+    no error (which would confirm the hidden finding exists) and the Secret row is
+    left exactly as it was."""
+    from app.correlation.store import save_findings
+    from app.correlation.types import FindingDraft
+    from scoped import scoped
+    from sqlalchemy import text
+
+    _run(client)  # a.bello stores FINDING as Secret
+
+    def stored_row():
+        with owner_engine.connect() as conn:
+            return conn.execute(
+                text("SELECT * FROM findings WHERE key = :key"), {"key": FINDING}
+            ).one()
+
+    before = stored_row()
+    assert before.classification_code == "secret"
+    ctx = _ctx(client, app_engine, "t.adeyemi")  # clearance 1, unit Bn 4
+    draft = FindingDraft(
+        key=FINDING,
+        analysis="rising_faults",
+        title="overwrite attempt",
+        summary="s",
+        severity="low",
+        classification_code="restricted",
+        compartments=[],
+        unit_path="/command-a/bde-2/bn-4/",
+        evidence_ids=[],
+        details={},
+    )
+    with scoped(app_engine, ctx) as scope:
+        assert save_findings(scope, [draft]) == []
+    assert stored_row() == before
 
 
 def test_run_audits_the_decision_before_its_tool_queries_and_commits_after(client) -> None:

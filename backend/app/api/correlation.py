@@ -69,7 +69,7 @@ def run_correlation(ctx: CurrentContext, conn: ConnDep) -> RunResult:
     with guarded(ctx, conn, "run_correlation", "finding") as scope:
         names = unit_names(conn)
         drafts = run_rising_faults(scope, Labels.load(conn), names)
-        save_findings(scope, drafts)  # committed once the audit batch is written
+        stored = set(save_findings(scope, drafts))  # committed once the audit batch is written
         rows = list_findings(scope)
         scope.record(
             event(
@@ -84,6 +84,8 @@ def run_correlation(ctx: CurrentContext, conn: ConnDep) -> RunResult:
                         "classification": d.classification_code,
                         "compartments": d.compartments,
                         "evidence": d.evidence_ids,
+                        # False: the key belongs to a finding above the runner's label
+                        "stored": d.key in stored,
                     }
                     for d in drafts
                 ],
