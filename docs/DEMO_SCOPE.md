@@ -123,6 +123,35 @@ uv run python scripts/prefill_cache.py --verify   # cache-only check
 > Monday. Evidence is sorted by chunk id in the prompt so ranking noise cannot change
 > a key, but only a run in the demo configuration proves it.
 
+## Demo-day checklist
+
+Run from the repo root, in this order, with `DEMO_DATE=2026-10-07` set in `.env`.
+
+1. **Database up:** `docker compose -f infra/compose.yaml up -d db` (Postgres on :5434).
+2. **Schema first:** `cd backend && uv run alembic upgrade head && cd ..`. The seed and
+   the API expect the latest migration.
+3. **Reseed:** `set -a && . ./.env && set +a; uv run python -m app.seed`.
+4. **Ingest documents:** `uv run python scripts/ingest_documents.py`. Chunk ids are stable,
+   so this does not move the cache keys.
+5. **Audit ledger:** on this machine the git ledger lives at
+   `C:\Users\PC\projects\gateway-audit-ledger` (the `audit_ledger_path` default). On a new
+   machine, initialise it once with `scripts/setup_audit_ledger.sh <path>` and set
+   `AUDIT_LEDGER_PATH` if the path differs.
+6. **Start the API:** `uv run uvicorn app.main:app --port 8001` (on Windows without uv on
+   PATH: `.venv/Scripts/python.exe -m uvicorn app.main:app --port 8001 --app-dir backend`).
+   Then `cd web && npm run dev` for the UI on :3000.
+7. **Run correlation as `a.bello`:** the reseed clears findings, so click "Run correlation"
+   on the dashboard (or `POST /api/v1/correlation/run`) before the demo. Check that
+   `FND-RISING-FAULTS-BN-4` appears and is labelled Secret.
+8. **Cache prefill (needs the Gemini key):** `uv run python scripts/prefill_cache.py`, then
+   `--verify` until every row passes. Re-run it after any change to prompts, seed data,
+   documents or tools (see above).
+9. **Demo configuration:** restart the API with `LLM_CACHE_ONLY=1` and click through each
+   scripted question once, each as the first message of a new chat, as the user who
+   asks it in the script.
+10. **Audit check:** open the audit viewer and run verify. Expect `valid`, `checkpoint_ok`
+    and `ledger_ok` all true.
+
 ## Cut entirely (AGENTS.md DEMO CUT)
 
 Workflows, OCR, reranker, observability, Kubernetes, air-gapped deployment
