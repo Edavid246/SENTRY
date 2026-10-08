@@ -1,7 +1,7 @@
 """Demo reference adapter: the only code that reads canonical_records.
 
 It stands in for the client's logistics / personnel systems (SPEC 11.4). Every
-read applies LocalPolicy.row_filter(ctx, "record") inside the SQL, together
+read applies the policy row_filter(ctx, "record") inside the SQL, together
 with the Postgres RLS context, which the adapter sets itself so it cannot be
 called without one. Read-only: no statement here writes.
 """
@@ -15,12 +15,10 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from app.authz.context import AccessContext
-from app.authz.policy import LocalPolicy
+from app.authz.policy import get_policy
 from app.clock import UTC_TS_FORMAT, demo_now
 from app.connectors.base import AdapterDescription, RecordFilter, SourceRecord
-from app.db import get_engine, set_rls_context_for
-
-POLICY = LocalPolicy()
+from app.db import set_rls_context_for
 
 # Record fields a search may compare as an ISO date. The name is a bound
 # parameter, never interpolated; the allow-list keeps the surface explicit.
@@ -77,7 +75,7 @@ class DemoReferenceAdapter:
         self, conn: Connection, ctx: AccessContext, record_filter: RecordFilter
     ) -> list[SourceRecord]:
         set_rls_context_for(conn, ctx)
-        row_filter = POLICY.row_filter(ctx, "record")
+        row_filter = get_policy().row_filter(ctx, "record")
         clauses = [row_filter.where_sql, "canonical_records.entity_type = :entity_type"]
         params: dict[str, object] = {**row_filter.params, "entity_type": record_filter.entity_type}
         if record_filter.unit_path is not None:
@@ -113,7 +111,7 @@ class DemoReferenceAdapter:
 
     def get(self, conn: Connection, ctx: AccessContext, source_ref: str) -> SourceRecord | None:
         set_rls_context_for(conn, ctx)
-        row_filter = POLICY.row_filter(ctx, "record")
+        row_filter = get_policy().row_filter(ctx, "record")
         row = (
             conn.execute(
                 text(
@@ -128,7 +126,9 @@ class DemoReferenceAdapter:
         )
         return None if row is None else _record(row)
 
-    def stream(self, ctx: AccessContext, since: datetime) -> Iterator[SourceRecord]:
+    def stream(
+        self, conn: Connection, ctx: AccessContext, since: datetime
+    ) -> Iterator[SourceRecord]:
         """STUB live feed (docs/STUBS.md): replay the seeded detections in time order.
 
         Yields the Detection records the caller may see (same policy row filter + RLS as
@@ -137,8 +137,7 @@ class DemoReferenceAdapter:
         """
         cutoff = since.astimezone(UTC).strftime(UTC_TS_FORMAT)
         end = demo_now().strftime(UTC_TS_FORMAT)
-        with get_engine().connect() as conn:
-            records = self.search(conn, ctx, RecordFilter(entity_type="Detection"))
+        records = self.search(conn, ctx, RecordFilter(entity_type="Detection"))
         fresh = [r for r in records if cutoff < str(r.data["observed_at"]) <= end]
         yield from sorted(fresh, key=lambda r: (r.data["observed_at"], r.source_ref))
 

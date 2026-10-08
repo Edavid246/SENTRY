@@ -7,8 +7,8 @@ requests into calls and outcomes into responses: AssistantForbidden -> 403,
 ConversationNotFound -> 404, ModelUnavailable -> 503.
 
 Conversation reads (GET /conversations, GET /conversations/{id}) resolve the
-caller's own threads only, under the same decide + row filter + RLS order,
-and are audited like every other read. Citations for a stored turn are
+caller's own threads only, as guarded reads (app.api.guard): decide, then
+row filter + RLS inside the query, audited on the way out. Citations for a stored turn are
 resolved from its inline citation markers, chunk by chunk, through the chunk
 row filter — a passage that is no longer visible simply drops out.
 """
@@ -22,23 +22,15 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from app.api.deps import (
-    ConnDep,
-    CurrentContext,
-    ModelsDep,
-    audit_events,
-    decide_event,
-    query_event,
-)
+from app.api.deps import ConnDep, CurrentContext, ModelsDep
+from app.api.guard import guarded
 from app.assistant.conversations import ConversationNotFound
 from app.assistant.service import AssistantForbidden, ModelUnavailable, answer
-from app.authz.context import AccessContext
-from app.authz.policy import LocalPolicy
-from app.db import format_array, set_rls_context_for
+from app.authz.policy import RowFilter
+from app.db import format_array
 from app.knowledge.answer import parse_cited_chunk_ids
 from app.knowledge.retrieve import RetrievedChunk
 
-POLICY = LocalPolicy()
 router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
 
 MAX_QUESTION_CHARS = 2000
@@ -173,7 +165,7 @@ def _citation_from_row(row) -> CitationOut:
     )
 
 
-def _visible_citations(conn, ctx: AccessContext, chunk_ids: list[str]) -> dict[str, CitationOut]:
+def _visible_citations(conn, row_filter: RowFilter, chunk_ids: list[str]) -> dict[str, CitationOut]:
     """Resolve stored citation markers to the chunks the caller may still see.
 
     Same policy row filter as retrieval: a passage whose classification,
@@ -181,7 +173,6 @@ def _visible_citations(conn, ctx: AccessContext, chunk_ids: list[str]) -> dict[s
     """
     if not chunk_ids:
         return {}
-    chunk_filter = POLICY.row_filter(ctx, "chunk")
     rows = (
         conn.execute(
             text(
@@ -190,14 +181,28 @@ def _visible_citations(conn, ctx: AccessContext, chunk_ids: list[str]) -> dict[s
                 " FROM chunks"
                 " JOIN documents ON documents.id = chunks.document_id"
                 " WHERE chunks.id::text = ANY(CAST(:ids AS text[]))"
-                f" AND {chunk_filter.where_sql}"
+                f" AND {row_filter.where_sql}"
             ),
-            {"ids": format_array(chunk_ids), **chunk_filter.params},
+            {"ids": format_array(chunk_ids), **row_filter.params},
         )
         .mappings()
         .all()
     )
     return {str(row["id"]): _citation_from_row(row) for row in rows}
+
+
+def _summary(row) -> ConversationSummary:
+    return ConversationSummary(
+        id=str(row["id"]),
+        title=str(row["title"]),
+        classification_code=str(row["classification_code"]),
+        compartments=[str(code) for code in (row["compartments"] or [])],
+        created_at=row["created_at"].isoformat(),
+        updated_at=row["updated_at"].isoformat(),
+    )
+
+
+_CONVERSATION_COLUMNS = "id, title, classification_code, compartments, created_at, updated_at"
 
 
 @router.get("/conversations", response_model=list[ConversationSummary])
@@ -211,44 +216,23 @@ def list_conversations(
     Another user's conversations are never in scope: the ownership predicate
     is part of the SQL, alongside the policy row filter and RLS.
     """
-    decision = POLICY.decide(ctx, "read", "conversation")
-    if not decision.allowed:
-        audit_events([decide_event(ctx, decision, resource="conversation", requested="read")])
-        raise HTTPException(status_code=403, detail="forbidden")
-    set_rls_context_for(conn, ctx)
-    row_filter = POLICY.row_filter(ctx, "conversation")
-    rows = (
-        conn.execute(
-            text(
-                "SELECT id, title, classification_code, compartments, created_at, updated_at"
-                " FROM conversations"
-                " WHERE user_id = :user_id"
-                f" AND {row_filter.where_sql}"
-                " ORDER BY updated_at DESC, id DESC LIMIT :limit"
-            ),
-            {"user_id": ctx.user_id, "limit": limit, **row_filter.params},
+    with guarded(ctx, conn, "read", "conversation") as scope:
+        row_filter = scope.filter("conversation")
+        rows = (
+            conn.execute(
+                text(
+                    f"SELECT {_CONVERSATION_COLUMNS} FROM conversations"
+                    " WHERE user_id = :user_id"
+                    f" AND {row_filter.where_sql}"
+                    " ORDER BY updated_at DESC, id DESC LIMIT :limit"
+                ),
+                {"user_id": ctx.user_id, "limit": limit, **row_filter.params},
+            )
+            .mappings()
+            .all()
         )
-        .mappings()
-        .all()
-    )
-    results = [
-        ConversationSummary(
-            id=str(row["id"]),
-            title=str(row["title"]),
-            classification_code=str(row["classification_code"]),
-            compartments=[str(code) for code in (row["compartments"] or [])],
-            created_at=row["created_at"].isoformat(),
-            updated_at=row["updated_at"].isoformat(),
-        )
-        for row in rows
-    ]
-    audit_events(
-        [
-            decide_event(ctx, decision, resource="conversation", requested="read"),
-            query_event(ctx, "conversations", len(results)),
-        ]
-    )
-    return results
+        scope.read("conversations", len(rows))
+    return [_summary(row) for row in rows]
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
@@ -261,54 +245,45 @@ def get_conversation(
     allowed to read — answers 404, exactly like the POST that appends to it,
     so an id can never be probed for existence.
     """
-    decision = POLICY.decide(ctx, "read", "conversation")
-    if not decision.allowed:
-        audit_events([decide_event(ctx, decision, resource="conversation", requested="read")])
-        raise HTTPException(status_code=404, detail="not found")
-    set_rls_context_for(conn, ctx)
-    conversation_filter = POLICY.row_filter(ctx, "conversation")
-    row = (
-        conn.execute(
-            text(
-                "SELECT id, title, classification_code, compartments, created_at, updated_at"
-                " FROM conversations"
-                " WHERE id = :id AND user_id = :user_id"
-                f" AND {conversation_filter.where_sql}"
-            ),
-            {"id": conversation_id, "user_id": ctx.user_id, **conversation_filter.params},
+    with guarded(ctx, conn, "read", "conversation", on_deny="not_found") as scope:
+        conversation_filter = scope.filter("conversation")
+        row = (
+            conn.execute(
+                text(
+                    f"SELECT {_CONVERSATION_COLUMNS} FROM conversations"
+                    " WHERE id = :id AND user_id = :user_id"
+                    f" AND {conversation_filter.where_sql}"
+                ),
+                {"id": conversation_id, "user_id": ctx.user_id, **conversation_filter.params},
+            )
+            .mappings()
+            .first()
         )
-        .mappings()
-        .first()
-    )
-    if row is None:
-        audit_events(
-            [
-                decide_event(ctx, decision, resource="conversation", requested="read"),
-                query_event(ctx, "conversations", 0),
-            ]
-        )
-        raise HTTPException(status_code=404, detail="not found")
+        if row is None:
+            scope.read("conversations", 0)
+            raise HTTPException(status_code=404, detail="not found")
 
-    message_filter = POLICY.row_filter(ctx, "message")
-    messages = (
-        conn.execute(
-            text(
-                "SELECT role, content, created_at FROM messages"
-                " WHERE conversation_id = :id"
-                f" AND {message_filter.where_sql}"
-                " ORDER BY created_at, CASE role WHEN 'user' THEN 0 ELSE 1 END, id"
-            ),
-            {"id": conversation_id, **message_filter.params},
+        message_filter = scope.filter("message")
+        messages = (
+            conn.execute(
+                text(
+                    "SELECT role, content, created_at FROM messages"
+                    " WHERE conversation_id = :id"
+                    f" AND {message_filter.where_sql}"
+                    " ORDER BY created_at, CASE role WHEN 'user' THEN 0 ELSE 1 END, id"
+                ),
+                {"id": conversation_id, **message_filter.params},
+            )
+            .mappings()
+            .all()
         )
-        .mappings()
-        .all()
-    )
+        scope.read("messages", len(messages))
 
-    wanted: list[str] = []
-    for message in messages:
-        if str(message["role"]) == "assistant":
-            wanted.extend(parse_cited_chunk_ids(str(message["content"])))
-    citations = _visible_citations(conn, ctx, list(dict.fromkeys(wanted)))
+        wanted: list[str] = []
+        for message in messages:
+            if str(message["role"]) == "assistant":
+                wanted.extend(parse_cited_chunk_ids(str(message["content"])))
+        citations = _visible_citations(conn, scope.filter("chunk"), list(dict.fromkeys(wanted)))
 
     turns = [
         TurnOut(
@@ -323,18 +298,4 @@ def get_conversation(
         )
         for message in messages
     ]
-    audit_events(
-        [
-            decide_event(ctx, decision, resource="conversation", requested="read"),
-            query_event(ctx, "messages", len(turns)),
-        ]
-    )
-    return ConversationDetail(
-        id=str(row["id"]),
-        title=str(row["title"]),
-        classification_code=str(row["classification_code"]),
-        compartments=[str(code) for code in (row["compartments"] or [])],
-        created_at=row["created_at"].isoformat(),
-        updated_at=row["updated_at"].isoformat(),
-        turns=turns,
-    )
+    return ConversationDetail(**_summary(row).model_dump(), turns=turns)

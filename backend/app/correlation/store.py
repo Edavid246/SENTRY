@@ -10,11 +10,9 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from app.authz.context import AccessContext
-from app.authz.policy import LocalPolicy
+from app.authz.policy import get_policy
 from app.correlation.types import FindingDraft
 from app.db import set_rls_context_for
-
-POLICY = LocalPolicy()
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,7 +70,7 @@ def save_findings(conn: Connection, ctx: AccessContext, drafts: list[FindingDraf
 def list_findings(conn: Connection, ctx: AccessContext, key: str | None = None) -> list[FindingRow]:
     """The findings this caller may see; the row filter is inside the query."""
     set_rls_context_for(conn, ctx)
-    row_filter = POLICY.row_filter(ctx, "finding")
+    row_filter = get_policy().row_filter(ctx, "finding")
     where = row_filter.where_sql
     params: dict[str, Any] = dict(row_filter.params)
     if key is not None:

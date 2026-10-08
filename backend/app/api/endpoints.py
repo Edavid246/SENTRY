@@ -3,17 +3,14 @@
 Everything is mounted under /api/v1 (one route convention; no root-level
 aliases) so the Next.js UI can proxy /api/* to this service same-origin.
 
-Authorization order is fixed: LocalPolicy.decide first (may this action run
-at all?), then set_rls_context + LocalPolicy.row_filter together inside one
-transaction (which rows?). The detail route returns 404 for anything not
-visible — including callers whose action was denied — so a probe can never
-distinguish a restricted document from a non-existent one.
-
-Audit wiring (SPEC 14): one decide event for every request that consults the
-policy (allow or deny, written before the response or status raise), plus a
-query event carrying the row count when rows were actually read. Login
-attempts are audited as single login events. The SELECT inside GET /audit is
-itself not audited — the viewer's own read would otherwise recurse.
+Every classified read runs inside `guarded` (app.api.guard): the policy
+decides first, then the policy row filter and RLS apply together inside the
+query, and the decide event plus a query event with the row count are audited
+on the way out. The detail routes answer 404 for anything not visible —
+including callers whose action was denied — so a probe can never distinguish
+a restricted document from a non-existent one. Login attempts are audited as
+single login events. The SELECT inside GET /audit is itself not audited — the
+viewer's own read would otherwise recurse.
 """
 
 from typing import Annotated, Any
@@ -25,14 +22,14 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
+from app.api.deps import ConnDep, CurrentContext
+from app.api.guard import guarded
 from app.audit.chain import recent_events, utc_now_iso, verify_report
-from app.authz.policy import LocalPolicy
+from app.audit.events import audit_events
 from app.authz.tokens import DevTokenValidator
 from app.connectors.demo import DemoReferenceAdapter
-from app.db import get_engine, set_rls_context_for
+from app.db import get_engine
 
-POLICY = LocalPolicy()
 _HASHER = PasswordHasher()
 # Same generic 401 for unknown user and wrong password; a dummy verify keeps
 # the two paths close in timing so the message is not the only protection.
@@ -130,51 +127,33 @@ def me(ctx: CurrentContext, conn: ConnDep) -> dict[str, Any]:
 
 @router.get("/documents", tags=["data"])
 def list_documents(ctx: CurrentContext, conn: ConnDep) -> list[dict[str, str | None]]:
-    decision = POLICY.decide(ctx, "read", "document")
-    if not decision.allowed:
-        audit_events([decide_event(ctx, decision, resource="document", requested="read")])
-        raise HTTPException(status_code=403, detail="forbidden")
-    set_rls_context_for(conn, ctx)
-    row_filter = POLICY.row_filter(ctx, "document")
-    rows = conn.execute(
-        text(
-            "SELECT source_ref, title, classification_code FROM documents"
-            f" WHERE {row_filter.where_sql} ORDER BY source_ref"
-        ),
-        row_filter.params,
-    ).mappings()
-    results = [dict(row) for row in rows]
-    audit_events(
-        [
-            decide_event(ctx, decision, resource="document", requested="read"),
-            query_event(ctx, "documents", len(results)),
-        ]
-    )
+    with guarded(ctx, conn, "read", "document") as scope:
+        row_filter = scope.filter("document")
+        rows = conn.execute(
+            text(
+                "SELECT source_ref, title, classification_code FROM documents"
+                f" WHERE {row_filter.where_sql} ORDER BY source_ref"
+            ),
+            row_filter.params,
+        ).mappings()
+        results = [dict(row) for row in rows]
+        scope.read("documents", len(results))
     return results
 
 
 @router.get("/records", tags=["data"])
 def list_records(ctx: CurrentContext, conn: ConnDep) -> list[dict[str, str]]:
-    decision = POLICY.decide(ctx, "retrieve", "record")
-    if not decision.allowed:
-        audit_events([decide_event(ctx, decision, resource="record", requested="retrieve")])
-        raise HTTPException(status_code=403, detail="forbidden")
-    set_rls_context_for(conn, ctx)
-    row_filter = POLICY.row_filter(ctx, "record")
-    rows = conn.execute(
-        text(
-            "SELECT source_ref, entity_type, classification_code FROM canonical_records"
-            f" WHERE {row_filter.where_sql} ORDER BY source_ref"
-        ),
-        row_filter.params,
-    ).mappings()
-    results = [dict(row) for row in rows]
-    audit_events(
-        [
-            decide_event(ctx, decision, resource="record", requested="retrieve"),
-            query_event(ctx, "canonical_records", len(results)),
-        ]
-    )
+    with guarded(ctx, conn, "retrieve", "record") as scope:
+        row_filter = scope.filter("record")
+        rows = conn.execute(
+            text(
+                "SELECT source_ref, entity_type, classification_code FROM canonical_records"
+                f" WHERE {row_filter.where_sql} ORDER BY source_ref"
+            ),
+            row_filter.params,
+        ).mappings()
+        results = [dict(row) for row in rows]
+        scope.read("canonical_records", len(results))
     return results
 
 
@@ -192,17 +171,9 @@ class RecordDetail(BaseModel):
 @router.get("/records/{source_ref}", tags=["data"], response_model=RecordDetail)
 def get_record(source_ref: str, ctx: CurrentContext, conn: ConnDep) -> RecordDetail:
     """One record, through the adapter (policy row filter + RLS). 404 when not visible."""
-    decision = POLICY.decide(ctx, "retrieve", "record")
-    if not decision.allowed:
-        audit_events([decide_event(ctx, decision, resource="record", requested="retrieve")])
-        raise HTTPException(status_code=404, detail="not found")
-    record = DemoReferenceAdapter().get(conn, ctx, source_ref)
-    audit_events(
-        [
-            decide_event(ctx, decision, resource="record", requested="retrieve"),
-            query_event(ctx, "canonical_records", 0 if record is None else 1),
-        ]
-    )
+    with guarded(ctx, conn, "retrieve", "record", on_deny="not_found") as scope:
+        record = DemoReferenceAdapter().get(conn, ctx, source_ref)
+        scope.read("canonical_records", 0 if record is None else 1)
     if record is None:
         raise HTTPException(status_code=404, detail="not found")
     return RecordDetail(
@@ -221,29 +192,20 @@ def get_record(source_ref: str, ctx: CurrentContext, conn: ConnDep) -> RecordDet
 def get_document(source_ref: str, ctx: CurrentContext, conn: ConnDep) -> dict[str, str]:
     # 404 — not 403 — whenever the row is not visible, including a denied
     # action: never confirm that a restricted document exists.
-    decision = POLICY.decide(ctx, "read", "document")
-    if not decision.allowed:
-        audit_events([decide_event(ctx, decision, resource="document", requested="read")])
-        raise HTTPException(status_code=404, detail="not found")
-    set_rls_context_for(conn, ctx)
-    row_filter = POLICY.row_filter(ctx, "document")
-    row = (
-        conn.execute(
-            text(
-                "SELECT source_ref, title, classification_code FROM documents"
-                f" WHERE source_ref = :source_ref AND {row_filter.where_sql}"
-            ),
-            {"source_ref": source_ref, **row_filter.params},
+    with guarded(ctx, conn, "read", "document", on_deny="not_found") as scope:
+        row_filter = scope.filter("document")
+        row = (
+            conn.execute(
+                text(
+                    "SELECT source_ref, title, classification_code FROM documents"
+                    f" WHERE source_ref = :source_ref AND {row_filter.where_sql}"
+                ),
+                {"source_ref": source_ref, **row_filter.params},
+            )
+            .mappings()
+            .first()
         )
-        .mappings()
-        .first()
-    )
-    audit_events(
-        [
-            decide_event(ctx, decision, resource="document", requested="read"),
-            query_event(ctx, "documents", 0 if row is None else 1),
-        ]
-    )
+        scope.read("documents", 0 if row is None else 1)
     if row is None:
         raise HTTPException(status_code=404, detail="not found")
     return dict(row)
@@ -262,47 +224,9 @@ def get_document_chunk(
     accepts the user-facing source_ref a citation carries, or the document's
     internal uuid.
     """
-    decision = POLICY.decide(ctx, "read", "chunk")
-    if not decision.allowed:
-        audit_events([decide_event(ctx, decision, resource="chunk", requested="read")])
-        raise HTTPException(status_code=404, detail="not found")
-    set_rls_context_for(conn, ctx)
-    row_filter = POLICY.row_filter(ctx, "chunk")
-    try:
-        chunk_key = str(UUID(chunk_id))
-    except ValueError:
-        chunk_key = None
-    document_where = "documents.source_ref = :document_id"
-    document_value = document_id
-    try:
-        document_value = str(UUID(document_id))
-        document_where = "documents.id = :document_id"
-    except ValueError:
-        pass
-    row = None
-    if chunk_key is not None:
-        row = (
-            conn.execute(
-                text(
-                    "SELECT chunks.id AS chunk_id, documents.id AS document_id,"
-                    " documents.source_ref, documents.title, chunks.text, chunks.page,"
-                    " chunks.section, chunks.classification_code, chunks.compartments"
-                    " FROM chunks"
-                    " JOIN documents ON documents.id = chunks.document_id"
-                    f" WHERE chunks.id = :chunk_id AND {document_where}"
-                    f" AND {row_filter.where_sql}"
-                ),
-                {"chunk_id": chunk_key, "document_id": document_value, **row_filter.params},
-            )
-            .mappings()
-            .first()
-        )
-    audit_events(
-        [
-            decide_event(ctx, decision, resource="chunk", requested="read"),
-            query_event(ctx, "chunks", 0 if row is None else 1),
-        ]
-    )
+    with guarded(ctx, conn, "read", "chunk", on_deny="not_found") as scope:
+        row = _visible_chunk(conn, scope.filter("chunk"), document_id, chunk_id)
+        scope.read("chunks", 0 if row is None else 1)
     if row is None:
         raise HTTPException(status_code=404, detail="not found")
     return {
@@ -318,6 +242,39 @@ def get_document_chunk(
     }
 
 
+def _visible_chunk(conn, row_filter, document_id: str, chunk_id: str):
+    """The chunk, if visible under `row_filter`; None for a malformed id or no match."""
+    try:
+        chunk_key = str(UUID(chunk_id))
+    except ValueError:
+        chunk_key = None
+    document_where = "documents.source_ref = :document_id"
+    document_value = document_id
+    try:
+        document_value = str(UUID(document_id))
+        document_where = "documents.id = :document_id"
+    except ValueError:
+        pass
+    if chunk_key is None:
+        return None
+    return (
+        conn.execute(
+            text(
+                "SELECT chunks.id AS chunk_id, documents.id AS document_id,"
+                " documents.source_ref, documents.title, chunks.text, chunks.page,"
+                " chunks.section, chunks.classification_code, chunks.compartments"
+                " FROM chunks"
+                " JOIN documents ON documents.id = chunks.document_id"
+                f" WHERE chunks.id = :chunk_id AND {document_where}"
+                f" AND {row_filter.where_sql}"
+            ),
+            {"chunk_id": chunk_key, "document_id": document_value, **row_filter.params},
+        )
+        .mappings()
+        .first()
+    )
+
+
 @router.get("/audit", tags=["audit"])
 def list_audit(
     ctx: CurrentContext,
@@ -330,20 +287,16 @@ def list_audit(
     Every item carries `event_id`, so an answer's audit_event_id deep-links
     here with `?event_id=`.
     """
-    decision = POLICY.decide(ctx, "read_audit", "audit")
-    audit_events([decide_event(ctx, decision, resource="audit", requested="read_audit")])
-    if not decision.allowed:
-        raise HTTPException(status_code=403, detail="forbidden")
     # The viewer's own SELECT is not audited (no recursion); the decide event
-    # above already records that the read happened.
+    # already records that the read happened.
+    with guarded(ctx, None, "read_audit", "audit"):
+        pass
     return recent_events(get_engine(), limit, event_id=event_id)
 
 
 @router.get("/audit/verify", tags=["audit"])
 def audit_verify(ctx: CurrentContext) -> dict[str, Any]:
     """Chain verification plus both tamper-evidence layers (SPEC 14.2)."""
-    decision = POLICY.decide(ctx, "read_audit", "audit")
-    audit_events([decide_event(ctx, decision, resource="audit", requested="read_audit")])
-    if not decision.allowed:
-        raise HTTPException(status_code=403, detail="forbidden")
+    with guarded(ctx, None, "read_audit", "audit"):
+        pass
     return verify_report(get_engine())

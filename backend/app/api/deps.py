@@ -5,21 +5,20 @@ identity tables through it first, then the endpoint sets the RLS context in
 the same transaction and runs its query — authorization before retrieval
 (AGENTS.md Principle Zero), never the other way around.
 
-`audit_events` is the single wiring point from HTTP into the hash-chained
-audit log (SPEC 14): endpoints batch their events through it, and a token
-that fails validation is audited here before the generic 401.
+A token that fails validation is audited here (app.audit.events) before the
+generic 401.
 """
 
 from collections.abc import Iterator
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException
 from sqlalchemy.engine import Connection
 
 from app.ai_gateway.port import ModelPort
-from app.audit.chain import append_events, utc_now_iso
+from app.audit.chain import utc_now_iso
+from app.audit.events import audit_events
 from app.authz.context import AccessContext
-from app.authz.policy import Decision
 from app.authz.tokens import DevTokenValidator, TokenError
 from app.db import get_engine
 
@@ -42,47 +41,6 @@ def get_models() -> ModelPort:
 
 
 ModelsDep = Annotated[ModelPort, Depends(get_models)]
-
-
-def audit_events(payloads: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Append a batch of audit events; failure is blocking (500, no data served).
-
-    Returns the stored rows (seq/event_id/... in insertion order) so callers
-    that need to surface an audit id (the assistant answer event) can do so.
-    """
-    if not payloads:
-        return []
-    return append_events(get_engine(), payloads)
-
-
-def decide_event(
-    ctx: AccessContext, decision: Decision, *, resource: str, requested: str
-) -> dict[str, Any]:
-    """Audit payload for a policy decision (allow or deny)."""
-    payload: dict[str, Any] = {
-        "actor": ctx.username,
-        "action": "decide",
-        "resource": resource,
-        "requested": requested,
-        "decision": "allow" if decision.allowed else "deny",
-        "timestamp": utc_now_iso(),
-    }
-    if not decision.allowed:
-        payload["reasons"] = list(decision.reasons)
-    return payload
-
-
-def query_event(ctx: AccessContext, resource: str, rows: int, **extra: Any) -> dict[str, Any]:
-    """Audit payload for rows actually read; `extra` carries ids (record_ids, item_ids)."""
-    return {
-        "actor": ctx.username,
-        "action": "query",
-        "resource": resource,
-        "decision": "allow",
-        "rows": int(rows),
-        **extra,
-        "timestamp": utc_now_iso(),
-    }
 
 
 def _unauthenticated() -> HTTPException:

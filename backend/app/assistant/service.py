@@ -39,22 +39,20 @@ from sqlalchemy.engine import Connection
 
 from app.ai_gateway.base import ChatMessage, ProviderError, ProviderNotConfiguredError
 from app.ai_gateway.port import ModelPort
-from app.api.deps import audit_events, decide_event
 from app.assistant.conversations import load_history, open_conversation, store_turn
 from app.audit.chain import utc_now_iso
+from app.audit.events import audit_events, decide_event
 from app.authz.context import AccessContext
 from app.authz.labels import Labelled, Labels
-from app.authz.policy import Decision, LocalPolicy
+from app.authz.policy import Decision, get_policy
 from app.data_queries.explain import explain_result
 from app.data_queries.registry import execute_tool
 from app.data_queries.routing import RoutedReport, RoutedTool, route_question, route_report
 from app.data_queries.tools import ToolResult
-from app.db import set_rls_context_for
 from app.knowledge.answer import generate_answer
 from app.knowledge.retrieve import RetrievedChunk, is_fts_only, retrieve_chunks
 from app.reporting.training import DOCUMENT_QUERY, DraftReport, generate_training_report
 
-POLICY = LocalPolicy()
 AUDIT_TEXT_LIMIT = 300
 
 # SPEC §8.3: requests to ignore permissions, reveal restricted sources or act
@@ -308,11 +306,12 @@ def answer(
 ) -> AnswerOutcome:
     """Answer one question for `ctx`; see the module docstring for the order."""
     pathway = _choose(question)
+    policy = get_policy()
     decisions: list[tuple[Decision, str, str]] = [
-        (POLICY.decide(ctx, "answer", "assistant"), "assistant", "answer")
+        (policy.decide(ctx, "answer", "assistant"), "assistant", "answer")
     ]
     if decisions[0][0].allowed:
-        decisions += [(POLICY.decide(ctx, a, r), r, a) for a, r in pathway.sources]
+        decisions += [(policy.decide(ctx, a, r), r, a) for a, r in pathway.sources]
     decision_events = [
         decide_event(ctx, decision, resource=resource, requested=action)
         for decision, resource, action in decisions
@@ -324,7 +323,6 @@ def answer(
     conv_id, new_conversation = open_conversation(conn, ctx, conversation_id)
     audit_events(decision_events)
 
-    set_rls_context_for(conn, ctx)
     turn = _Turn(ctx, conn, question, models, conv_id, new_conversation)
     try:
         produced = pathway.run(turn)

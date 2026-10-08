@@ -2,11 +2,11 @@
 
 Vector similarity (pgvector, exact search) fused with PostgreSQL full-text
 search by reciprocal rank fusion (RRF). The authorization filter is applied
-INSIDE the SQL query — bound parameters only, from the same LocalPolicy
+INSIDE the SQL query — bound parameters only, from the same policy
 row_filter the other endpoints use — so unauthorized chunks are never
 retrieved (Principle Zero: authorization before retrieval, enforced in the
-database, not by filtering results afterwards). The caller also sets the RLS
-context, so both layers agree; docs/PRODUCTION_DEBT.md records the RRF choice
+database, not by filtering results afterwards). It sets the caller's RLS
+context itself, so both layers always agree; docs/PRODUCTION_DEBT.md records the RRF choice
 over a neural reranker (reranker is DEMO CUT).
 
 A chunk is a candidate if it matches the full-text query OR its vector
@@ -23,10 +23,10 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from app.authz.context import AccessContext
-from app.authz.policy import LocalPolicy
+from app.authz.policy import get_policy
 from app.config import get_settings
+from app.db import set_rls_context_for
 
-POLICY = LocalPolicy()
 RRF_K = 60.0
 
 
@@ -88,7 +88,8 @@ def retrieve_chunks(
     limit = top_k if top_k is not None else settings.retrieval_top_k
     floor = min_similarity if min_similarity is not None else settings.retrieval_min_similarity
     vector = query_vector
-    row_filter = POLICY.row_filter(ctx, "chunk")
+    set_rls_context_for(conn, ctx)
+    row_filter = get_policy().row_filter(ctx, "chunk")
     params: dict[str, Any] = {
         **row_filter.params,
         "question": question,

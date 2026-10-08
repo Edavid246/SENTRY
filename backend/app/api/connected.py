@@ -14,14 +14,13 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
+from app.api.deps import ConnDep, CurrentContext
+from app.api.guard import guarded
 from app.audit.chain import utc_now_iso
-from app.authz.policy import LocalPolicy
 from app.clock import UTC_TS_FORMAT, demo_now, demo_today
 from app.connectors.base import RecordFilter, SourceRecord
 from app.connectors.demo import DemoReferenceAdapter
 
-POLICY = LocalPolicy()
 ADAPTER = DemoReferenceAdapter()
 
 router = APIRouter(prefix="/api/v1/connected", tags=["connected"])
@@ -72,6 +71,7 @@ def _parse_ts(value: str, name: str) -> datetime:
 @router.get("/replay")
 def connected_replay(
     ctx: CurrentContext,
+    conn: ConnDep,
     after: Annotated[str | None, Query()] = None,
     upto: Annotated[str | None, Query()] = None,
     hours: Annotated[int, Query(ge=1, le=720)] = 48,
@@ -81,41 +81,35 @@ def connected_replay(
     The synthetic detections are the "stream"; the client drives a replay clock and polls
     with `after` (the last observed_at it has) and `upto` (the clock). Stateless: the
     server holds no cursor. Stream and policy row filter + RLS come from the adapter, so
-    an event the caller may not see is never read. Only non-empty batches are audited,
-    with the ids delivered.
+    an event the caller may not see is never read. Every poll is audited (a decide event
+    and a query event with the ids delivered, possibly none).
     """
     now = demo_now()
     window_start = now - timedelta(hours=hours)
     since = _parse_ts(after, "after") if after else window_start - timedelta(seconds=1)
     limit = min(_parse_ts(upto, "upto"), now) if upto else now
-    decision = POLICY.decide(ctx, "retrieve", "record")
-    decision_event = decide_event(ctx, decision, resource="connected_replay", requested="retrieve")
     out: dict[str, Any] = {
         "window_start": window_start.strftime(UTC_TS_FORMAT),
         "window_end": now.strftime(UTC_TS_FORMAT),
         "events": [],
     }
-    if not decision.allowed:
-        audit_events([decision_event])
-        return out
-    events = [
-        r
-        for r in ADAPTER.stream(ctx, max(since, window_start - timedelta(seconds=1)))
-        if r.data["observed_at"] <= limit.strftime(UTC_TS_FORMAT)
-    ]
+    with guarded(
+        ctx,
+        conn,
+        "retrieve",
+        "record",
+        on_deny="empty",
+        audit_resource="connected_replay",
+    ) as scope:
+        if not scope.allowed:
+            return out
+        events = [
+            r
+            for r in ADAPTER.stream(conn, ctx, max(since, window_start - timedelta(seconds=1)))
+            if r.data["observed_at"] <= limit.strftime(UTC_TS_FORMAT)
+        ]
+        scope.read("connected_replay", len(events), record_ids=[r.source_ref for r in events])
     out["events"] = [_detection_feature(r) for r in events]
-    if events:
-        audit_events(
-            [
-                decision_event,
-                query_event(
-                    ctx,
-                    "connected_replay",
-                    len(events),
-                    record_ids=[r.source_ref for r in events],
-                ),
-            ]
-        )
     return out
 
 
@@ -127,13 +121,20 @@ def connected_map(
     mission_days: Annotated[int, Query(ge=1, le=365)] = 30,
 ) -> dict[str, Any]:
     """Sensors, recent detections and mission tracks the caller may see (never more)."""
-    decision = POLICY.decide(ctx, "retrieve", "record")
-    decision_event = decide_event(ctx, decision, resource="connected_map", requested="retrieve")
-    if not decision.allowed:
-        audit_events([decision_event])
-        # Roles without data access get an empty map, not a hint about what exists.
-        return {"type": "FeatureCollection", "features": [], "generated_at": utc_now_iso()}
+    with guarded(
+        ctx, conn, "retrieve", "record", on_deny="empty", audit_resource="connected_map"
+    ) as scope:
+        if not scope.allowed:
+            # Roles without data access get an empty map, not a hint about what exists.
+            return {"type": "FeatureCollection", "features": [], "generated_at": utc_now_iso()}
+        features, refs = _map_features(conn, ctx, hours, mission_days)
+        scope.read("connected_map", len(refs), record_ids=refs)
+    return {"type": "FeatureCollection", "features": features, "generated_at": utc_now_iso()}
 
+
+def _map_features(
+    conn, ctx, hours: int, mission_days: int
+) -> tuple[list[dict[str, Any]], list[str]]:
     now = demo_now()
     start = (now - timedelta(hours=hours)).strftime(UTC_TS_FORMAT)
     end = now.strftime(UTC_TS_FORMAT)
@@ -186,6 +187,4 @@ def connected_map(
             }
         )
         refs.append(msn.source_ref)
-
-    audit_events([decision_event, query_event(ctx, "connected_map", len(refs), record_ids=refs)])
-    return {"type": "FeatureCollection", "features": features, "generated_at": utc_now_iso()}
+    return features, refs

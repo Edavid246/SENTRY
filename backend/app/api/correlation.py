@@ -17,14 +17,12 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
+from app.api.deps import ConnDep, CurrentContext
+from app.api.guard import guarded
 from app.audit.chain import utc_now_iso
 from app.authz.labels import Labels
-from app.authz.policy import LocalPolicy
 from app.correlation.analysis import ANALYSIS, run_rising_faults
 from app.correlation.store import FindingRow, list_findings, save_findings
-
-POLICY = LocalPolicy()
 
 router = APIRouter(prefix="/api/v1/correlation", tags=["correlation"])
 
@@ -47,11 +45,6 @@ class FindingOut(BaseModel):
 class RunResult(BaseModel):
     analysis: str
     findings: list[FindingOut]
-
-
-def _decide(ctx, action: str):
-    decision = POLICY.decide(ctx, action, "finding")
-    return decision, decide_event(ctx, decision, resource="finding", requested=action)
 
 
 def _unit_names(conn) -> dict[str, str]:
@@ -80,18 +73,13 @@ def finding_out(row: FindingRow, names: dict[str, str]) -> FindingOut:
 
 @router.post("/run", response_model=RunResult)
 def run_correlation(ctx: CurrentContext, conn: ConnDep) -> RunResult:
-    decision, decision_event = _decide(ctx, "run_correlation")
-    if not decision.allowed:
-        audit_events([decision_event])
-        raise HTTPException(status_code=403, detail="forbidden")
-    names = _unit_names(conn)
-    drafts = run_rising_faults(ctx, conn, Labels.load(conn), names)
-    save_findings(conn, ctx, drafts)
-    conn.commit()
-    rows = list_findings(conn, ctx)
-    audit_events(
-        [
-            decision_event,
+    with guarded(ctx, conn, "run_correlation", "finding") as scope:
+        names = _unit_names(conn)
+        drafts = run_rising_faults(ctx, conn, Labels.load(conn), names)
+        save_findings(conn, ctx, drafts)
+        conn.commit()
+        rows = list_findings(conn, ctx)
+        scope.event(
             {
                 "actor": ctx.username,
                 "action": "correlation_run",
@@ -108,42 +96,25 @@ def run_correlation(ctx: CurrentContext, conn: ConnDep) -> RunResult:
                     for d in drafts
                 ],
                 "timestamp": utc_now_iso(),
-            },
-        ]
-    )
+            }
+        )
     return RunResult(analysis=ANALYSIS, findings=[finding_out(r, names) for r in rows])
 
 
 @router.get("/findings", response_model=list[FindingOut])
 def findings(ctx: CurrentContext, conn: ConnDep) -> list[FindingOut]:
-    decision, decision_event = _decide(ctx, "read")
-    if not decision.allowed:
-        audit_events([decision_event])
-        raise HTTPException(status_code=403, detail="forbidden")
-    rows = list_findings(conn, ctx)
-    audit_events(
-        [
-            decision_event,
-            query_event(ctx, "finding", len(rows), item_ids=[r.key for r in rows]),
-        ]
-    )
+    with guarded(ctx, conn, "read", "finding") as scope:
+        rows = list_findings(conn, ctx)
+        scope.read("finding", len(rows), item_ids=[r.key for r in rows])
     names = _unit_names(conn)
     return [finding_out(r, names) for r in rows]
 
 
 @router.get("/findings/{finding_id}", response_model=FindingOut)
 def finding(finding_id: str, ctx: CurrentContext, conn: ConnDep) -> FindingOut:
-    decision, decision_event = _decide(ctx, "read")
-    if not decision.allowed:
-        audit_events([decision_event])
-        raise HTTPException(status_code=404, detail="not found")
-    rows = list_findings(conn, ctx, key=finding_id)
-    audit_events(
-        [
-            decision_event,
-            query_event(ctx, "finding", len(rows), item_ids=[r.key for r in rows]),
-        ]
-    )
+    with guarded(ctx, conn, "read", "finding", on_deny="not_found") as scope:
+        rows = list_findings(conn, ctx, key=finding_id)
+        scope.read("finding", len(rows), item_ids=[r.key for r in rows])
     if not rows:
         raise HTTPException(status_code=404, detail="not found")
     return finding_out(rows[0], _unit_names(conn))

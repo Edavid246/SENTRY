@@ -11,6 +11,7 @@ from app.authz.context import AccessContext, permissions_for_role
 from app.db import set_rls_context
 from app.knowledge.retrieve import retrieve_chunks
 from app.seed import _id
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 # (role, unit_path, clearance_rank, compartments)
@@ -82,7 +83,18 @@ def test_restricted_user_cannot_retrieve_higher_classified_parent_unit_docs(
     assert "DOC-204" in refs
 
 
-def test_no_rls_context_returns_no_chunks(app_engine: Engine, ingested: dict[str, int]) -> None:
-    ctx = _context("a.bello")
+def test_retrieval_sets_the_rls_context_itself(
+    app_engine: Engine, ingested: dict[str, int]
+) -> None:
+    """A fresh connection with no context set: retrieval scopes it to the caller,
+    so it cannot be run unscoped and returns exactly the caller's chunks."""
+    ctx = _context("t.adeyemi")
     with app_engine.connect() as conn:
-        assert retrieve_chunks(conn, ctx, "vehicle maintenance", query_vector=None) == []
+        fresh = [c.document_ref for c in retrieve_chunks(conn, ctx, "servicing", query_vector=None)]
+    assert fresh == _refs(app_engine, "t.adeyemi", "servicing")
+
+
+def test_no_rls_context_reads_no_chunks(app_engine: Engine, ingested: dict[str, int]) -> None:
+    """The database layer on its own: without an access context RLS returns nothing."""
+    with app_engine.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM chunks")).scalar_one() == 0

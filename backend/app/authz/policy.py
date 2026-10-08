@@ -61,6 +61,11 @@ class Policy(Protocol):
     ) -> bool: ...
 
 
+def get_policy() -> Policy:
+    """The one place the policy implementation is chosen (OPA replaces it here)."""
+    return _POLICY
+
+
 class LocalPolicy:
     """Pure-Python policy behind the Policy protocol (OPA is stubbed — docs/STUBS.md)."""
 
@@ -121,3 +126,6 @@ class LocalPolicy:
             and set(compartments) <= set(ctx.compartments)
             and unit_path.startswith(ctx.unit_path)
         )
+
+
+_POLICY: Policy = LocalPolicy()

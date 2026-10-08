@@ -1,8 +1,8 @@
 """Dashboard summary (SPEC 18 step 1): GET /api/v1/dashboard/summary.
 
-Built from the caller's AccessContext. Authorization order matches every other
-data endpoint: LocalPolicy.decide first (may this role read the dashboard at
-all?), then every item is filtered through `LocalPolicy.item_visible`, the
+Built from the caller's AccessContext. A guarded read (app.api.guard), like
+every other data endpoint: the policy decides first (may this role read the
+dashboard at all?), then every item is filtered through the policy's `item_visible`, the
 SPEC 7.1 rule, before it is added to the response. Nothing the caller may not
 see is ever put into a tile. Audited: a decide event and a query event with
 the item ids returned.
@@ -15,21 +15,20 @@ compartments, unit_path, unit_name}`.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from app.api.deps import ConnDep, CurrentContext, audit_events, decide_event, query_event
+from app.api.deps import ConnDep, CurrentContext
+from app.api.guard import guarded
 from app.audit.chain import utc_now_iso
 from app.authz.context import AccessContext
 from app.authz.labels import Labels
-from app.authz.policy import LocalPolicy
+from app.authz.policy import get_policy
 from app.correlation.store import list_findings
 from app.dashboard.fixtures import TILES, FixtureTile
 from app.data_queries.registry import execute_tool
-
-POLICY = LocalPolicy()
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 
@@ -94,7 +93,7 @@ def _build_tile(
         for item in tile.items
         # An unknown classification code has no rank: fail closed (never shown).
         if (rank := labels.rank(item.classification)) is not None
-        and POLICY.item_visible(
+        and get_policy().item_visible(
             ctx,
             classification_rank=rank,
             compartments=item.compartments,
@@ -202,24 +201,19 @@ def _findings_tile(ctx: AccessContext, conn: Connection, names: dict[str, str]) 
 
 @router.get("/summary", response_model=DashboardSummary)
 def dashboard_summary(ctx: CurrentContext, conn: ConnDep) -> DashboardSummary:
-    decision = POLICY.decide(ctx, "read", "dashboard")
-    decision_event = decide_event(ctx, decision, resource="dashboard", requested="read")
-    if not decision.allowed:
-        audit_events([decision_event])
-        raise HTTPException(status_code=403, detail="forbidden")
-
-    labels, names = Labels.load(conn), _unit_names(conn)
-    fixtures = {tile.key: tile for tile in TILES}
-    built = {
-        key: (
-            _real_tile(ctx, conn, key, labels, names)
-            if key in _REAL_TILES
-            else _findings_tile(ctx, conn, names)
-            if key == "recent_findings"
-            else _build_tile(ctx, fixtures[key], labels, names)
-        )
-        for key in DashboardTiles.model_fields
-    }
-    item_ids = [item.id for tile in built.values() for item in tile.items]
-    audit_events([decision_event, query_event(ctx, "dashboard", len(item_ids), item_ids=item_ids)])
+    with guarded(ctx, conn, "read", "dashboard") as scope:
+        labels, names = Labels.load(conn), _unit_names(conn)
+        fixtures = {tile.key: tile for tile in TILES}
+        built = {
+            key: (
+                _real_tile(ctx, conn, key, labels, names)
+                if key in _REAL_TILES
+                else _findings_tile(ctx, conn, names)
+                if key == "recent_findings"
+                else _build_tile(ctx, fixtures[key], labels, names)
+            )
+            for key in DashboardTiles.model_fields
+        }
+        item_ids = [item.id for tile in built.values() for item in tile.items]
+        scope.read("dashboard", len(item_ids), item_ids=item_ids)
     return DashboardSummary(generated_at=utc_now_iso(), tiles=DashboardTiles(**built))

@@ -9,7 +9,7 @@ component slots in. **Demo build only; never claim the dev profile is sovereign.
 | Spec component | Spec | Demo implementation | Later |
 |---|---|---|---|
 | Identity | Keycloak, password+OTP (SPEC §4, §6, §7.1) | Seeded users, shared demo password, HS256 dev JWT behind `TokenValidator`; `users.keycloak_id` column reserved | Replace validator with Keycloak JWKS/OIDC |
-| Policy engine | OPA with partial evaluation (SPEC §7.3) | `LocalPolicy`, Python ABAC behind the `Policy` protocol (`decide` + `row_filter`) | `OpaPolicy` implements same protocol |
+| Policy engine | OPA with partial evaluation (SPEC §7.3) | `LocalPolicy`, Python ABAC behind the `Policy` protocol (`decide` + `row_filter`) | `OpaPolicy` implements same protocol; swap it in at `get_policy()` (`app/authz/policy.py`), the one wiring point |
 | Job queue | Procrastinate worker (SPEC §6, §5.2) | `scripts/` run manually (seed today; ingestion/sync later) | Worker service |
 | Tool selection | Model selects a typed tool (SPEC §8.2) | Keyword router in `data_queries/routing.py`; the registry and tool contracts are the real ones | Model picks from `REGISTRY`; authorization is unchanged because tools authorize themselves |
 | Source-system adapters | One adapter per source system (SPEC §11) | A single `DemoReferenceAdapter` over `canonical_records`; `stream()` replays seeded detections, `sync()` is a no-op | Per-system adapters behind `SourceAdapter`; only the translation layer changes |

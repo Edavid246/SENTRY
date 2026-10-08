@@ -166,6 +166,6 @@ def test_audit_write_failure_blocks_the_request(client, monkeypatch) -> None:
     def boom(*args, **kwargs) -> None:
         raise RuntimeError("audit storage down")
 
-    monkeypatch.setattr("app.api.endpoints.audit_events", boom)
+    monkeypatch.setattr("app.audit.events.append_events", boom)
     with pytest.raises(RuntimeError, match="audit storage down"):
         client.get("/api/v1/documents", headers=headers)
