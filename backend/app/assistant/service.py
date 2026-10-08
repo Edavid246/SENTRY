@@ -38,9 +38,14 @@ from uuid import UUID
 
 from sqlalchemy.engine import Connection
 
-from app.ai_gateway.base import ChatMessage, LLMResult, ProviderError, ProviderNotConfiguredError
+from app.ai_gateway.base import LLMResult, ProviderError, ProviderNotConfiguredError
 from app.ai_gateway.port import ModelPort
-from app.assistant.conversations import load_history, open_conversation, store_turn
+from app.assistant.conversations import (
+    HistoryMessage,
+    load_history,
+    open_conversation,
+    store_turn,
+)
 from app.audit.events import AUDIT_TEXT_LIMIT, event
 from app.authz.context import AccessContext
 from app.authz.labels import Label, Labelled, Labels
@@ -178,7 +183,7 @@ class _Knowledge:
     sources: tuple[Requirement, ...] = ()
 
     def run(self, turn: _Turn) -> _Produced:
-        history: tuple[ChatMessage, ...] = ()
+        history: tuple[HistoryMessage, ...] = ()
         if not turn.new_conversation:
             history = load_history(turn.scope, turn.conversation_id)
         chunks, query_vector = turn.retrieve(turn.question)
@@ -194,10 +199,16 @@ class _Knowledge:
                     question=turn.question[:AUDIT_TEXT_LIMIT],
                 )
             )
-        cited = generate_answer(turn.question, chunks, gateway=turn.models, history=history)
+        cited = generate_answer(
+            turn.question,
+            chunks,
+            gateway=turn.models,
+            history=tuple(message.chat() for message in history),
+        )
         return _Produced(
             answer=cited.answer,
-            label=turn.label(chunks),
+            # The earlier turns are model input too, so they are part of the label.
+            label=turn.label([*chunks, *history]),
             citations=cited.citations,
             found=cited.found,
             degraded=degraded,

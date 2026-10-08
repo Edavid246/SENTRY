@@ -111,17 +111,42 @@ def open_conversation(scope: Scope, requested: UUID | None) -> tuple[UUID, bool]
     return requested, False
 
 
-def load_history(scope: Scope, conversation_id: UUID) -> tuple[ChatMessage, ...]:
-    """The last HISTORY_TURNS messages, oldest first."""
+@dataclass(frozen=True, slots=True)
+class HistoryMessage:
+    """An earlier turn sent back to the model, with the label it was stored under.
+
+    It is an input to the next answer, so that answer's derived label includes it.
+    """
+
+    role: str
+    text: str
+    classification_code: str
+    compartments: tuple[str, ...]
+
+    def chat(self) -> ChatMessage:
+        return ChatMessage(role=self.role, text=self.text)
+
+
+def load_history(scope: Scope, conversation_id: UUID) -> tuple[HistoryMessage, ...]:
+    """The last HISTORY_TURNS messages the caller may see, oldest first."""
+    row_filter = scope.filter("message")
     rows = scope.conn.execute(
         text(
-            "SELECT role, content FROM messages"
-            " WHERE conversation_id = :id"
+            "SELECT role, content, classification_code, compartments FROM messages"
+            f" WHERE conversation_id = :id AND {row_filter.where_sql}"
             " ORDER BY created_at DESC, id DESC LIMIT :limit"
         ),
-        {"id": conversation_id, "limit": HISTORY_TURNS},
+        {"id": conversation_id, "limit": HISTORY_TURNS, **row_filter.params},
     ).all()
-    return tuple(ChatMessage(role=str(row.role), text=str(row.content)) for row in reversed(rows))
+    return tuple(
+        HistoryMessage(
+            role=str(row.role),
+            text=str(row.content),
+            classification_code=str(row.classification_code),
+            compartments=tuple(str(code) for code in (row.compartments or [])),
+        )
+        for row in reversed(rows)
+    )
 
 
 def store_turn(

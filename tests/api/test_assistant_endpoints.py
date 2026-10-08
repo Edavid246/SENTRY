@@ -292,6 +292,39 @@ def test_not_found_answer_reports_found_false(client, ingested, models) -> None:
     assert body["citations"] == []
 
 
+def _message_labels(engine: Engine, conversation_id: str) -> list[tuple[str, str, list[str]]]:
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT role, classification_code, compartments FROM messages"
+                " WHERE conversation_id = :id"
+                " ORDER BY created_at, CASE role WHEN 'user' THEN 0 ELSE 1 END, id"
+            ),
+            {"id": conversation_id},
+        ).all()
+    return [(str(role), str(code), sorted(comps or [])) for role, code, comps in rows]
+
+
+def test_follow_up_answer_inherits_the_label_of_the_history_it_was_given(
+    client, ingested: dict[str, int], owner_engine: Engine, models
+) -> None:
+    """The earlier turns are sent to the model, so a follow-up that retrieves nothing
+    new must still carry their label (AGENTS.md: derived items inherit the highest
+    classification and the union of compartments of their inputs)."""
+    models()
+    first = _ask(client, "a.bello", "maintenance")
+    assert first.status_code == 200, first.text
+    conversation_id = first.json()["conversation_id"]
+    [(_, code, comps), _] = _message_labels(owner_engine, conversation_id)
+    assert code != "unclassified", "precondition: turn 1 must be labelled above the floor"
+
+    follow_up = _ask(client, "a.bello", "xylophone quantum bananas", conversation_id)
+    assert follow_up.status_code == 200, follow_up.text
+    assert follow_up.json()["found"] is False  # no new evidence: only the history is input
+    turn_two = _message_labels(owner_engine, conversation_id)[2:]
+    assert turn_two == [("user", code, comps), ("assistant", code, comps)]
+
+
 def test_refusal_answer_reports_found_false(client, ingested: dict[str, int], models) -> None:
     """A blocked answer (citation outside the evidence set) is a refusal:
     found=false and the answer event is recorded as a denial."""
