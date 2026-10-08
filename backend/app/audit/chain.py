@@ -174,23 +174,43 @@ def _git(args: list[str], cwd: Path) -> str:
     return result.stdout
 
 
+_WALK_BATCH = 1000
+
+
+def _walk_chain(engine: Engine) -> tuple[int, int | None, str | None]:
+    """Stream the chain in seq order: (rows walked, first broken seq, its event_id).
+
+    Rows arrive in batches from a server-side cursor, so memory stays flat as
+    the log grows. After the first break the walk only counts, so the count
+    always covers every event.
+    """
+    walked = 0
+    broken: tuple[int, str] | None = None
+    prev_hash = GENESIS_PREV_HASH
+    with engine.connect() as conn:
+        rows = conn.execution_options(stream_results=True, yield_per=_WALK_BATCH).execute(
+            text("SELECT seq, event_id, payload, prev_hash, hash FROM audit_events ORDER BY seq")
+        )
+        for seq, event_id, payload, stored_prev, stored_hash in rows:
+            walked += 1
+            if broken is not None:
+                continue
+            if (
+                int(seq) != walked
+                or stored_prev != prev_hash
+                or stored_hash != compute_hash(str(stored_prev), payload)
+            ):
+                broken = (int(seq), str(event_id))
+            prev_hash = str(stored_hash)
+    if broken is None:
+        return walked, None, None
+    return walked, broken[0], broken[1]
+
+
 def verify_chain(engine: Engine) -> tuple[bool, int | None]:
     """Re-walk the whole chain in seq order; first break returns its seq."""
-    with engine.connect() as conn:
-        rows = conn.execute(
-            text("SELECT seq, payload, prev_hash, hash FROM audit_events ORDER BY seq")
-        ).all()
-    prev_hash = GENESIS_PREV_HASH
-    expected_seq = 1
-    for seq, payload, stored_prev, stored_hash in rows:
-        seq = int(seq)
-        if seq != expected_seq or stored_prev != prev_hash:
-            return False, seq
-        if stored_hash != compute_hash(str(stored_prev), payload):
-            return False, seq
-        prev_hash = str(stored_hash)
-        expected_seq += 1
-    return True, None
+    _, broken_seq, _ = _walk_chain(engine)
+    return broken_seq is None, broken_seq
 
 
 def _db_tips(engine: Engine, seq: int) -> tuple[tuple[int, str] | None, tuple[int, str] | None]:
@@ -275,15 +295,8 @@ def verify_report(engine: Engine) -> dict[str, Any]:
     deep-link straight to it with GET /audit?event_id=...; `checked_count` is
     the number of events the walk covered.
     """
-    valid, broken_seq = verify_chain(engine)
-    with engine.connect() as conn:
-        checked_count = int(conn.execute(text("SELECT count(*) FROM audit_events")).scalar_one())
-        first_bad_event_id: str | None = None
-        if broken_seq is not None:
-            row = conn.execute(
-                text("SELECT event_id FROM audit_events WHERE seq = :seq"), {"seq": broken_seq}
-            ).first()
-            first_bad_event_id = str(row[0]) if row is not None else None
+    checked_count, broken_seq, first_bad_event_id = _walk_chain(engine)
+    valid = broken_seq is None
     checkpoint_ok, checkpoint_tip = checkpoint_status(engine)
     ledger_ok, ledger_tip = ledger_status(engine)
     return {

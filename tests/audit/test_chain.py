@@ -295,3 +295,28 @@ def test_concurrent_appends_serialise_without_gaps(settings) -> None:
         assert verify_chain(engine) == (True, None)
     finally:
         engine.dispose()
+
+
+def test_verify_walks_the_chain_once_streamed_with_no_extra_count(app_engine: Engine) -> None:
+    """The verify job must scale with the log: one streamed walk over audit_events
+    (not a fetch-all) that also yields checked_count, so there is no count(*)."""
+    from sqlalchemy import event as sa_event
+
+    walks: list[tuple[str, bool]] = []
+
+    def capture(conn, cursor, statement, parameters, context, executemany) -> None:
+        if "audit_events" in statement:
+            walks.append((statement, bool(context.execution_options.get("stream_results"))))
+
+    sa_event.listen(app_engine, "before_cursor_execute", capture)
+    try:
+        report = verify_report(app_engine)
+    finally:
+        sa_event.remove(app_engine, "before_cursor_execute", capture)
+    assert report["valid"] is True and report["checked_count"] == _count(app_engine)
+    assert not [s for s, _ in walks if "count(" in s.lower()]
+    full_walks = [
+        (s, streamed) for s, streamed in walks if "ORDER BY seq" in s and "LIMIT" not in s
+    ]
+    assert len(full_walks) == 1
+    assert full_walks[0][1] is True, "the chain walk must stream its rows"
