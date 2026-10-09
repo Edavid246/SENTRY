@@ -23,6 +23,7 @@ from app.connectors import get_adapter
 from app.connectors.base import RecordFilter, SourceRecord
 from app.correlation.store import list_findings
 from app.data_queries.errors import ToolParamError
+from app.geo.states import check_state
 
 MAX_WITHIN_DAYS = 365
 MAX_PERIOD_HOURS = 24 * 30
@@ -116,6 +117,13 @@ def _pattern(value: Any, pattern: re.Pattern[str], message: str) -> str | None:
     if not isinstance(value, str) or not pattern.match(value):
         raise ToolParamError(message)
     return value
+
+
+def _state(value: Any) -> str | None:
+    try:
+        return check_state(value)
+    except ValueError as exc:
+        raise ToolParamError(str(exc)) from None
 
 
 def _number(value: Any) -> float | None:
@@ -272,11 +280,12 @@ def training_activity(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
 
 def uas_missions(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
     """UAS missions dated in the last `period_days` (default 30), optionally by status."""
-    _check_names(params, frozenset({"unit_path", "status", "period_days"}))
+    _check_names(params, frozenset({"unit_path", "status", "period_days", "state"}))
     unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
     status = params.get("status")
     if status is not None and status not in MISSION_STATUSES:
         raise ToolParamError("status must be 'completed' or 'cancelled'")
+    state = _state(params.get("state"))
     period_days = _bounded_int(
         params.get("period_days", DEFAULT_MISSION_DAYS), "period_days", 1, MAX_WITHIN_DAYS
     )
@@ -294,12 +303,14 @@ def uas_missions(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
     records = [
         r
         for r in found
-        if r.data["mission_date"] >= start and (status is None or r.data.get("status") == status)
+        if r.data["mission_date"] >= start
+        and (status is None or r.data.get("status") == status)
+        and (state is None or r.data.get("state") == state)
     ]
     records.sort(key=lambda r: (r.data["mission_date"], r.source_ref), reverse=True)
     return _table(
         "uas_missions",
-        {"unit_path": unit_path, "period_days": period_days, **_given(status=status)},
+        {"unit_path": unit_path, "period_days": period_days, **_given(status=status, state=state)},
         records,
         {
             "id": _source_ref,
@@ -311,9 +322,10 @@ def uas_missions(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
 
 def detections_near_site(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
     """Surveillance detections at a site (depot or facility) in the last `period_hours`."""
-    _check_names(params, frozenset({"unit_path", "site", "period_hours"}))
+    _check_names(params, frozenset({"unit_path", "site", "period_hours", "state"}))
     unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
     site = _pattern(params.get("site"), _SITE_RE, "site must look like DEP-B4 or UAS-HANGAR")
+    state = _state(params.get("state"))
     period_hours = _bounded_int(
         params.get("period_hours", DEFAULT_DETECTION_HOURS), "period_hours", 1, MAX_PERIOD_HOURS
     )
@@ -327,11 +339,12 @@ def detections_near_site(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
         for r in found
         if start <= str(r.data.get("observed_at", "")) <= end
         and (site is None or r.data.get("site") == site)
+        and (state is None or r.data.get("state") == state)
     ]
     records.sort(key=lambda r: (r.data["observed_at"], r.source_ref), reverse=True)
     return _table(
         "detections_near_site",
-        {"unit_path": unit_path, "period_hours": period_hours, **_given(site=site)},
+        {"unit_path": unit_path, "period_hours": period_hours, **_given(site=site, state=state)},
         records,
         {
             "id": _source_ref,

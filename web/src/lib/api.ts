@@ -180,10 +180,11 @@ export const api = {
   record: (sourceRef: string) =>
     request<RecordDetail>(`/records/${encodeURIComponent(sourceRef)}`),
   dashboard: () => request<DashboardSummary>("/dashboard/summary"),
-  connectedMap: () => request<ConnectedMap>("/connected/map"),
-  replay: (after: string | null, upto: string) =>
+  connectedMap: (state?: string) =>
+    request<ConnectedMap>(`/connected/map${state ? `?state=${encodeURIComponent(state)}` : ""}`),
+  replay: (after: string | null, upto: string, state?: string) =>
     request<ReplayBatch>(
-      `/connected/replay?upto=${encodeURIComponent(upto)}${after ? `&after=${encodeURIComponent(after)}` : ""}`,
+      `/connected/replay?upto=${encodeURIComponent(upto)}${after ? `&after=${encodeURIComponent(after)}` : ""}${state ? `&state=${encodeURIComponent(state)}` : ""}`,
     ),
   verify: () => request<VerifyReport>("/audit/verify"),
 };

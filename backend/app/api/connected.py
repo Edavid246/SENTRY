@@ -21,6 +21,7 @@ from app.authz.scope import Scope
 from app.clock import UTC_TS_FORMAT, demo_now, demo_today
 from app.connectors import get_adapter
 from app.connectors.base import RecordFilter, SourceRecord
+from app.geo.states import check_state
 
 router = APIRouter(prefix="/api/v1/connected", tags=["connected"])
 
@@ -67,6 +68,18 @@ def _parse_ts(value: str, name: str) -> datetime:
     return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
 
 
+def _state_param(value: str | None) -> str | None:
+    """Validated against the closed state list; applied after the adapter read."""
+    try:
+        return check_state(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+
+
+def _in_state(record: SourceRecord, state: str | None) -> bool:
+    return state is None or record.data.get("state") == state
+
+
 @router.get("/replay")
 def connected_replay(
     ctx: CurrentContext,
@@ -74,6 +87,7 @@ def connected_replay(
     after: Annotated[str | None, Query()] = None,
     upto: Annotated[str | None, Query()] = None,
     hours: Annotated[int, Query(ge=1, le=720)] = 48,
+    state: Annotated[str | None, Query()] = None,
 ) -> dict[str, Any]:
     """STUB live feed: detections the caller may see, replayed in time order.
 
@@ -83,6 +97,7 @@ def connected_replay(
     an event the caller may not see is never read. Every poll is audited (a decide event
     and a query event with the ids delivered, possibly none).
     """
+    state = _state_param(state)
     now = demo_now()
     window_start = now - timedelta(hours=hours)
     since = _parse_ts(after, "after") if after else window_start - timedelta(seconds=1)
@@ -100,7 +115,7 @@ def connected_replay(
         events = [
             r
             for r in get_adapter().stream(scope, max(since, window_start - timedelta(seconds=1)))
-            if r.data["observed_at"] <= limit.strftime(UTC_TS_FORMAT)
+            if r.data["observed_at"] <= limit.strftime(UTC_TS_FORMAT) and _in_state(r, state)
         ]
         scope.read("connected_replay", len(events), record_ids=[r.source_ref for r in events])
     out["events"] = [_detection_feature(r) for r in events]
@@ -113,19 +128,21 @@ def connected_map(
     conn: ConnDep,
     hours: Annotated[int, Query(ge=1, le=720)] = 48,
     mission_days: Annotated[int, Query(ge=1, le=365)] = 30,
+    state: Annotated[str | None, Query()] = None,
 ) -> dict[str, Any]:
     """Sensors, recent detections and mission tracks the caller may see (never more)."""
+    state = _state_param(state)
     with guarded_or_empty(ctx, conn, "retrieve", "record", audit_resource="connected_map") as scope:
         if scope is None:
             # Roles without data access get an empty map, not a hint about what exists.
             return {"type": "FeatureCollection", "features": [], "generated_at": utc_now_iso()}
-        features, refs = _map_features(scope, hours, mission_days)
+        features, refs = _map_features(scope, hours, mission_days, state)
         scope.read("connected_map", len(refs), record_ids=refs)
     return {"type": "FeatureCollection", "features": features, "generated_at": utc_now_iso()}
 
 
 def _map_features(
-    scope: Scope, hours: int, mission_days: int
+    scope: Scope, hours: int, mission_days: int, state: str | None = None
 ) -> tuple[list[dict[str, Any]], list[str]]:
     now = demo_now()
     start = (now - timedelta(hours=hours)).strftime(UTC_TS_FORMAT)
@@ -136,6 +153,8 @@ def _map_features(
     features: list[dict[str, Any]] = []
     refs: list[str] = []
     for sensor in adapter.search(scope, RecordFilter(entity_type="Sensor")):
+        if not _in_state(sensor, state):
+            continue
         features.append(
             _point(
                 sensor,
@@ -147,7 +166,7 @@ def _map_features(
         refs.append(sensor.source_ref)
     detections = adapter.search(scope, RecordFilter(entity_type="Detection"))
     for det in sorted(detections, key=lambda r: r.data["observed_at"]):
-        if not start <= det.data["observed_at"] <= end:
+        if not start <= det.data["observed_at"] <= end or not _in_state(det, state):
             continue
         features.append(_detection_feature(det))
         refs.append(det.source_ref)
@@ -160,7 +179,7 @@ def _map_features(
         ),
     )
     for msn in sorted(missions, key=lambda r: r.data["mission_date"]):
-        if msn.data["mission_date"] < mission_start:
+        if msn.data["mission_date"] < mission_start or not _in_state(msn, state):
             continue
         features.append(
             {

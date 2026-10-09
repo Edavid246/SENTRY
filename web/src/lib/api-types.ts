@@ -214,9 +214,6 @@ export interface paths {
         /**
          * List Conversations
          * @description The caller's own conversations, newest first (SPEC §10.1).
-         *
-         *     Another user's conversations are never in scope: the ownership predicate
-         *     is part of the SQL, alongside the policy row filter and RLS.
          */
         get: operations["list_conversations_api_v1_assistant_conversations_get"];
         put?: never;
@@ -333,8 +330,8 @@ export interface paths {
          *     The synthetic detections are the "stream"; the client drives a replay clock and polls
          *     with `after` (the last observed_at it has) and `upto` (the clock). Stateless: the
          *     server holds no cursor. Stream and policy row filter + RLS come from the adapter, so
-         *     an event the caller may not see is never read. Only non-empty batches are audited,
-         *     with the ids delivered.
+         *     an event the caller may not see is never read. Every poll is audited (a decide event
+         *     and a query event with the ids delivered, possibly none).
          */
         get: operations["connected_replay_api_v1_connected_replay_get"];
         put?: never;
@@ -1214,6 +1211,7 @@ export interface operations {
                 after?: string | null;
                 upto?: string | null;
                 hours?: number;
+                state?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -1250,6 +1248,7 @@ export interface operations {
             query?: {
                 hours?: number;
                 mission_days?: number;
+                state?: string | null;
             };
             header?: {
                 authorization?: string | null;

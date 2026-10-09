@@ -9,6 +9,7 @@ import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { ClearanceBadge } from "@/components/ClearanceBadge";
 import { BASEMAP_BOUNDS, basemapStyle, registerBasemap } from "@/lib/basemap";
+import { STATES } from "@/lib/states";
 
 const COLOURS: Record<MapKind, string> = {
   sensor: "#8fa89d",
@@ -47,14 +48,16 @@ export default function MapPage() {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
+  const [state, setState] = useState("");
 
   useEffect(() => {
     if (!me) return;
+    setError(null);
     api
-      .connectedMap()
+      .connectedMap(state || undefined)
       .then(setData)
       .catch(() => setError("The map data could not be loaded."));
-  }, [me]);
+  }, [me, state]);
 
   // Replay (STUB live feed, docs/STUBS.md): detections arrive one batch at a time as a
   // replay clock advances through the window; sensors and missions stay as loaded.
@@ -70,7 +73,7 @@ export default function MapPage() {
   }, []);
   const startReplay = async () => {
     try {
-      const head = await api.replay(null, "1970-01-01T00:00:00Z");
+      const head = await api.replay(null, "1970-01-01T00:00:00Z", state || undefined);
       const end = Date.parse(head.window_end);
       let clock = Date.parse(head.window_start);
       let last: string | null = null;
@@ -82,7 +85,7 @@ export default function MapPage() {
         try {
           clock = Math.min(clock + REPLAY_STEP_MS, end);
           const upto = new Date(clock).toISOString().replace(".000Z", "Z");
-          const batch = await api.replay(last, upto);
+          const batch = await api.replay(last, upto, state || undefined);
           if (batch.events.length) last = batch.events[batch.events.length - 1].properties.observed_at ?? last;
           setReplay((r) => (r ? { events: [...r.events, ...batch.events], clock: upto } : r));
           if (clock >= end && timer.current) {
@@ -225,6 +228,25 @@ export default function MapPage() {
           <p className="mt-1 text-[0.75rem] text-mute">
             Only what your clearance and compartments allow is returned by the API.
           </p>
+          <label className="mt-3 flex flex-col gap-1 text-[0.75rem] text-mute">
+            State
+            <select
+              data-testid="state-filter"
+              className="border border-rule bg-surface px-2 py-1 text-[0.85rem] text-ink"
+              value={state}
+              onChange={(e) => {
+                stopReplay();
+                setState(e.target.value);
+              }}
+            >
+              <option value="">All states</option>
+              {STATES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="mt-3 flex items-center gap-2">
             <button
               type="button"

@@ -625,6 +625,7 @@ _SITES = {
     "UAS-HANGAR": (5.490, 9.390),
 }
 _CT = "connected-tech-demo"
+_STATE = "Niger"  # every demo site is on fictitious rural land in Niger State
 _UAS_WING = "/eib-group/briech/"
 
 
@@ -635,6 +636,7 @@ def _hours_from_now(offset: int) -> str:
 def _sensor(ref, classification, compartments, unit_path, sensor_id, site, status="online"):
     lon, lat = _SITES[site]
     data = {"sensor_id": sensor_id, "site": site, "kind": "camera", "status": status}
+    data["state"] = _STATE
     data |= {"lon": lon, "lat": lat, "format": "ONVIF-style (synthetic)"}
     return (ref, "Sensor", _CT, classification, compartments, unit_path, data)
 
@@ -646,6 +648,7 @@ def _detection(
     data = {
         "sensor_id": sensor_id,
         "site": site,
+        "state": _STATE,
         "object_type": kind,
         "confidence": confidence,
         "observed_at": _hours_from_now(hours),
@@ -663,6 +666,7 @@ def _mission(ref, classification, offset, mission, platform, status, area, reaso
         "status": status,
         "mission_date": _days_from_today(offset),
         "area": area,
+        "state": _STATE,
         "reason": reason,
         "track_kind": "flown" if status == "completed" else "planned",
         "track": [list(point) for point in route],
