@@ -59,6 +59,11 @@ _DETECTION_RE = re.compile(
 _SITE_RE = re.compile(r"\b(DEP-[A-Za-z0-9-]+|UAS-HANGAR)\b", re.IGNORECASE)
 _HOURS_RE = re.compile(r"\b(?:last|past)\s+(\d{1,4})\s+hours?\b", re.IGNORECASE)
 _THIS_PERIOD_RE = re.compile(r"\bthis\s+(week|month)\b", re.IGNORECASE)
+_DELIVERY_RE = re.compile(r"\b(deliver\w*|shipments?)\b", re.IGNORECASE)
+_OVERDUE_RE = re.compile(r"\b(overdue|late|delayed|behind schedule|past due)\b", re.IGNORECASE)
+_CONTRACT_RE = re.compile(r"\bcontracts?\b", re.IGNORECASE)
+_CLIENT_NAME_RE = re.compile(r"\bClient Agency ([A-Z])\b", re.IGNORECASE)
+_CONTRACT_STATUS_RE = re.compile(r"\b(at[ -]risk|active|completed)\b", re.IGNORECASE)
 _PATH_RE = re.compile(r"(?<![\w])(?:\.\.?/|/)[\w./-]+")
 
 
@@ -110,6 +115,19 @@ def route_question(question: str) -> RoutedTool | None:
     if not _REQUEST_RE.search(question):
         return None
     params = _unit_path_params(question)
+    # Contract rules come before the stock and UAS rules: "deliver" and "inventory" overlap.
+    is_delivery = _DELIVERY_RE.search(question) and _OVERDUE_RE.search(question)
+    if is_delivery or _CONTRACT_RE.search(question):
+        client = _CLIENT_NAME_RE.search(question)
+        if client:
+            params["client"] = f"Client Agency {client.group(1).upper()}"
+    if is_delivery:
+        return RoutedTool("deliveries_overdue", params)
+    if _CONTRACT_RE.search(question):
+        status = _CONTRACT_STATUS_RE.search(question)
+        if status:
+            params["status"] = status.group(1).lower().replace(" ", "_").replace("-", "_")
+        return RoutedTool("contracts_status", params)
     if _EQUIPMENT_RE.search(question) and _MAINTENANCE_RE.search(question):
         within = _WITHIN_RE.search(question)
         if within:

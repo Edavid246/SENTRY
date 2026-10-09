@@ -109,7 +109,7 @@ USERS = [
         "role": "uas_ops",
         "unit": "/eib-group/briech/",
         "clearance": "confidential",
-        "compartments": ["UAS-OPS"],
+        "compartments": ["UAS-OPS", "CLIENT-A"],
         "data_scope": "standard",
     },
     {
@@ -139,6 +139,7 @@ SOURCE_SYSTEMS = [
     {"name": "personnel-ref", "adapter_type": "personnel", "status": "connected"},
     {"name": "connected-tech-demo", "adapter_type": "connected-tech", "status": "connected"},
     {"name": "forensics-demo", "adapter_type": "forensics", "status": "connected"},
+    {"name": "contracts-demo", "adapter_type": "contracts", "status": "connected"},
 ]
 
 # (ref, title, classification, compartments, unit path)
@@ -790,6 +791,280 @@ RECORDS += [
             "format": "CASE/UCO style (synthetic)",
         },
     ),  # fmt: skip
+]
+
+
+# Contracts and deliveries (pivot Task 4). Fictitious, illustrative figures; the agencies are
+# generic labels mapped to the CLIENT-A..D compartments (no real agency names). Due dates are
+# offsets from the demo date so "overdue" stays true on any seed day. A delivery shares its
+# contract's client, compartment and owning unit.
+_CONTRACTS = "contracts-demo"
+_BRIECH = "/eib-group/briech/"
+_POCTOVA = "/eib-group/poctova/"
+_GIGA = "/eib-group/giga/"
+_CLIENT = {c: f"Client Agency {c}" for c in "ABCD"}
+
+
+def _contract(ref, cid, client, subject, status, classification, unit_path, end_offset, value):
+    data = {
+        "contract_ref": cid,
+        "client": _CLIENT[client],
+        "subject": subject,
+        "status": status,
+        "end_date": _days_from_today(end_offset),
+        "value_musd": value,
+    }
+    compartments = [f"CLIENT-{client}"] + (["FORENSICS"] if unit_path == _GIGA else [])
+    return (ref, "Contract", _CONTRACTS, classification, compartments, unit_path, data)
+
+
+def _delivery(ref, did, cid, client, item, qty, offset, status, classification, unit_path):
+    data = {
+        "delivery_ref": did,
+        "contract_ref": cid,
+        "client": _CLIENT[client],
+        "item": item,
+        "quantity": qty,
+        "due_date": _days_from_today(offset),
+        "status": status,
+    }
+    compartments = [f"CLIENT-{client}"] + (["FORENSICS"] if unit_path == _GIGA else [])
+    return (ref, "Delivery", _CONTRACTS, classification, compartments, unit_path, data)
+
+
+RECORDS += [
+    _contract(
+        "REC-063",
+        "CT-101",
+        "A",
+        "Reconnaissance UAS fleet supply",
+        "active",
+        "confidential",
+        _BRIECH,
+        180,
+        4.2,
+    ),
+    _contract(
+        "REC-064",
+        "CT-102",
+        "A",
+        "UAS spares and maintenance support",
+        "at_risk",
+        "confidential",
+        _BRIECH,
+        90,
+        1.1,
+    ),
+    _contract(
+        "REC-065",
+        "CT-103",
+        "B",
+        "Payload integration trials",
+        "active",
+        "confidential",
+        _BRIECH,
+        120,
+        0.8,
+    ),
+    _contract(
+        "REC-066",
+        "CT-201",
+        "C",
+        "Body armour plate supply",
+        "active",
+        "confidential",
+        _POCTOVA,
+        240,
+        2.6,
+    ),
+    _contract(
+        "REC-067",
+        "CT-202",
+        "D",
+        "Uniform and kit lots",
+        "completed",
+        "restricted",
+        _POCTOVA,
+        -30,
+        0.9,
+    ),
+    _contract(
+        "REC-068",
+        "CT-203",
+        "C",
+        "Helmet liner supply",
+        "at_risk",
+        "confidential",
+        _POCTOVA,
+        60,
+        0.5,
+    ),
+    _contract(
+        "REC-069",
+        "CT-301",
+        "B",
+        "Perimeter surveillance service",
+        "active",
+        "secret",
+        "/eib-group/stratoc/",
+        300,
+        3.4,
+    ),
+    _contract(
+        "REC-070",
+        "CT-302",
+        "D",
+        "Forensic laboratory analysis retainer",
+        "active",
+        "secret",
+        _GIGA,
+        200,
+        0.7,
+    ),
+    _delivery(
+        "REC-071",
+        "DL-101",
+        "CT-101",
+        "A",
+        "Reconnaissance UAS airframes",
+        4,
+        -10,
+        "pending",
+        "confidential",
+        _BRIECH,
+    ),
+    _delivery(
+        "REC-072",
+        "DL-102",
+        "CT-101",
+        "A",
+        "Ground control stations",
+        2,
+        -25,
+        "delivered",
+        "confidential",
+        _BRIECH,
+    ),
+    _delivery(
+        "REC-073",
+        "DL-103",
+        "CT-102",
+        "A",
+        "Gimbal spares kit",
+        6,
+        -3,
+        "in_transit",
+        "confidential",
+        _BRIECH,
+    ),
+    _delivery(
+        "REC-074",
+        "DL-104",
+        "CT-102",
+        "A",
+        "Battery packs",
+        20,
+        14,
+        "pending",
+        "confidential",
+        _BRIECH,
+    ),
+    _delivery(
+        "REC-075",
+        "DL-105",
+        "CT-103",
+        "B",
+        "Payload units",
+        3,
+        -7,
+        "pending",
+        "confidential",
+        _BRIECH,
+    ),
+    _delivery(
+        "REC-076",
+        "DL-201",
+        "CT-201",
+        "C",
+        "Armour plate set",
+        500,
+        -15,
+        "pending",
+        "confidential",
+        _POCTOVA,
+    ),
+    _delivery(
+        "REC-077",
+        "DL-202",
+        "CT-201",
+        "C",
+        "Armour plate set",
+        500,
+        20,
+        "pending",
+        "confidential",
+        _POCTOVA,
+    ),
+    _delivery(
+        "REC-078",
+        "DL-203",
+        "CT-202",
+        "D",
+        "Uniform lot",
+        1200,
+        -60,
+        "delivered",
+        "restricted",
+        _POCTOVA,
+    ),
+    _delivery(
+        "REC-079",
+        "DL-204",
+        "CT-203",
+        "C",
+        "Helmet liner lot",
+        800,
+        -2,
+        "pending",
+        "confidential",
+        _POCTOVA,
+    ),
+    _delivery(
+        "REC-080",
+        "DL-205",
+        "CT-203",
+        "C",
+        "Helmet liner lot",
+        800,
+        30,
+        "pending",
+        "confidential",
+        _POCTOVA,
+    ),
+    _delivery(
+        "REC-081",
+        "DL-301",
+        "CT-301",
+        "B",
+        "Camera mast kits",
+        4,
+        -5,
+        "in_transit",
+        "secret",
+        "/eib-group/stratoc/",
+    ),
+    _delivery(
+        "REC-082",
+        "DL-401",
+        "CT-302",
+        "D",
+        "Analysis workstation",
+        1,
+        -1,
+        "pending",
+        "secret",
+        _GIGA,
+    ),
 ]
 
 

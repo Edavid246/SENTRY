@@ -6,12 +6,12 @@ of user compartments AND row unit at or below the user's unit, strictly
 downward). Deliberately NOT derived from app.seed: a seeding bug must not
 be able to rewrite its own expectations.
 
-Verified sets (16 documents, 62 records in the corpus):
+Verified sets (16 documents, 82 records in the corpus):
 
-    owner    14 documents, 61 records
+    owner    14 documents, 81 records
     logistics.head    6 documents, 42 records
     coo   1 document,  24 records
-    briech.lead      1 document,  8 records
+    briech.lead      1 document,  14 records
     group.it       none  (data_scope=none)
     group.audit   none  (data_scope=audit)
 
@@ -60,7 +60,7 @@ GOLD_RECORDS: dict[str, frozenset[str]] = {
             "REC-007",
             "REC-009",
             "REC-010",
-            *(f"REC-0{n}" for n in range(11, 63)),
+            *(f"REC-0{n}" for n in range(11, 83)),
         }
     ),
     "logistics.head": frozenset(
@@ -87,6 +87,8 @@ GOLD_RECORDS: dict[str, frozenset[str]] = {
         {"REC-009", "REC-044"}
         # UAS-OPS detection and Confidential missions (060 is Secret)
         | {"REC-053", "REC-055", "REC-056", "REC-057", "REC-058", "REC-059"}
+        # Client Agency A contracts 063-064 and their deliveries 071-074 (CLIENT-A, Confidential)
+        | {"REC-063", "REC-064", "REC-071", "REC-072", "REC-073", "REC-074"}
     ),
     "group.it": frozenset(),
     "group.audit": frozenset(),

@@ -60,6 +60,7 @@ class DashboardTiles(BaseModel):
     readiness: DashboardTile
     maintenance_backlog: DashboardTile
     expiring_certifications: DashboardTile
+    overdue_deliveries: DashboardTile
     recent_findings: DashboardTile
 
 
@@ -124,6 +125,14 @@ EXPIRED_CERTIFICATIONS = ToolTile(
     label="certifications expired",
     unit="people",
     title="Certifications expired",
+)
+OVERDUE_DELIVERIES = ToolTile(
+    tool="deliveries_overdue",
+    params={},
+    prefix="DLV",
+    label="deliveries overdue",
+    unit="deliveries",
+    title="Overdue deliveries",
 )
 
 
@@ -260,6 +269,7 @@ def dashboard_summary(ctx: CurrentContext, conn: ConnDep) -> DashboardSummary:
             readiness=_group_status_tile(scope, labels, names),
             maintenance_backlog=_tool_tile(scope, MAINTENANCE_BACKLOG, labels, names),
             expiring_certifications=_tool_tile(scope, EXPIRED_CERTIFICATIONS, labels, names),
+            overdue_deliveries=_tool_tile(scope, OVERDUE_DELIVERIES, labels, names),
             recent_findings=_findings_tile(scope, names),
         )
         item_ids = [
@@ -268,6 +278,7 @@ def dashboard_summary(ctx: CurrentContext, conn: ConnDep) -> DashboardSummary:
                 tiles.readiness,
                 tiles.maintenance_backlog,
                 tiles.expiring_certifications,
+                tiles.overdue_deliveries,
                 tiles.recent_findings,
             )
             for item in tile.items

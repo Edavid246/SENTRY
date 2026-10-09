@@ -23,11 +23,11 @@ EXPECTED_COUNTS = {
     Compartment: 6,
     Unit: 8,
     User: 6,
-    UserCompartment: 7,
-    SourceSystem: 6,
+    UserCompartment: 8,
+    SourceSystem: 7,
     Document: 16,
     Chunk: 32,
-    CanonicalRecord: 62,
+    CanonicalRecord: 82,
 }
 
 

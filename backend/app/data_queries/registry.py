@@ -21,7 +21,9 @@ from app.connectors.base import SourceRecord
 from app.data_queries.errors import ToolParamError
 from app.data_queries.tools import (
     ToolResult,
+    contracts_status,
     correlation_findings,
+    deliveries_overdue,
     detections_near_site,
     equipment_due_for_maintenance,
     expired_certifications,
@@ -40,6 +42,8 @@ REGISTRY: dict[str, ToolFn] = {
     "training_activity": training_activity,
     "uas_missions": uas_missions,
     "detections_near_site": detections_near_site,
+    "deliveries_overdue": deliveries_overdue,
+    "contracts_status": contracts_status,
 }
 
 # The policy decisions a caller needs before a tool runs. Tools read source records;

@@ -10,7 +10,13 @@ from test_assistant_endpoints import _audit, _latest
 from test_auth_endpoints import auth_header
 
 PATH = "/api/v1/dashboard/summary"
-TILE_KEYS = {"readiness", "maintenance_backlog", "expiring_certifications", "recent_findings"}
+TILE_KEYS = {
+    "readiness",
+    "maintenance_backlog",
+    "expiring_certifications",
+    "overdue_deliveries",
+    "recent_findings",
+}
 ITEM_KEYS = {
     "id",
     "label",
@@ -99,6 +105,7 @@ def test_tiles_are_real_exactly_where_the_data_is_real(client) -> None:
     tiles = _summary(client, "owner").json()["tiles"]
     assert {k: t["stub"] for k, t in tiles.items()} == {
         "readiness": False,
+        "overdue_deliveries": False,
         "maintenance_backlog": False,
         "expiring_certifications": False,
         "recent_findings": False,
@@ -171,7 +178,7 @@ def test_compartment_item_needs_the_compartment(client) -> None:
     briech_lead = _summary(client, "briech.lead").json()
     # The Briech lead holds UAS-OPS and is in the Briech UAS: sees only that unit's items.
     # (the Secret expired UAS certification is above The Briech lead's clearance)
-    assert _all_ids(briech_lead) == {"GRP-BRIECH"}
+    assert _all_ids(briech_lead) == {"GRP-BRIECH", "DLV-BRIECH"}
 
 
 def test_no_data_roles_get_403(client) -> None:
@@ -217,5 +224,5 @@ def test_tool_queries_are_audited_after_the_decision_that_allowed_them(client) -
         for e in sorted(_audit(client), key=lambda e: e["seq"])
         if e["seq"] > tip and e["payload"]["actor"] == "owner" and e["payload"]["action"] != "login"
     ]
-    # maintenance + certifications tiles, then the four group-status tools
-    assert mine == ["decide", *["data_query"] * 6, "query"]
+    # maintenance + certifications tiles, then the four group-status tools and overdue deliveries
+    assert mine == ["decide", *["data_query"] * 7, "query"]

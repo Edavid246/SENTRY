@@ -40,7 +40,7 @@ CONTEXTS: dict[str, dict] = {
     },
     "briech.lead": {
         "clearance_rank": 2,
-        "compartments": ["UAS-OPS"],
+        "compartments": ["UAS-OPS", "CLIENT-A"],
         "unit_path": "/eib-group/briech/",
         "data_scope": "standard",
     },

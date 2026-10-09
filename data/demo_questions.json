@@ -59,6 +59,16 @@
       "status": "built"
     },
     {
+      "id": "data-overdue-deliveries",
+      "spec_step": "18.3",
+      "pathway": "data",
+      "asked_by": "owner",
+      "tool": "deliveries_overdue",
+      "question": "Which deliveries are overdue?",
+      "expected": "Result table (id, delivery_ref, contract_ref, client, item, quantity, due_date, days_overdue, status, unit_path) from the typed tool deliveries_overdue: 7 rows for owner, oldest first; briech.lead sees 2 (Client Agency A only); coo sees none.",
+      "status": "built"
+    },
+    {
       "id": "data-expired-certifications",
       "spec_step": "18.3",
       "pathway": "data",

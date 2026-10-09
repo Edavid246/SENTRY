@@ -20,7 +20,9 @@ from app.connectors.base import AdapterDescription, RecordFilter, SourceRecord
 
 # Record fields a search may compare as an ISO date. The name is a bound
 # parameter, never interpolated; the allow-list keeps the surface explicit.
-DATE_FIELDS: frozenset[str] = frozenset({"maintenance_due_date", "expires", "mission_date"})
+DATE_FIELDS: frozenset[str] = frozenset(
+    {"maintenance_due_date", "expires", "mission_date", "due_date"}
+)
 ENTITY_TYPES: tuple[str, ...] = (
     "Equipment",
     "Qualification",
@@ -32,6 +34,8 @@ ENTITY_TYPES: tuple[str, ...] = (
     "Mission",
     "EvidenceItem",
     "CustodyEvent",
+    "Contract",
+    "Delivery",
 )
 
 _SELECT = (

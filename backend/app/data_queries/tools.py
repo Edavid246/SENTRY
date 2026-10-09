@@ -33,6 +33,8 @@ MISSION_STATUSES = frozenset({"completed", "cancelled"})
 DEFAULT_PERIOD_DAYS = 90  # one quarter
 _DEPOT_RE = re.compile(r"^DEP-[A-Z0-9]{1,8}(?:-[A-Z0-9]{1,8})?$")
 _SITE_RE = re.compile(r"^(?:DEP-[A-Z0-9]{1,8}|UAS-HANGAR)$")
+_CLIENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .&-]{0,39}$")
+CONTRACT_STATUSES = frozenset({"active", "at_risk", "completed"})
 _UNIT_PATH_RE = re.compile(r"^/(?:[a-z0-9-]+/)+$")
 
 Column = Callable[[SourceRecord], Any]
@@ -349,6 +351,70 @@ def detections_near_site(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
         {
             "id": _source_ref,
             **_fields("observed_at", "site", "sensor_id", "object_type", "confidence"),
+            "unit_path": _unit_path,
+        },
+    )
+
+
+def deliveries_overdue(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    """Deliveries past their due date and not yet delivered, optionally for one client."""
+    _check_names(params, frozenset({"unit_path", "client"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    client = _pattern(params.get("client"), _CLIENT_RE, "client is not a valid client name")
+    today = demo_today()
+    found = get_adapter().search(
+        scope,
+        RecordFilter(
+            entity_type="Delivery",
+            unit_path=unit_path,
+            date_field="due_date",
+            on_or_before=today - timedelta(days=1),
+        ),
+    )
+    records = [
+        r
+        for r in found
+        if r.data.get("status") != "delivered"
+        and (client is None or r.data.get("client") == client)
+    ]
+    records.sort(key=lambda r: (r.data["due_date"], r.source_ref))
+    return _table(
+        "deliveries_overdue",
+        {"unit_path": unit_path, **_given(client=client)},
+        records,
+        {
+            "id": _source_ref,
+            **_fields("delivery_ref", "contract_ref", "client", "item", "quantity", "due_date"),
+            "days_overdue": lambda r: (today - date.fromisoformat(r.data["due_date"])).days,
+            "status": _field("status"),
+            "unit_path": _unit_path,
+        },
+    )
+
+
+def contracts_status(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    """Contracts the caller may see, optionally for one client and/or one status."""
+    _check_names(params, frozenset({"unit_path", "client", "status"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    client = _pattern(params.get("client"), _CLIENT_RE, "client is not a valid client name")
+    status = params.get("status")
+    if status is not None and status not in CONTRACT_STATUSES:
+        raise ToolParamError("status must be 'active', 'at_risk' or 'completed'")
+    found = get_adapter().search(scope, RecordFilter(entity_type="Contract", unit_path=unit_path))
+    records = [
+        r
+        for r in found
+        if (client is None or r.data.get("client") == client)
+        and (status is None or r.data.get("status") == status)
+    ]
+    records.sort(key=lambda r: (r.data["contract_ref"], r.source_ref))
+    return _table(
+        "contracts_status",
+        {"unit_path": unit_path, **_given(client=client, status=status)},
+        records,
+        {
+            "id": _source_ref,
+            **_fields("contract_ref", "client", "subject", "status", "end_date", "value_musd"),
             "unit_path": _unit_path,
         },
     )

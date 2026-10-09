@@ -183,6 +183,9 @@ export default function DashboardPage() {
             <TileFrame tileKey="expiring_certifications" tile={summary.tiles.expiring_certifications}>
               <BarList items={summary.tiles.expiring_certifications.items} />
             </TileFrame>
+            <TileFrame tileKey="overdue_deliveries" tile={summary.tiles.overdue_deliveries}>
+              <BarList items={summary.tiles.overdue_deliveries.items} />
+            </TileFrame>
             <TileFrame
               tileKey="recent_findings"
               tile={summary.tiles.recent_findings}

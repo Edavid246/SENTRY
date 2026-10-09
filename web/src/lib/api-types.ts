@@ -517,7 +517,7 @@ export interface components {
         DashboardTile: {
             /**
              * Stub
-             * @description true while the tile's data is placeholder fixtures
+             * @description true while the tile's data is placeholder data
              */
             stub: boolean;
             /** Source */
@@ -532,6 +532,7 @@ export interface components {
             readiness: components["schemas"]["DashboardTile"];
             maintenance_backlog: components["schemas"]["DashboardTile"];
             expiring_certifications: components["schemas"]["DashboardTile"];
+            overdue_deliveries: components["schemas"]["DashboardTile"];
             recent_findings: components["schemas"]["DashboardTile"];
         };
         /** FindingOut */
