@@ -51,7 +51,9 @@ EQUIPMENT_COLUMNS = [
 ]
 CERT_COLUMNS = ["id", "name", "rank", "certification", "expired_date", "unit_path"]
 
-OWNER_EQUIPMENT = {f"REC-0{n}" for n in (11, 12, 13, 14, 15, 16, 18)}  # 017 is due in 90 days
+OWNER_EQUIPMENT = {
+    f"REC-0{n}" for n in (11, 12, 13, 14, 15, 16, 18, 93, 94, 95)
+}  # 017 is due in 90 days
 COO_EQUIPMENT = {"REC-011", "REC-012"}
 OWNER_CERTS = {f"REC-0{n}" for n in (19, 20, 21, 22, 23, 24, 41, 42)}  # 025 is valid for 200 days
 COO_CERTS = {"REC-019", "REC-020", "REC-041", "REC-042"}
@@ -120,7 +122,13 @@ def test_equipment_columns_overdue_and_due_in_15_days(client, explain_calls) -> 
 def test_within_days_is_extracted_and_applied(client, explain_calls) -> None:
     body = _ask(client, "owner", "Show me the equipment due for maintenance in the next 7 days")
     assert body.status_code == 200
-    assert _ids(body.json()) == {"REC-011", "REC-014", "REC-018"}  # overdue or due within 7 days
+    assert _ids(body.json()) == {
+        "REC-011",
+        "REC-014",
+        "REC-018",
+        "REC-094",
+        "REC-095",
+    }  # overdue or due within 7 days
     event = _data_queries(client, "owner")[-1]["payload"]
     assert event["params"]["within_days"] == 7
 
@@ -253,7 +261,7 @@ def test_data_query_event_is_written_with_sanitized_params_and_rows(client, expl
     assert payload["action"] == "data_query"
     assert payload["tool"] == "equipment_due_for_maintenance"
     assert payload["params"] == {"unit_path": "/eib-group/stratoc/", "within_days": 30}
-    assert payload["rows"] == len(body["result_table"]["rows"]) == 5
+    assert payload["rows"] == len(body["result_table"]["rows"]) == 6
     assert payload["decision"] == "allow"
     assert set(payload["record_ids"]) == _ids(body)
 
@@ -434,7 +442,7 @@ def test_stock_below_threshold_owner_sees_more_than_coo(client, explain_calls) -
     coo = _ask(client, "coo", STOCK_QUESTION).json()
     assert owner["result_table"]["columns"] == STOCK_COLUMNS
     # REC-005 and REC-027 are above their thresholds; REC-010 (subsidiary level) is below.
-    assert _ids(owner) == {"REC-010", "REC-026"}
+    assert _ids(owner) == {"REC-010", "REC-026", "REC-096"}  # 096: Briech jet fuel (Secret)
     assert _ids(coo) == {"REC-026"}
     row = coo["result_table"]["rows"][0]
     assert row["shortfall"] == row["threshold"] - row["quantity"] == 12

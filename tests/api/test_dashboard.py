@@ -77,8 +77,8 @@ def test_owner_and_coo_get_different_dashboards(client) -> None:
         "GRP-POCTOVA",
     }
     assert _ids(coo, "readiness") == {"GRP-STRATOC"}
-    # real tiles: overdue equipment REC-011 (Site 4) and REC-014 (Stratoc)
-    assert _ids(owner, "maintenance_backlog") == {"MNT-SITE-4", "MNT-STRATOC"}
+    # real tiles: overdue equipment REC-011 (Site 4), REC-014 (Stratoc), REC-094 (Briech, Secret)
+    assert _ids(owner, "maintenance_backlog") == {"MNT-SITE-4", "MNT-STRATOC", "MNT-BRIECH"}
     assert _ids(coo, "maintenance_backlog") == {"MNT-SITE-4"}
     assert _ids(owner, "expiring_certifications") == {
         "CRT-SITE-4",
@@ -137,7 +137,8 @@ def test_group_status_counts_and_inherited_labels(client) -> None:
     assert owner["GRP-STRATOC"]["value"] == 10
     assert owner["GRP-STRATOC"]["classification"] == "confidential"
     # Briech: REC-023 cert (Secret, UAS-OPS) + cancelled missions 056/057/060 (060 Secret)
-    assert owner["GRP-BRIECH"]["value"] == 4
+    # + airstrip lighting REC-094 and airframe REC-095 due for maintenance (both Secret)
+    assert owner["GRP-BRIECH"]["value"] == 6
     assert owner["GRP-BRIECH"]["classification"] == "secret"
     assert owner["GRP-BRIECH"]["compartments"] == ["UAS-OPS"]
     # a subsidiary with nothing open: zero inputs, lowest label, no compartments

@@ -6,10 +6,10 @@ of user compartments AND row unit at or below the user's unit, strictly
 downward). Deliberately NOT derived from app.seed: a seeding bug must not
 be able to rewrite its own expectations.
 
-Verified sets (16 documents, 92 records in the corpus):
+Verified sets (16 documents, 97 records in the corpus):
 
-    owner    14 documents, 91 records
-    logistics.head    6 documents, 42 records
+    owner    14 documents, 96 records
+    logistics.head    6 documents, 43 records
     coo   1 document,  24 records
     briech.lead      1 document,  20 records
     group.it       none  (data_scope=none)
@@ -60,7 +60,7 @@ GOLD_RECORDS: dict[str, frozenset[str]] = {
             "REC-007",
             "REC-009",
             "REC-010",
-            *(f"REC-0{n}" for n in range(11, 93)),
+            *(f"REC-0{n}" for n in range(11, 98)),
         }
     ),
     "logistics.head": frozenset(
@@ -70,6 +70,7 @@ GOLD_RECORDS: dict[str, frozenset[str]] = {
         # planted-pattern: Site 4 faults 028-035 (036 is Secret), Stratoc faults, maintainers
         | {f"REC-0{n}" for n in range(28, 36)}
         | {"REC-037", "REC-038", "REC-039", "REC-040", "REC-041", "REC-042"}
+        | {"REC-093"}  # command-and-control vehicle (094-097 are Briech Secret: owner only)
         | {"REC-043", "REC-045"}  # training events in Stratoc / Site 4 (044 is the Briech UAS)
         # connected tech: depot sensors + detections (053 is UAS-OPS, 055-060 Briech UAS missions)
         | {"REC-046", "REC-047", "REC-048", "REC-049", "REC-050", "REC-051", "REC-052", "REC-054"}
