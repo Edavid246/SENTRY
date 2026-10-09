@@ -122,6 +122,16 @@ export default function DivisionPage() {
               {view && view.sections.length > 0 && (
                 <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-2">
                   {view.key === "poctova" && <SerialLookup division={view.key} />}
+                  {view.key === "briech" && (
+                    <Link
+                      href="/map"
+                      data-testid="open-map"
+                      className="flex items-center justify-between gap-4 border border-rule bg-surface px-4 py-3 text-[0.95rem] hover:border-amber xl:col-span-2"
+                    >
+                      <span>Open the map: sensors, detections and mission areas</span>
+                      <span aria-hidden className="text-amber">→</span>
+                    </Link>
+                  )}
                   {view.sections.map((section) => (
                     <SectionCard key={section.key} section={section} />
                   ))}

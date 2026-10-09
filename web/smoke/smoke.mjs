@@ -102,6 +102,11 @@ try {
   check(true, "a section row opens its record");
   await page.goBack();
   await page.waitForSelector('[data-testid="division-title"]');
+  await page.goto(BASE + "/d/briech");
+  await page.waitForSelector('[data-testid="section-fleet"]');
+  check((await page.locator('[data-testid="service-gauge"]').count()) >= 1, "briech fleet shows a service gauge");
+  check((await page.locator('[data-testid="open-map"]').count()) === 1, "briech links to the map");
+  await shot("12d-division-briech");
   await page.click('[data-testid="back-to-group"]');
   await page.waitForSelector('[data-testid="division-briech"]');
   check(true, "back to the group home works");

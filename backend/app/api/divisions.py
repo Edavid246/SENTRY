@@ -39,6 +39,7 @@ class SectionRow(BaseModel):
     label: str
     detail: str
     flagged: bool = Field(description="true when this row needs attention")
+    meter: float | None = Field(description="0..1 gauge fill, e.g. hours flown of the interval")
 
 
 class Section(BaseModel):
@@ -70,6 +71,7 @@ class SectionSpec:
     detail: Callable[[Row], str]
     flagged: Callable[[Row], bool] = lambda row: True
     params: Mapping[str, Any] = field(default_factory=dict)
+    meter: Callable[[Row], float | None] = lambda row: None
 
 
 def _run_detail(row: Row) -> str:
@@ -100,7 +102,70 @@ _COMPLIANCE = (
 )
 
 
+def _fleet_detail(row: Row) -> str:
+    left = row["hours_to_service"]
+    text = f"{row['flight_hours']:g} flight hours"
+    if row.get("status"):
+        text += f" · {str(row['status']).replace('_', ' ')}"
+    if left is not None:
+        return f"{text} · {left:g} h to service"
+    return f"{text} · next service {row['next_service']}" if row.get("next_service") else text
+
+
+def _fleet_meter(row: Row) -> float | None:
+    interval = row["service_interval_hours"]
+    return None if not interval else min(1.0, row["flight_hours"] / interval)
+
+
 SECTIONS: dict[str, tuple[SectionSpec, ...]] = {
+    "briech": (
+        SectionSpec(
+            "fleet",
+            "Aircraft and hours to service",
+            "uas_fleet",
+            "No aircraft are visible to you.",
+            lambda r: str(r["name"]),
+            _fleet_detail,
+            lambda r: (
+                r["status"] not in (None, "in_service")
+                or (r["hours_to_service"] is not None and r["hours_to_service"] <= 25)
+            ),
+            meter=_fleet_meter,
+        ),
+        SectionSpec(
+            "missions",
+            "Missions, last 30 days",
+            "uas_missions",
+            "No missions in the last 30 days.",
+            lambda r: f"{r['mission']} · {r['platform']}",
+            lambda r: (
+                f"{r['mission_date']} · {r['area']} · {r['status']}"
+                + (f" · {r['reason']}" if r.get("reason") else "")
+            ),
+            lambda r: r["status"] == "cancelled",
+        ),
+        SectionSpec(
+            "deliveries",
+            "Overdue deliveries",
+            "deliveries_overdue",
+            "No delivery is overdue.",
+            lambda r: f"{r['delivery_ref']} · {r['item']}",
+            lambda r: (
+                f"{r['client']} · qty {r['quantity']} · due {r['due_date']} "
+                f"({r['days_overdue']} days overdue) · {r['status']}"
+            ),
+        ),
+        SectionSpec(
+            "contracts",
+            "Contracts",
+            "contracts_status",
+            "No contracts are visible to you.",
+            lambda r: f"{r['contract_ref']} · {r['subject']}",
+            lambda r: f"{r['client']} · {r['status'].replace('_', ' ')} · ends {r['end_date']}",
+            lambda r: r["status"] == "at_risk",
+        ),
+        *_COMPLIANCE,
+    ),
     "poctova": (
         SectionSpec(
             "qc-holds",
@@ -163,6 +228,7 @@ def _build(labels: Labels, spec: SectionSpec, outcome: ToolOutcome) -> Section:
                     label=spec.label(row),
                     detail=spec.detail(row),
                     flagged=spec.flagged(row),
+                    meter=spec.meter(row),
                 )
             )
     label = labels.derive(list(outcome.records)) if outcome.records else None

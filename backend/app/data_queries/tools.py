@@ -494,3 +494,28 @@ def production_runs(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
             "unit_path": _unit_path,
         },
     )
+
+
+def uas_fleet(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    """Aircraft (equipment that logs flight hours), with hours left to the next service."""
+    _check_names(params, frozenset({"unit_path"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    found = get_adapter().search(scope, RecordFilter(entity_type="Equipment", unit_path=unit_path))
+    records = [r for r in found if _number(r.data.get("flight_hours")) is not None]
+    records.sort(key=lambda r: (r.data["name"], r.source_ref))
+
+    def hours_left(record: SourceRecord) -> float | None:
+        interval = _number(record.data.get("service_interval_hours"))
+        return None if interval is None else interval - record.data["flight_hours"]
+
+    return _table(
+        "uas_fleet",
+        {"unit_path": unit_path},
+        records,
+        {
+            "id": _source_ref,
+            **_fields("name", "status", "flight_hours", "service_interval_hours", "next_service"),
+            "hours_to_service": hours_left,
+            "unit_path": _unit_path,
+        },
+    )

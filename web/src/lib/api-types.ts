@@ -791,6 +791,11 @@ export interface components {
              * @description true when this row needs attention
              */
             flagged: boolean;
+            /**
+             * Meter
+             * @description 0..1 gauge fill, e.g. hours flown of the interval
+             */
+            meter: number | null;
         };
         /** TurnOut */
         TurnOut: {

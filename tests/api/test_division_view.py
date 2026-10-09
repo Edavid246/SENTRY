@@ -86,3 +86,29 @@ def test_bad_serial_is_refused_without_a_query(client) -> None:
 
 def test_requires_login(client) -> None:
     assert client.get(f"{BASE}/poctova").status_code == 401
+
+
+def test_briech_sections_for_the_owner(client) -> None:
+    sections = _sections(client, "owner", "briech")
+    assert list(sections) == [
+        "fleet",
+        "missions",
+        "deliveries",
+        "contracts",
+        "maintenance",
+        "certifications",
+    ]
+    # REC-009 has no service interval (no gauge); REC-095 is 492 of 500 hours (a nearly full gauge).
+    assert _refs(sections["fleet"]) == ["REC-009", "REC-095"]
+    assert [r["meter"] for r in sections["fleet"]["rows"]] == [None, 0.984]
+    assert [r["flagged"] for r in sections["fleet"]["rows"]] == [False, True]
+    assert _refs(sections["contracts"]) == ["REC-063", "REC-064", "REC-065"]
+    assert [r["flagged"] for r in sections["contracts"]["rows"]] == [False, True, False]
+
+
+def test_briech_lead_sees_fewer_rows_and_a_lower_label(client) -> None:
+    sections = _sections(client, "briech.lead", "briech")
+    assert _refs(sections["fleet"]) == ["REC-009"]  # the Secret airframe is absent, not locked
+    assert sections["fleet"]["classification"] == "confidential"
+    assert sections["deliveries"]["compartments"] == ["CLIENT-A"]
+    assert _refs(sections["maintenance"]) == []

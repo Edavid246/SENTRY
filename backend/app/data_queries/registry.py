@@ -32,6 +32,7 @@ from app.data_queries.tools import (
     serial_trace,
     stock_below_threshold,
     training_activity,
+    uas_fleet,
     uas_missions,
 )
 
@@ -44,6 +45,7 @@ REGISTRY: dict[str, ToolFn] = {
     "correlation_findings": correlation_findings,
     "training_activity": training_activity,
     "uas_missions": uas_missions,
+    "uas_fleet": uas_fleet,
     "detections_near_site": detections_near_site,
     "deliveries_overdue": deliveries_overdue,
     "contracts_status": contracts_status,

@@ -5,6 +5,26 @@ import { useState } from "react";
 import { api, ApiError, type DivisionSection } from "@/lib/api";
 import { ClearanceBadge } from "./ClearanceBadge";
 
+// How much of a service interval has been flown. The tick marks the last tenth, where an
+// aircraft should already be booked in; the fill turns amber once it passes the tick.
+function ServiceGauge({ fraction }: { fraction: number }) {
+  const pct = Math.round(Math.max(0, Math.min(1, fraction)) * 100);
+  return (
+    <div
+      role="meter"
+      aria-label="Service interval flown"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={pct}
+      data-testid="service-gauge"
+      className="relative mt-2 h-2 border border-rule bg-ground"
+    >
+      <div className={`h-full ${pct >= 90 ? "bg-amber" : "bg-sage"}`} style={{ width: `${pct}%` }} />
+      <span aria-hidden className="absolute inset-y-[-3px] left-[90%] w-px bg-ink opacity-60" />
+    </div>
+  );
+}
+
 // One section of a division dashboard: the rows of a typed tool, each linking to its record
 // (and from there to the evidence panel). Flagged rows are the ones needing attention.
 export function SectionCard({ section }: { section: DivisionSection }) {
@@ -35,6 +55,7 @@ export function SectionCard({ section }: { section: DivisionSection }) {
                   {row.label}
                 </Link>
                 <p className="mt-1 text-[0.85rem] text-sage">{row.detail}</p>
+                {row.meter != null && <ServiceGauge fraction={row.meter} />}
                 <p className="mt-1 font-mono text-[0.7rem] text-mute">{row.ref}</p>
               </li>
             ))}
