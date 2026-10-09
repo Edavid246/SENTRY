@@ -37,8 +37,8 @@ class CitedAnswer:
 
 def build_system_prompt(insufficient_message: str) -> str:
     return (
-        "You are the Defence Gateway assistant, an informational system for a"
-        " defence headquarters. Answer ONLY from the EVIDENCE passages supplied in"
+        "You are the Defence Gateway assistant, an informational system for a private"
+        " defence and security group. Answer ONLY from the EVIDENCE passages supplied in"
         " the user message; do not use any other knowledge. Every factual claim must"
         " carry a citation written exactly as [chunk_id: document_title, page N]"
         " using a chunk id from the evidence (use the section name when a passage has"

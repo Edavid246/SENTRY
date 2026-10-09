@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api/v1/correlation", tags=["correlation"])
 
 
 class FindingOut(BaseModel):
-    id: str = Field(description="stable finding id, e.g. FND-RISING-FAULTS-BN-4")
+    id: str = Field(description="stable finding id, e.g. FND-RISING-FAULTS-SITE-4")
     analysis: str
     title: str
     summary: str

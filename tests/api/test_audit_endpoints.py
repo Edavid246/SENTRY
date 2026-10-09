@@ -13,9 +13,9 @@ from app.audit.chain import append_events, utc_now_iso
 from app.db import get_engine
 from test_auth_endpoints import auth_header, login
 
-AUDITOR = "f.danjuma"
-SYSADMIN = "s.eze"
-DATA_USERS = ["a.bello", "a.okafor", "t.adeyemi", "k.musa"]
+AUDITOR = "group.audit"
+SYSADMIN = "group.it"
+DATA_USERS = ["owner", "logistics.head", "coo", "briech.lead"]
 
 
 def _audit(client, username: str = AUDITOR, limit: int = 200) -> list[dict]:
@@ -32,11 +32,11 @@ def _latest(events: list[dict], **match) -> dict | None:
 
 
 def test_login_success_and_failure_are_both_audited(client) -> None:
-    assert login(client, "a.bello", password="wrong-password").status_code == 401
-    assert login(client, "a.bello").status_code == 200
+    assert login(client, "owner", password="wrong-password").status_code == 401
+    assert login(client, "owner").status_code == 200
     events = _audit(client)
-    denied = _latest(events, actor="a.bello", action="login", decision="deny")
-    allowed = _latest(events, actor="a.bello", action="login", decision="allow")
+    denied = _latest(events, actor="owner", action="login", decision="deny")
+    allowed = _latest(events, actor="owner", action="login", decision="allow")
     assert denied is not None
     assert denied["payload"]["reasons"] == ["invalid credentials"]
     assert allowed is not None
@@ -74,14 +74,12 @@ def test_rejected_token_is_audited(client) -> None:
 
 
 def test_allowed_data_request_records_decide_then_query(client) -> None:
-    headers = auth_header(client, "a.bello")
+    headers = auth_header(client, "owner")
     response = client.get("/api/v1/documents", headers=headers)
     assert response.status_code == 200
     events = _audit(client)
-    decide = _latest(
-        events, actor="a.bello", action="decide", resource="document", decision="allow"
-    )
-    query = _latest(events, actor="a.bello", action="query", resource="document")
+    decide = _latest(events, actor="owner", action="decide", resource="document", decision="allow")
+    query = _latest(events, actor="owner", action="query", resource="document")
     assert decide is not None and query is not None
     assert decide["payload"]["requested"] == "read"
     assert query["payload"]["rows"] == len(response.json())
@@ -154,14 +152,14 @@ def test_audit_items_have_the_viewer_shape(client) -> None:
 
 
 def test_login_timestamps_are_utc(client) -> None:
-    assert login(client, "t.adeyemi").status_code == 200
-    event = _latest(_audit(client), actor="t.adeyemi", action="login", decision="allow")
+    assert login(client, "coo").status_code == 200
+    event = _latest(_audit(client), actor="coo", action="login", decision="allow")
     assert event is not None
     assert event["payload"]["timestamp"].endswith("+00:00")
 
 
 def test_audit_write_failure_blocks_the_request(client, monkeypatch) -> None:
-    headers = auth_header(client, "a.bello")
+    headers = auth_header(client, "owner")
 
     def boom(*args, **kwargs) -> None:
         raise RuntimeError("audit storage down")

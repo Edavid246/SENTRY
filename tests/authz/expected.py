@@ -8,12 +8,12 @@ be able to rewrite its own expectations.
 
 Verified sets (16 documents, 62 records in the corpus):
 
-    a.bello    14 documents, 61 records
-    a.okafor    6 documents, 42 records
-    t.adeyemi   1 document,  24 records
-    k.musa      1 document,  8 records
-    s.eze       none  (data_scope=none)
-    f.danjuma   none  (data_scope=audit)
+    owner    14 documents, 61 records
+    logistics.head    6 documents, 42 records
+    coo   1 document,  24 records
+    briech.lead      1 document,  8 records
+    group.it       none  (data_scope=none)
+    group.audit   none  (data_scope=audit)
 
 Q2 keyword expectation: exactly one chunk containing KEYWORD in each of
 DOC-001, DOC-006 and DOC-013 (nowhere else); per-user counts follow from
@@ -23,7 +23,7 @@ the gold document sets.
 KEYWORD = "maintenance"
 
 GOLD_DOCUMENTS: dict[str, frozenset[str]] = {
-    "a.bello": frozenset(
+    "owner": frozenset(
         {
             "DOC-001",
             "DOC-002",
@@ -41,15 +41,15 @@ GOLD_DOCUMENTS: dict[str, frozenset[str]] = {
             "DOC-016",
         }
     ),
-    "a.okafor": frozenset({"DOC-001", "DOC-002", "DOC-003", "DOC-009", "DOC-013", "DOC-016"}),
-    "t.adeyemi": frozenset({"DOC-003"}),
-    "k.musa": frozenset({"DOC-006"}),
-    "s.eze": frozenset(),
-    "f.danjuma": frozenset(),
+    "logistics.head": frozenset({"DOC-001", "DOC-002", "DOC-003", "DOC-009", "DOC-013", "DOC-016"}),
+    "coo": frozenset({"DOC-003"}),
+    "briech.lead": frozenset({"DOC-006"}),
+    "group.it": frozenset(),
+    "group.audit": frozenset(),
 }
 
 GOLD_RECORDS: dict[str, frozenset[str]] = {
-    "a.bello": frozenset(
+    "owner": frozenset(
         {
             "REC-001",
             "REC-002",
@@ -63,40 +63,40 @@ GOLD_RECORDS: dict[str, frozenset[str]] = {
             *(f"REC-0{n}" for n in range(11, 63)),
         }
     ),
-    "a.okafor": frozenset(
+    "logistics.head": frozenset(
         {"REC-001", "REC-002", "REC-003", "REC-005", "REC-010"}
         | {"REC-011", "REC-012", "REC-013", "REC-014", "REC-015", "REC-017"}
         | {"REC-019", "REC-020", "REC-021", "REC-022", "REC-025", "REC-026", "REC-027"}
-        # planted-pattern records: Bn 4 faults 028-035 (036 is Secret), Bde 2 faults, maintainers
+        # planted-pattern: Site 4 faults 028-035 (036 is Secret), Stratoc faults, maintainers
         | {f"REC-0{n}" for n in range(28, 36)}
         | {"REC-037", "REC-038", "REC-039", "REC-040", "REC-041", "REC-042"}
-        | {"REC-043", "REC-045"}  # training events in Bde 2 / Bn 4 (044 is the UAS Wing)
-        # connected tech: depot sensors + detections (053 is UAS-OPS, 055-060 UAS Wing missions)
+        | {"REC-043", "REC-045"}  # training events in Stratoc / Site 4 (044 is the Briech UAS)
+        # connected tech: depot sensors + detections (053 is UAS-OPS, 055-060 Briech UAS missions)
         | {"REC-046", "REC-047", "REC-048", "REC-049", "REC-050", "REC-051", "REC-052", "REC-054"}
     ),
-    "t.adeyemi": frozenset(
+    "coo": frozenset(
         {"REC-002", "REC-011", "REC-012", "REC-017", "REC-019", "REC-020", "REC-025"}
         | {"REC-026", "REC-027"}
-        | {f"REC-0{n}" for n in range(28, 36)}  # Bn 4 faults, not the Secret 036
+        | {f"REC-0{n}" for n in range(28, 36)}  # Site 4 faults, not the Secret 036
         | {"REC-041", "REC-042"}
         | {"REC-045"}
-        # Bn 4 sensor and Restricted detections (054 is Confidential)
+        # Site 4 sensor and Restricted detections (054 is Confidential)
         | {"REC-046", "REC-048", "REC-049", "REC-050"}
     ),
-    "k.musa": frozenset(
+    "briech.lead": frozenset(
         {"REC-009", "REC-044"}
         # UAS-OPS detection and Confidential missions (060 is Secret)
         | {"REC-053", "REC-055", "REC-056", "REC-057", "REC-058", "REC-059"}
     ),
-    "s.eze": frozenset(),
-    "f.danjuma": frozenset(),
+    "group.it": frozenset(),
+    "group.audit": frozenset(),
 }
 
 GOLD_KEYWORD_CHUNK_COUNTS: dict[str, int] = {
-    "a.bello": 3,
-    "a.okafor": 2,
-    "t.adeyemi": 0,
-    "k.musa": 1,
-    "s.eze": 0,
-    "f.danjuma": 0,
+    "owner": 3,
+    "logistics.head": 2,
+    "coo": 0,
+    "briech.lead": 1,
+    "group.it": 0,
+    "group.audit": 0,
 }

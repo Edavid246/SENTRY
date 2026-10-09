@@ -1,7 +1,7 @@
 """Permission-aware retrieval: the authorization filter runs inside the query.
 
 The adversarial cases matter more than the happy path: a restricted user one
-level below Brigade 2 must never receive the Confidential Brigade 2 policy or
+level below EIB Stratoc must never receive the Confidential EIB Stratoc policy or
 the Restricted logistics SOP, even though both are highly relevant to the
 query — relevance never overrides authorization (Principle Zero)."""
 
@@ -17,8 +17,8 @@ from sqlalchemy.engine import Engine
 
 # (role, unit_path, clearance_rank, compartments)
 USERS = {
-    "a.bello": ("commander", "/command-a/", 3, ("UAS-OPS", "FORENSICS")),
-    "t.adeyemi": ("training", "/command-a/bde-2/bn-4/", 1, ()),
+    "owner": ("commander", "/eib-group/", 3, ("UAS-OPS", "FORENSICS")),
+    "coo": ("training", "/eib-group/stratoc/site-4/", 1, ()),
 }
 
 
@@ -52,22 +52,22 @@ def _refs(engine: Engine, username: str, question: str) -> list[str]:
 def test_relevant_policy_is_retrieved_for_commander(
     app_engine: Engine, ingested: dict[str, int]
 ) -> None:
-    refs = _refs(app_engine, "a.bello", "maintenance")
+    refs = _refs(app_engine, "owner", "maintenance")
     assert "DOC-201" in refs
 
 
 def test_logistics_question_retrieves_the_sop(app_engine: Engine, ingested: dict[str, int]) -> None:
-    refs = _refs(app_engine, "a.bello", "stock depot reorder")
+    refs = _refs(app_engine, "owner", "stock depot reorder")
     assert "DOC-203" in refs
 
 
 def test_restricted_user_cannot_retrieve_higher_classified_parent_unit_docs(
     app_engine: Engine, ingested: dict[str, int]
 ) -> None:
-    """Adeyemi (Restricted, Battalion 4) is a highly relevant searcher, but the
-    Confidential Brigade 2 policy (DOC-201) and the Restricted Brigade 2 SOP
+    """COO (Restricted, Stratoc Site Team 4) is a highly relevant searcher, but the
+    Confidential EIB Stratoc policy (DOC-201) and the Restricted EIB Stratoc SOP
     (DOC-203) are above/outside her scope and must not appear."""
-    refs = _refs(app_engine, "t.adeyemi", "servicing maintenance")
+    refs = _refs(app_engine, "coo", "servicing maintenance")
     assert "DOC-201" not in refs
     assert "DOC-203" not in refs
     # Her own unit's documents remain reachable.
@@ -79,7 +79,7 @@ def test_retrieval_needs_the_scopes_rls_context_as_well_as_its_filter(
 ) -> None:
     """The row filter alone is not enough: with the scope's RLS context cleared,
     the database itself returns nothing, so both layers always apply together."""
-    ctx = _context("a.bello")
+    ctx = _context("owner")
     with app_engine.connect() as conn:
         scope = Scope(ctx, conn)
         assert retrieve_chunks(scope, "maintenance", query_vector=None)

@@ -45,7 +45,7 @@ def test_login_succeeds_for_every_demo_user(client, username: str) -> None:
 
 
 def test_wrong_password_is_generic_401(client) -> None:
-    response = login(client, "a.bello", password="wrong-password")
+    response = login(client, "owner", password="wrong-password")
     assert response.status_code == 401
     assert response.json() == {"detail": "invalid credentials"}
 
@@ -57,7 +57,7 @@ def test_unknown_username_is_the_same_401(client) -> None:
 
 
 def test_wrong_password_and_unknown_username_are_indistinguishable(client) -> None:
-    wrong_password = login(client, "a.bello", password="wrong-password")
+    wrong_password = login(client, "owner", password="wrong-password")
     unknown_user = login(client, "ghost.user", password="whatever")
     assert wrong_password.status_code == unknown_user.status_code
     assert wrong_password.json() == unknown_user.json()
@@ -130,7 +130,7 @@ def test_me_forged_token_401(client) -> None:
     import jwt
 
     forged = jwt.encode(
-        {"sub": "a.bello", "exp": 9_999_999_999},
+        {"sub": "owner", "exp": 9_999_999_999},
         "wrong-secret-deliberately-long-enough",
         algorithm="HS256",
     )
@@ -147,7 +147,7 @@ def test_me_signed_token_without_jti_401(client, settings) -> None:
 
     now = int(time.time())
     token = jwt.encode(
-        {"sub": "a.bello", "iat": now, "exp": now + 3600},
+        {"sub": "owner", "iat": now, "exp": now + 3600},
         settings.dev_jwt_secret,
         algorithm="HS256",
     )

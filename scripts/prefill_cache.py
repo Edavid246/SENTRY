@@ -32,7 +32,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 QUESTIONS_FILE = REPO / "data" / "demo_questions.json"
-DEFAULT_USERS = ("a.bello", "t.adeyemi")
+DEFAULT_USERS = ("owner", "coo")
 DEMO_PASSWORD = "Demo!Gateway2026"  # README: dev seed password, not a secret
 # Pathways that are not assistant queries (the audit viewer asks no model).
 NON_ASSISTANT_PATHWAYS = frozenset({"audit"})
@@ -153,7 +153,7 @@ def run(pairs: list[Pair], *, verify: bool, pause: float) -> list[Outcome]:
         # The planted finding exists only once a commander has run the correlation job;
         # the findings question needs it in place (idempotent, so safe on every run).
         boss = client.post(
-            "/api/v1/auth/login", json={"username": "a.bello", "password": DEMO_PASSWORD}
+            "/api/v1/auth/login", json={"username": "owner", "password": DEMO_PASSWORD}
         )
         if boss.status_code == 200:
             client.post(

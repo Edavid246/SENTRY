@@ -71,17 +71,17 @@ def _ctx(client, app_engine, username: str):
 
 
 def test_cancelled_missions_this_week_by_user(client, explain_calls) -> None:
-    bello = _ask(client, "a.bello", CANCELLED_QUESTION).json()
-    musa = _ask(client, "k.musa", CANCELLED_QUESTION).json()
-    # 056 and 057 are Confidential UAS-OPS; 060 is Secret (Bello only); 059 is 40 days old
-    assert bello["result_table"]["columns"] == MISSION_COLUMNS
-    assert _ids(bello) == {"REC-056", "REC-057", "REC-060"}
-    assert _ids(musa) == {"REC-056", "REC-057"}
-    assert all(row["status"] == "cancelled" for row in bello["result_table"]["rows"])
+    owner = _ask(client, "owner", CANCELLED_QUESTION).json()
+    briech_lead = _ask(client, "briech.lead", CANCELLED_QUESTION).json()
+    # 056 and 057 are Confidential UAS-OPS; 060 is Secret (Owner only); 059 is 40 days old
+    assert owner["result_table"]["columns"] == MISSION_COLUMNS
+    assert _ids(owner) == {"REC-056", "REC-057", "REC-060"}
+    assert _ids(briech_lead) == {"REC-056", "REC-057"}
+    assert all(row["status"] == "cancelled" for row in owner["result_table"]["rows"])
     assert explain_calls == ["uas_missions"] * 2
 
 
-@pytest.mark.parametrize("username", ["t.adeyemi", "a.okafor"])
+@pytest.mark.parametrize("username", ["coo", "logistics.head"])
 def test_users_without_uas_ops_get_no_missions(client, explain_calls, username) -> None:
     body = _ask(client, username, CANCELLED_QUESTION).json()
     assert body["result_table"]["rows"] == []
@@ -90,7 +90,7 @@ def test_users_without_uas_ops_get_no_missions(client, explain_calls, username) 
 
 
 def test_missions_default_window_is_thirty_days(client, app_engine) -> None:
-    ctx = _ctx(client, app_engine, "a.bello")
+    ctx = _ctx(client, app_engine, "owner")
     outcome, _ = run_tool(app_engine, ctx, "uas_missions", {})
     assert {row["id"] for row in outcome.result.rows} == {
         "REC-055",
@@ -108,19 +108,19 @@ def test_missions_default_window_is_thirty_days(client, app_engine) -> None:
 
 def test_detections_scoped_by_clearance_unit_and_compartment(client, explain_calls) -> None:
     ask = lambda user: _ids(_ask(client, user, ALL_DETECTIONS_QUESTION).json())  # noqa: E731
-    # 050 is 70 h old; 053 is UAS-OPS; 054 is Confidential (above Adeyemi's Restricted)
-    assert ask("a.bello") == {"REC-048", "REC-049", "REC-051", "REC-052", "REC-053", "REC-054"}
-    assert ask("a.okafor") == {"REC-048", "REC-049", "REC-051", "REC-052", "REC-054"}
-    assert ask("t.adeyemi") == {"REC-048", "REC-049"}
-    assert ask("k.musa") == {"REC-053"}
+    # 050 is 70 h old; 053 is UAS-OPS; 054 is Confidential (above COO's Restricted)
+    assert ask("owner") == {"REC-048", "REC-049", "REC-051", "REC-052", "REC-053", "REC-054"}
+    assert ask("logistics.head") == {"REC-048", "REC-049", "REC-051", "REC-052", "REC-054"}
+    assert ask("coo") == {"REC-048", "REC-049"}
+    assert ask("briech.lead") == {"REC-053"}
 
 
 def test_detections_near_a_site_and_window(client, explain_calls) -> None:
-    body = _ask(client, "a.bello", DETECTION_QUESTION).json()
+    body = _ask(client, "owner", DETECTION_QUESTION).json()
     assert body["result_table"]["columns"] == DETECTION_COLUMNS
     assert _ids(body) == {"REC-048", "REC-049", "REC-054"}  # DEP-B4, newest first
     assert [row["id"] for row in body["result_table"]["rows"]] == ["REC-054", "REC-048", "REC-049"]
-    longer = _ask(client, "a.bello", "Show detections near DEP-B4 in the last 100 hours").json()
+    longer = _ask(client, "owner", "Show detections near DEP-B4 in the last 100 hours").json()
     assert _ids(longer) == {"REC-048", "REC-049", "REC-050", "REC-054"}
 
 
@@ -139,11 +139,11 @@ def test_detections_near_a_site_and_window(client, explain_calls) -> None:
         ("uas_missions", {"status": "exploded"}),
         ("uas_missions", {"period_days": -1}),
         ("uas_missions", {"period_days": "30"}),
-        ("uas_missions", {"unit_path": "/command-a/"}),  # outside Adeyemi's unit scope
+        ("uas_missions", {"unit_path": "/eib-group/"}),  # outside COO's unit scope
     ],
 )
 def test_bad_params_are_refused_with_a_denied_audit_event(client, app_engine, tool, params) -> None:
-    ctx = _ctx(client, app_engine, "t.adeyemi")
+    ctx = _ctx(client, app_engine, "coo")
     outcome, _ = run_tool(app_engine, ctx, tool, params)
     assert outcome.refused and outcome.result is None
     with pytest.raises(ToolParamError):
@@ -201,19 +201,19 @@ def _refs(response) -> set[str]:
 
 
 def test_map_features_equal_the_oracle_per_user(client) -> None:
-    assert _refs(_map(client, "a.bello")) == {
+    assert _refs(_map(client, "owner")) == {
         *("REC-046", "REC-047"),  # sensors
         *("REC-048", "REC-049", "REC-051", "REC-052", "REC-053", "REC-054"),  # detections <= 48 h
         *("REC-055", "REC-056", "REC-057", "REC-058", "REC-060"),  # missions <= 30 days
     }
-    assert _refs(_map(client, "t.adeyemi")) == {"REC-046", "REC-048", "REC-049"}
-    assert _refs(_map(client, "k.musa")) == {
+    assert _refs(_map(client, "coo")) == {"REC-046", "REC-048", "REC-049"}
+    assert _refs(_map(client, "briech.lead")) == {
         *("REC-053", "REC-055", "REC-056", "REC-057", "REC-058")  # no Secret 060
     }
 
 
 def test_map_geometry_shapes_and_window(client) -> None:
-    body = _map(client, "a.bello", hours=100, mission_days=60).json()
+    body = _map(client, "owner", hours=100, mission_days=60).json()
     assert body["type"] == "FeatureCollection"
     kinds = {f["properties"]["kind"]: f["geometry"]["type"] for f in body["features"]}
     assert kinds == {"sensor": "Point", "detection": "Point", "mission": "LineString"}
@@ -223,7 +223,7 @@ def test_map_geometry_shapes_and_window(client) -> None:
         assert {"classification", "compartments", "unit_path"} <= set(feature["properties"])
 
 
-@pytest.mark.parametrize("username", ["s.eze", "f.danjuma"])
+@pytest.mark.parametrize("username", ["group.it", "group.audit"])
 def test_map_is_empty_for_roles_without_data_access(client, username) -> None:
     response = _map(client, username)
     assert response.status_code == 200
@@ -232,18 +232,18 @@ def test_map_is_empty_for_roles_without_data_access(client, username) -> None:
 
 def test_map_requires_authentication_and_validates_window(client) -> None:
     assert client.get(MAP_PATH).status_code == 401
-    assert _map(client, "a.bello", hours=0).status_code == 422
-    assert _map(client, "a.bello", hours=100000).status_code == 422
+    assert _map(client, "owner", hours=0).status_code == 422
+    assert _map(client, "owner", hours=100000).status_code == 422
 
 
 def test_map_read_is_audited_with_the_returned_ids_only(client) -> None:
     from test_assistant_endpoints import _audit
 
-    _map(client, "t.adeyemi")
+    _map(client, "coo")
     events = [
         e
         for e in sorted(_audit(client), key=lambda e: e["seq"])
-        if e["payload"].get("resource") == "connected_map" and e["payload"]["actor"] == "t.adeyemi"
+        if e["payload"].get("resource") == "connected_map" and e["payload"]["actor"] == "coo"
     ]
     query = [e for e in events if e["payload"]["action"] == "query"][-1]["payload"]
     assert set(query["record_ids"]) == {"REC-046", "REC-048", "REC-049"}
@@ -263,10 +263,10 @@ def _replay_refs(response) -> list[str]:
 
 
 def test_replay_streams_visible_detections_in_time_order(client) -> None:
-    bello = _replay(client, "a.bello")
-    times = [f["properties"]["observed_at"] for f in bello.json()["events"]]
+    owner = _replay(client, "owner")
+    times = [f["properties"]["observed_at"] for f in owner.json()["events"]]
     assert times == sorted(times)
-    assert set(_replay_refs(bello)) == {
+    assert set(_replay_refs(owner)) == {
         "REC-048",
         "REC-049",
         "REC-051",
@@ -274,23 +274,23 @@ def test_replay_streams_visible_detections_in_time_order(client) -> None:
         "REC-053",
         "REC-054",
     }
-    assert set(_replay_refs(_replay(client, "t.adeyemi"))) == {"REC-048", "REC-049"}
-    assert _replay_refs(_replay(client, "k.musa")) == ["REC-053"]  # the UAS-OPS detection
+    assert set(_replay_refs(_replay(client, "coo"))) == {"REC-048", "REC-049"}
+    assert _replay_refs(_replay(client, "briech.lead")) == ["REC-053"]  # the UAS-OPS detection
 
 
 def test_replay_advances_with_the_clock_without_repeating(client) -> None:
-    full = _replay(client, "a.bello").json()["events"]
+    full = _replay(client, "owner").json()["events"]
     first, second = full[0]["properties"], full[1]["properties"]
-    early = _replay(client, "a.bello", upto=first["observed_at"])
+    early = _replay(client, "owner", upto=first["observed_at"])
     assert _replay_refs(early) == [first["ref"]]
-    nxt = _replay(client, "a.bello", after=first["observed_at"], upto=second["observed_at"])
+    nxt = _replay(client, "owner", after=first["observed_at"], upto=second["observed_at"])
     assert first["ref"] not in _replay_refs(nxt)
     assert second["ref"] in _replay_refs(nxt)
-    rest = _replay(client, "a.bello", after=full[-1]["properties"]["observed_at"])
+    rest = _replay(client, "owner", after=full[-1]["properties"]["observed_at"])
     assert _replay_refs(rest) == []
 
 
-@pytest.mark.parametrize("username", ["s.eze", "f.danjuma"])
+@pytest.mark.parametrize("username", ["group.it", "group.audit"])
 def test_replay_is_empty_for_roles_without_data_access(client, username) -> None:
     response = _replay(client, username)
     assert response.status_code == 200
@@ -299,19 +299,19 @@ def test_replay_is_empty_for_roles_without_data_access(client, username) -> None
 
 def test_replay_requires_authentication_and_valid_timestamps(client) -> None:
     assert client.get(REPLAY_PATH).status_code == 401
-    assert _replay(client, "a.bello", after="not-a-time").status_code == 422
-    assert _replay(client, "a.bello", upto="yesterday-ish").status_code == 422
+    assert _replay(client, "owner", after="not-a-time").status_code == 422
+    assert _replay(client, "owner", upto="yesterday-ish").status_code == 422
 
 
 def test_replay_audit_lists_only_delivered_ids(client) -> None:
     from test_assistant_endpoints import _audit
 
-    _replay(client, "t.adeyemi")
+    _replay(client, "coo")
     events = [
         e
         for e in sorted(_audit(client), key=lambda e: e["seq"])
         if e["payload"].get("resource") == "connected_replay"
-        and e["payload"]["actor"] == "t.adeyemi"
+        and e["payload"]["actor"] == "coo"
         and e["payload"]["action"] == "query"
     ]
     query = events[-1]["payload"]

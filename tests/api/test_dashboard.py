@@ -27,13 +27,13 @@ ITEM_KEYS = {
 }
 
 
-FINDING = "FND-RISING-FAULTS-BN-4"
+FINDING = "FND-RISING-FAULTS-SITE-4"
 
 
 def _run_correlation(client) -> None:
     """The finding exists only once a commander has run the job (idempotent)."""
     assert (
-        client.post("/api/v1/correlation/run", headers=auth_header(client, "a.bello")).status_code
+        client.post("/api/v1/correlation/run", headers=auth_header(client, "owner")).status_code
         == 200
     )
 
@@ -51,7 +51,7 @@ def _all_ids(body: dict) -> set[str]:
 
 
 def test_shape_is_the_contract_for_every_tile(client) -> None:
-    body = _summary(client, "a.bello").json()
+    body = _summary(client, "owner").json()
     assert set(body["tiles"]) == TILE_KEYS
     for tile in body["tiles"].values():
         assert set(tile) == {"stub", "source", "title", "items"}
@@ -60,37 +60,37 @@ def test_shape_is_the_contract_for_every_tile(client) -> None:
             assert set(item) == ITEM_KEYS
 
 
-def test_bello_and_adeyemi_get_different_dashboards(client) -> None:
-    bello = _summary(client, "a.bello").json()
-    adeyemi = _summary(client, "t.adeyemi").json()
-    assert _ids(bello, "readiness") == {"RDY-CMD", "RDY-BDE2", "RDY-BN4", "RDY-UAS"}
-    assert _ids(adeyemi, "readiness") == {"RDY-BN4"}
-    # real tiles: overdue equipment REC-011 (Bn 4) and REC-014 (Bde 2)
-    assert _ids(bello, "maintenance_backlog") == {"MNT-BN-4", "MNT-BDE-2"}
-    assert _ids(adeyemi, "maintenance_backlog") == {"MNT-BN-4"}
-    assert _ids(bello, "expiring_certifications") == {
-        "CRT-BN-4",
-        "CRT-BDE-2",
-        "CRT-UAS-WING",
-        "CRT-COMMAND-A",
+def test_owner_and_coo_get_different_dashboards(client) -> None:
+    owner = _summary(client, "owner").json()
+    coo = _summary(client, "coo").json()
+    assert _ids(owner, "readiness") == {"RDY-CMD", "RDY-STRATOC", "RDY-SITE4", "RDY-UAS"}
+    assert _ids(coo, "readiness") == {"RDY-SITE4"}
+    # real tiles: overdue equipment REC-011 (Site 4) and REC-014 (Stratoc)
+    assert _ids(owner, "maintenance_backlog") == {"MNT-SITE-4", "MNT-STRATOC"}
+    assert _ids(coo, "maintenance_backlog") == {"MNT-SITE-4"}
+    assert _ids(owner, "expiring_certifications") == {
+        "CRT-SITE-4",
+        "CRT-STRATOC",
+        "CRT-BRIECH",
+        "CRT-EIB-GROUP",
     }
-    assert _ids(adeyemi, "expiring_certifications") == {"CRT-BN-4"}
-    assert _all_ids(adeyemi) < _all_ids(bello)
+    assert _ids(coo, "expiring_certifications") == {"CRT-SITE-4"}
+    assert _all_ids(coo) < _all_ids(owner)
 
 
-def test_secret_finding_is_visible_to_bello_and_absent_for_adeyemi(client) -> None:
+def test_secret_finding_is_visible_to_owner_and_absent_for_coo(client) -> None:
     _run_correlation(client)
-    bello = _summary(client, "a.bello").json()
-    adeyemi = _summary(client, "t.adeyemi").json()
-    assert _ids(bello, "recent_findings") == {FINDING}
-    assert _ids(adeyemi, "recent_findings") == set()
+    owner = _summary(client, "owner").json()
+    coo = _summary(client, "coo").json()
+    assert _ids(owner, "recent_findings") == {FINDING}
+    assert _ids(coo, "recent_findings") == set()
     # Nowhere in the raw response either, not even as text.
     for needle in (FINDING, "spare-part shortage", "lapsed maintainer"):
-        assert needle not in _summary(client, "t.adeyemi").text
+        assert needle not in _summary(client, "coo").text
 
 
 def test_tiles_are_real_exactly_where_the_data_is_real(client) -> None:
-    tiles = _summary(client, "a.bello").json()["tiles"]
+    tiles = _summary(client, "owner").json()["tiles"]
     assert {k: t["stub"] for k, t in tiles.items()} == {
         "readiness": True,
         "maintenance_backlog": False,
@@ -103,45 +103,45 @@ def test_tiles_are_real_exactly_where_the_data_is_real(client) -> None:
 def test_real_tile_items_are_derived_and_inherit_classification(client) -> None:
     items = {
         i["id"]: i
-        for i in _summary(client, "a.bello").json()["tiles"]["expiring_certifications"]["items"]
+        for i in _summary(client, "owner").json()["tiles"]["expiring_certifications"]["items"]
     }
-    # one Secret/UAS-OPS record in the UAS Wing group: the count inherits both
-    assert items["CRT-UAS-WING"]["classification"] == "secret"
-    assert items["CRT-UAS-WING"]["compartments"] == ["UAS-OPS"]
-    # Bde 2 group mixes Restricted and Confidential records: highest wins
-    assert items["CRT-BDE-2"]["classification"] == "confidential"
-    assert items["CRT-BDE-2"]["value"] == 2
-    assert items["CRT-BN-4"]["detail"] == "REC-019, REC-020, REC-041, REC-042"
+    # one Secret/UAS-OPS record in the Briech UAS group: the count inherits both
+    assert items["CRT-BRIECH"]["classification"] == "secret"
+    assert items["CRT-BRIECH"]["compartments"] == ["UAS-OPS"]
+    # Stratoc group mixes Restricted and Confidential records: highest wins
+    assert items["CRT-STRATOC"]["classification"] == "confidential"
+    assert items["CRT-STRATOC"]["value"] == 2
+    assert items["CRT-SITE-4"]["detail"] == "REC-019, REC-020, REC-041, REC-042"
 
 
 def test_real_tiles_call_the_audited_typed_tools(client) -> None:
-    _summary(client, "t.adeyemi")
+    _summary(client, "coo")
     tools = {
         e["payload"]["tool"]
         for e in _audit(client)
-        if e["payload"].get("action") == "data_query" and e["payload"]["actor"] == "t.adeyemi"
+        if e["payload"].get("action") == "data_query" and e["payload"]["actor"] == "coo"
     }
     assert {"equipment_due_for_maintenance", "expired_certifications"} <= tools
 
 
 def test_confidential_user_sees_confidential_but_not_secret(client) -> None:
-    okafor = _summary(client, "a.okafor").json()
+    logistics_head = _summary(client, "logistics.head").json()
     _run_correlation(client)
-    assert _ids(_summary(client, "a.okafor").json(), "recent_findings") == set()
-    # UAS Wing is outside Okafor's unit scope (and needs UAS-OPS).
-    assert "RDY-UAS" not in _ids(okafor, "readiness")
+    assert _ids(_summary(client, "logistics.head").json(), "recent_findings") == set()
+    # Briech UAS is outside The logistics head's unit scope (and needs UAS-OPS).
+    assert "RDY-UAS" not in _ids(logistics_head, "readiness")
 
 
 def test_compartment_item_needs_the_compartment(client) -> None:
-    musa = _summary(client, "k.musa").json()
-    # Musa holds UAS-OPS and is in the UAS Wing: sees only that unit's items.
-    # (the Secret expired UAS certification is above Musa's clearance)
-    assert _all_ids(musa) == {"RDY-UAS"}
+    briech_lead = _summary(client, "briech.lead").json()
+    # The Briech lead holds UAS-OPS and is in the Briech UAS: sees only that unit's items.
+    # (the Secret expired UAS certification is above The Briech lead's clearance)
+    assert _all_ids(briech_lead) == {"RDY-UAS"}
 
 
 def test_no_data_roles_get_403(client) -> None:
-    assert _summary(client, "s.eze").status_code == 403
-    assert _summary(client, "f.danjuma").status_code == 403
+    assert _summary(client, "group.it").status_code == 403
+    assert _summary(client, "group.audit").status_code == 403
 
 
 def test_unauthenticated_is_401(client) -> None:
@@ -149,39 +149,37 @@ def test_unauthenticated_is_401(client) -> None:
 
 
 def test_every_returned_item_is_labelled_with_its_classification(client) -> None:
-    body = _summary(client, "a.bello").json()
+    body = _summary(client, "owner").json()
     _run_correlation(client)
-    body = _summary(client, "a.bello").json()
+    body = _summary(client, "owner").json()
     secret = [i for t in body["tiles"].values() for i in t["items"] if i["id"] == FINDING][0]
     assert secret["classification"] == "secret"
-    assert secret["unit_name"] == "Battalion 4"
+    assert secret["unit_name"] == "Stratoc Site Team 4"
 
 
 def test_audit_events_are_written(client) -> None:
-    body = _summary(client, "t.adeyemi").json()
+    body = _summary(client, "coo").json()
     events = _audit(client)
-    decide = _latest(events, actor="t.adeyemi", action="decide", resource="dashboard")
-    query = _latest(events, actor="t.adeyemi", action="query", resource="dashboard")
+    decide = _latest(events, actor="coo", action="decide", resource="dashboard")
+    query = _latest(events, actor="coo", action="query", resource="dashboard")
     assert decide["payload"]["decision"] == "allow"
     assert query["payload"]["rows"] == len(_all_ids(body))
     assert sorted(query["payload"]["item_ids"]) == sorted(_all_ids(body))
 
 
 def test_denied_call_is_audited(client) -> None:
-    _summary(client, "s.eze")
-    deny = _latest(_audit(client), actor="s.eze", action="decide", resource="dashboard")
+    _summary(client, "group.it")
+    deny = _latest(_audit(client), actor="group.it", action="decide", resource="dashboard")
     assert deny["payload"]["decision"] == "deny" and deny["payload"]["reasons"]
 
 
 def test_tool_queries_are_audited_after_the_decision_that_allowed_them(client) -> None:
     """One batch per request, in causal order: decide, the tiles' data_query events, query."""
     tip = max(event["seq"] for event in _audit(client))
-    _summary(client, "a.bello")
+    _summary(client, "owner")
     mine = [
         e["payload"]["action"]
         for e in sorted(_audit(client), key=lambda e: e["seq"])
-        if e["seq"] > tip
-        and e["payload"]["actor"] == "a.bello"
-        and e["payload"]["action"] != "login"
+        if e["seq"] > tip and e["payload"]["actor"] == "owner" and e["payload"]["action"] != "login"
     ]
     assert mine == ["decide", "data_query", "data_query", "query"]

@@ -20,40 +20,40 @@ from sqlalchemy.engine import Engine
 
 # SPEC 7.4 demo users — access context hand-authored, independent of app.seed.
 CONTEXTS: dict[str, dict] = {
-    "a.bello": {
+    "owner": {
         "clearance_rank": 3,
-        "compartments": ["UAS-OPS", "FORENSICS"],
-        "unit_path": "/command-a/",
+        "compartments": ["UAS-OPS", "FORENSICS", "CLIENT-A", "CLIENT-B", "CLIENT-C", "CLIENT-D"],
+        "unit_path": "/eib-group/",
         "data_scope": "standard",
     },
-    "a.okafor": {
+    "logistics.head": {
         "clearance_rank": 2,
         "compartments": [],
-        "unit_path": "/command-a/bde-2/",
+        "unit_path": "/eib-group/stratoc/",
         "data_scope": "standard",
     },
-    "t.adeyemi": {
+    "coo": {
         "clearance_rank": 1,
         "compartments": [],
-        "unit_path": "/command-a/bde-2/bn-4/",
+        "unit_path": "/eib-group/stratoc/site-4/",
         "data_scope": "standard",
     },
-    "k.musa": {
+    "briech.lead": {
         "clearance_rank": 2,
         "compartments": ["UAS-OPS"],
-        "unit_path": "/command-a/uas-wing/",
+        "unit_path": "/eib-group/briech/",
         "data_scope": "standard",
     },
-    "s.eze": {
+    "group.it": {
         "clearance_rank": -1,
         "compartments": [],
-        "unit_path": "/hq-it/",
+        "unit_path": "/group-it/",
         "data_scope": "none",
     },
-    "f.danjuma": {
+    "group.audit": {
         "clearance_rank": 1,
         "compartments": [],
-        "unit_path": "/hq-inspectorate/",
+        "unit_path": "/group-audit/",
         "data_scope": "audit",
     },
 }

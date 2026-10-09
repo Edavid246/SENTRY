@@ -73,21 +73,7 @@ in each step's report.
 ## Demo answer cache (prefill)
 
 The hosted model is slow and quota-limited, so the demo can replay answers recorded
-earlier. `scripts/prefill_cache.py` logs in as each demo user (the asker plus `a.bello`
-and `t.adeyemi`), asks every `built` assistant question in `data/demo_questions.json`
-through `POST /api/v1/assistant/query` with `LLM_CACHE_RECORD=1` (refused unless
-`APP_PROFILE=dev`), and writes `data/demo_llm_cache.json`. `--verify` then re-asks every
-pair with the hosted provider disabled (`LLM_CACHE_ONLY=1`, key ignored) and prints a
-pass/fail table. A failure is reported, never filled with a placeholder answer.
-
-**Quota.** The Gemini free tier allows 20 `gemini-3.5-flash` requests a day per project,
-and a full record run needs about 19 (the other pairs make no model call). A 429 with
-"limit: 20" means the day is spent: wait for the reset, then re-run. Record mode reuses
-any answer already in the cache (shown as `already recorded`, no call spent), so a
-re-run only pays for what is missing. To record everything afresh, delete
-`data/demo_llm_cache.json` first. The model's output budget is 4096 tokens because
-Gemini 3.5 Flash spends about 1000 of them thinking; an answer cut off at the limit is
-an error, never cached.
+earlier. This is a convenience, not a gate: if something is missing, the demo carries on.
 
 ```bash
 set -a && . ./.env && set +a
@@ -95,71 +81,48 @@ uv run python scripts/prefill_cache.py            # record (live Gemini, a few m
 uv run python scripts/prefill_cache.py --verify   # cache-only check
 ```
 
-> **Re-run the prefill after the code freeze.** Cache keys hash the exact model request
-> (system prompt + retrieved evidence + question), so **any change to prompts, the
-> corpus, chunking, retrieval, typed tools or the seeded data (including re-seeding on
-> a different day without the pin below) invalidates the cache**. A stale cache
-> does not fail quietly into wrong answers: a miss in cache-only mode is a 503. Ask each
-> demo question as the first message of a new chat; follow-ups carry history and have
-> their own keys. The prefill and verify runs add queries and audit events to the dev
-> database; every one of those events is tagged `source: "prefill"` (or
-> `"prefill-verify"`) in its audit payload and shows as a badge in the audit viewer.
-> The tag never reaches a prompt or a cache key.
->
-> **A cache miss never shows an error.** If the assistant answers 503 (nothing recorded for
-> that question in cache-only mode) or says nothing for 30 seconds, the chat shows a calm
-> panel: "This demonstration runs on recorded answers for its scripted questions. Live
-> model access is disabled in this environment." The wait ends at 30 s (the request is
-> abandoned in the browser; the server still logged it). `web/smoke/cache_miss.mjs`
-> checks both paths with Playwright against `STUB_MODE=unavailable web/smoke/stub_api.py`.
->
-> **`DEMO_DATE=2026-10-07` for the demo.** One setting pins the business date for exactly
-> two things: the seed's date offsets and the data tools' cutoffs ("due within 30
-> days", "expired"). Those decide which records reach a model prompt, so with the pin
-> the cache keys do not move as the calendar does. Set it in `.env` for the prefill,
-> the verify run and the demo, and re-seed with it
-> (`DEMO_DATE=2026-10-07 python -m app.seed`, then the ingest script). Unset (the
-> default) means the live clock. It is dev-profile only (the API refuses to start
-> otherwise) and never touches audit timestamps, token times, `created_at` or
-> `retrieved_at`. The dev database was seeded on 2026-10-07, so it already matches.
->
-> **Ingest.** A plain re-ingest is safe: chunk ids are uuid5 of document ref + chunk
-> index, and a test proves two from-scratch ingests give identical ids and text.
-> Regenerating the documents or changing the chunker invalidates the cache.
->
-> **Verify in the way you demo.** If the demo runs in compose, start the API with
-> `LLM_CACHE_ONLY=1` and click through each question once as the real user before
-> Monday. Evidence is sorted by chunk id in the prompt so ranking noise cannot change
-> a key, but only a run in the demo configuration proves it.
+What to know (facts, not rules):
+- Cache keys hash the exact model request (prompt + retrieved evidence + question). Changing
+  prompts, the corpus, chunking, retrieval, tools or seed data changes the keys, so re-run
+  the prefill after such a change. Cosmetic and UI changes do not matter.
+- Record mode reuses answers already cached, so a re-run only pays for what is missing. The
+  Gemini free tier allows about 20 requests a day (a full run needs about 19); a 429 means
+  wait for the 00:00 UTC reset. To start afresh, delete `data/demo_llm_cache.json`.
+- A failed or truncated answer is reported, never cached. Prefill and verify events carry a
+  `source: "prefill"` tag in the audit viewer.
+- `DEMO_DATE=2026-10-07` in `.env` pins the business date so keys do not drift with the
+  calendar. Dev profile only.
+- Plain re-ingest is safe: chunk ids are stable.
+
+**If a question misses the cache on the day**, in order of preference:
+1. If the Gemini key and quota are available, run without `LLM_CACHE_ONLY` and let the
+   question go live. It is a dev-profile demo; the live model is allowed.
+2. Otherwise the chat shows the calm "recorded answers" panel. Say so plainly and move to
+   the next step. The script is a guide, not a contract; any step can be skipped or
+   reordered.
+
+Follow-up questions have their own cache keys, so lead with the scripted wording. Ad-lib
+questions are fine when the live model is on.
 
 ## Demo-day checklist
 
-Run from the repo root, in this order, with `DEMO_DATE=2026-10-07` set in `.env`.
+Must (the demo does not work without these):
+1. `docker compose -f infra/compose.yaml up -d db`, then `cd backend && uv run alembic upgrade head`.
+2. Seed and ingest: `set -a && . ./.env && set +a; uv run python -m app.seed`, then
+   `uv run python scripts/ingest_documents.py`.
+3. Start the API (`uv run uvicorn app.main:app --port 8001`; Windows without uv on PATH:
+   `.venv/Scripts/python.exe -m uvicorn app.main:app --port 8001 --app-dir backend`) and the
+   UI (`cd web && npm run dev`, :3000).
+4. Log in as `owner`, click "Run correlation" on the dashboard (the reseed clears
+   findings), and check `FND-RISING-FAULTS-BN-4` appears, labelled Secret.
+5. Audit viewer: run verify. Expect `valid`, `checkpoint_ok` and `ledger_ok` true. The git
+   ledger path is `C:\Users\PC\projects\gateway-audit-ledger` on this machine; elsewhere run
+   `scripts/setup_audit_ledger.sh <path>` and set `AUDIT_LEDGER_PATH`.
 
-1. **Database up:** `docker compose -f infra/compose.yaml up -d db` (Postgres on :5434).
-2. **Schema first:** `cd backend && uv run alembic upgrade head && cd ..`. The seed and
-   the API expect the latest migration.
-3. **Reseed:** `set -a && . ./.env && set +a; uv run python -m app.seed`.
-4. **Ingest documents:** `uv run python scripts/ingest_documents.py`. Chunk ids are stable,
-   so this does not move the cache keys.
-5. **Audit ledger:** on this machine the git ledger lives at
-   `C:\Users\PC\projects\gateway-audit-ledger` (the `audit_ledger_path` default). On a new
-   machine, initialise it once with `scripts/setup_audit_ledger.sh <path>` and set
-   `AUDIT_LEDGER_PATH` if the path differs.
-6. **Start the API:** `uv run uvicorn app.main:app --port 8001` (on Windows without uv on
-   PATH: `.venv/Scripts/python.exe -m uvicorn app.main:app --port 8001 --app-dir backend`).
-   Then `cd web && npm run dev` for the UI on :3000.
-7. **Run correlation as `a.bello`:** the reseed clears findings, so click "Run correlation"
-   on the dashboard (or `POST /api/v1/correlation/run`) before the demo. Check that
-   `FND-RISING-FAULTS-BN-4` appears and is labelled Secret.
-8. **Cache prefill (needs the Gemini key):** `uv run python scripts/prefill_cache.py`, then
-   `--verify` until every row passes. Re-run it after any change to prompts, seed data,
-   documents or tools (see above).
-9. **Demo configuration:** restart the API with `LLM_CACHE_ONLY=1` and click through each
-   scripted question once, each as the first message of a new chat, as the user who
-   asks it in the script.
-10. **Audit check:** open the audit viewer and run verify. Expect `valid`, `checkpoint_ok`
-    and `ledger_ok` all true.
+Should (cheap insurance, skip if short of time):
+6. `prefill_cache.py`, then `--verify`, if anything that affects keys changed since the last
+   good run.
+7. One click-through of the scripted questions, as the users who ask them.
 
 ## Cut entirely (AGENTS.md DEMO CUT)
 

@@ -65,16 +65,16 @@ try {
   // login screen + failure
   await page.goto(BASE);
   await shot("01-login");
-  await login("a.bello", "wrong-password");
+  await login("owner", "wrong-password");
   await page.waitForSelector("text=Invalid credentials");
   check(true, "bad password shows inline 'Invalid credentials'");
   await shot("02-login-invalid");
 
-  // a.bello: policy question -> cited answer -> open citation
-  await login("a.bello");
+  // owner: policy question -> cited answer -> open citation
+  await login("owner");
   await page.waitForURL("**/dashboard");
   await page.waitForSelector('[data-testid="user-name"]');
-  check((await page.textContent('[data-testid="clearance-badge"]')).includes("SECRET"), "a.bello clearance badge is SECRET");
+  check((await page.textContent('[data-testid="clearance-badge"]')).includes("GOVERNMENT-SENSITIVE"), "owner clearance badge is GOVERNMENT-SENSITIVE");
   check((await page.locator("text=UAS-OPS").count()) > 0, "compartment tags shown");
   check((await page.locator('a[href="/audit"]').count()) === 0, "audit nav hidden without read_audit");
 
@@ -84,14 +84,14 @@ try {
   // the finding exists once a commander runs the correlation job
   await page.click('[data-testid="run-correlation"]');
   await page.waitForSelector('[data-testid="finding-link"]');
-  check((await page.locator('[data-testid="item-FND-RISING-FAULTS-BN-4"]').count()) === 1, "a.bello sees the Secret finding after running correlation");
-  const belloItems = await page.locator('[data-testid^="item-"]').count();
-  await shot("13-dashboard-bello");
+  check((await page.locator('[data-testid="item-FND-RISING-FAULTS-SITE-4"]').count()) === 1, "owner sees the Secret finding after running correlation");
+  const ownerItems = await page.locator('[data-testid^="item-"]').count();
+  await shot("13-dashboard-owner");
   await page.click('[data-testid="finding-link"]');
   await page.waitForSelector('[data-testid="finding-detail"]');
   const evidence = await page.locator('[data-testid="evidence-link"]').count();
   check(evidence === 10, `finding detail lists its evidence (${evidence} records)`);
-  check((await page.textContent('[data-testid="finding-detail"]')).includes("SECRET"), "finding detail shows the derived SECRET label");
+  check((await page.textContent('[data-testid="finding-detail"]')).includes("GOVERNMENT-SENSITIVE"), "finding detail shows the derived GOVERNMENT-SENSITIVE label");
   await shot("17-finding-detail");
   await page.locator('[data-testid="evidence-link"]').first().click();
   await page.waitForSelector('[data-testid="record-detail"]');
@@ -102,26 +102,26 @@ try {
   await page.waitForURL("**/chat");
   await shot("03-chat-empty");
   await ask(POLICY);
-  const belloCites = await page.locator('[data-testid="citation-badge"]').count();
-  check(belloCites > 0, `policy answer carries citations (${belloCites})`);
-  await shot("04-bello-policy-answer");
+  const ownerCites = await page.locator('[data-testid="citation-badge"]').count();
+  check(ownerCites > 0, `policy answer carries citations (${ownerCites})`);
+  await shot("04-owner-policy-answer");
   await page.locator('[data-testid="citation-badge"]').first().click();
   await page.waitForSelector('[data-testid="passage-panel"] blockquote');
   check(true, "citation opens the passage in the side panel");
-  await shot("05-bello-citation-panel");
+  await shot("05-owner-citation-panel");
 
   // reporting: a draft over records and documents, marked and labelled
   await ask(REPORT);
   await page.waitForSelector('[data-testid="draft-banner"]');
-  check((await page.textContent('[data-testid="draft-banner"]')).includes("UAS-OPS"), "a.bello draft carries the derived UAS-OPS label");
-  check((await page.locator('[data-testid="msg-assistant"]').last().textContent()).includes("REC-044"), "a.bello draft covers the UAS training event");
-  await shot("20-report-bello");
-  // a.bello: equipment question -> table
+  check((await page.textContent('[data-testid="draft-banner"]')).includes("UAS-OPS"), "owner draft carries the derived UAS-OPS label");
+  check((await page.locator('[data-testid="msg-assistant"]').last().textContent()).includes("REC-044"), "owner draft covers the UAS training event");
+  await shot("20-report-owner");
+  // owner: equipment question -> table
   await ask(EQUIPMENT);
   await page.waitForSelector('[data-testid="result-table"]');
-  const belloRows = await page.locator('[data-testid="result-table"] tbody tr').count();
-  check(belloRows > 0, `equipment answer renders a result table (${belloRows} rows)`);
-  await shot("06-bello-equipment-table");
+  const ownerRows = await page.locator('[data-testid="result-table"] tbody tr').count();
+  check(ownerRows > 0, `equipment answer renders a result table (${ownerRows} rows)`);
+  await shot("06-owner-equipment-table");
   await page.locator('[data-testid="record-link"]').first().click();
   await page.waitForSelector('[data-testid="record-detail"]');
   check(true, "a result-table row link opens the record detail");
@@ -130,15 +130,15 @@ try {
   // map: sensors, detections and missions from the connected-data endpoint
   await page.click('a[href="/map"]');
   await page.waitForSelector('[data-testid="map-canvas"][data-ready="true"]');
-  check((await page.textContent('[data-testid="count-sensor"]')) === "2", "a.bello map shows 2 sensors");
-  check((await page.textContent('[data-testid="count-detection"]')) === "6", "a.bello map shows 6 detections");
-  check((await page.textContent('[data-testid="count-mission"]')) === "5", "a.bello map shows 5 missions");
+  check((await page.textContent('[data-testid="count-sensor"]')) === "2", "owner map shows 2 sensors");
+  check((await page.textContent('[data-testid="count-detection"]')) === "6", "owner map shows 6 detections");
+  check((await page.textContent('[data-testid="count-mission"]')) === "5", "owner map shows 5 missions");
   await basemapLoaded;
   check(true, "offline basemap archive is served by this app");
   await page.click('[data-testid="map-item-REC-060"]');
   await page.waitForSelector('[data-testid="map-detail"]');
-  check((await page.textContent('[data-testid="map-detail"]')).includes("SECRET"), "Secret mission detail carries its classification badge");
-  await shot("17-map-bello");
+  check((await page.textContent('[data-testid="map-detail"]')).includes("GOVERNMENT-SENSITIVE"), "Secret mission detail carries its classification badge");
+  await shot("17-map-owner");
   // replay: detections arrive over time as the replay clock advances (stub live feed)
   await page.click('[data-testid="replay-toggle"]');
   await page.waitForSelector('[data-testid="replay-clock"]');
@@ -152,47 +152,47 @@ try {
   check(true, "map detail links to the record page");
   await logout();
 
-  // t.adeyemi: same questions -> fewer results
-  await login("t.adeyemi");
+  // coo: same questions -> fewer results
+  await login("coo");
   await page.waitForURL("**/dashboard");
   await page.waitForSelector('[data-testid="tile-recent_findings"]');
-  check((await page.locator('[data-testid="finding-link"]').count()) === 0, "t.adeyemi does not see the Secret finding");
-  check((await page.locator('[data-testid="run-correlation"]').count()) === 0, "t.adeyemi has no run-correlation button");
-  const adeyemiItems = await page.locator('[data-testid^="item-"]').count();
-  check(adeyemiItems < belloItems, `t.adeyemi dashboard is smaller (${adeyemiItems} < ${belloItems} items)`);
-  await shot("14-dashboard-adeyemi");
+  check((await page.locator('[data-testid="finding-link"]').count()) === 0, "coo does not see the Secret finding");
+  check((await page.locator('[data-testid="run-correlation"]').count()) === 0, "coo has no run-correlation button");
+  const cooItems = await page.locator('[data-testid^="item-"]').count();
+  check(cooItems < ownerItems, `coo dashboard is smaller (${cooItems} < ${ownerItems} items)`);
+  await shot("14-dashboard-coo");
   await page.click('a[href="/chat"]');
   await page.waitForURL("**/chat");
   await page.waitForSelector('[data-testid="user-name"]');
   await ask(POLICY);
-  const adeyemiCites = await page.locator('[data-testid="citation-badge"]').count();
+  const cooCites = await page.locator('[data-testid="citation-badge"]').count();
   await ask(REPORT);
   await page.waitForSelector('[data-testid="draft-banner"]');
   const draftText = await page.locator('[data-testid="msg-assistant"]').last().textContent();
-  check(!draftText.includes("REC-044") && !draftText.includes("UAS-OPS"), "t.adeyemi draft has no UAS record and no UAS-OPS label");
-  await shot("21-report-adeyemi");
+  check(!draftText.includes("REC-044") && !draftText.includes("UAS-OPS"), "coo draft has no UAS record and no UAS-OPS label");
+  await shot("21-report-coo");
   await ask(EQUIPMENT);
   await page.waitForSelector('[data-testid="result-table"]');
-  const adeyemiRows = await page.locator('[data-testid="result-table"] tbody tr').count();
-  check(adeyemiRows < belloRows, `t.adeyemi sees fewer equipment rows (${adeyemiRows} < ${belloRows})`);
-  check(adeyemiCites <= belloCites, `t.adeyemi citations ${adeyemiCites} <= a.bello ${belloCites}`);
-  await shot("07-adeyemi-fewer-results");
-  await page.goto(BASE + "/findings/FND-RISING-FAULTS-BN-4");
+  const cooRows = await page.locator('[data-testid="result-table"] tbody tr').count();
+  check(cooRows < ownerRows, `coo sees fewer equipment rows (${cooRows} < ${ownerRows})`);
+  check(cooCites <= ownerCites, `coo citations ${cooCites} <= owner ${ownerCites}`);
+  await shot("07-coo-fewer-results");
+  await page.goto(BASE + "/findings/FND-RISING-FAULTS-SITE-4");
   await page.waitForSelector('[data-testid="finding-error"]');
-  check(true, "t.adeyemi gets 'not found' for the Secret finding page");
+  check(true, "coo gets 'not found' for the Secret finding page");
   await page.goto(BASE + "/records/REC-023");
   await page.waitForSelector('[data-testid="record-error"]');
-  check(true, "t.adeyemi gets 'not found' for a Secret UAS record, same as a missing one");
-  await shot("16-record-hidden-adeyemi");
+  check(true, "coo gets 'not found' for a Secret UAS record, same as a missing one");
+  await shot("16-record-hidden-coo");
   await page.goto(BASE + "/map");
   await page.waitForSelector('[data-testid="map-canvas"][data-ready="true"]');
-  check((await page.textContent('[data-testid="count-mission"]')) === "0", "t.adeyemi map shows no missions");
-  check((await page.locator('[data-testid="map-item-REC-060"]').count()) === 0, "t.adeyemi map never lists the Secret mission");
-  await shot("18-map-adeyemi");
+  check((await page.textContent('[data-testid="count-mission"]')) === "0", "coo map shows no missions");
+  check((await page.locator('[data-testid="map-item-REC-060"]').count()) === 0, "coo map never lists the Secret mission");
+  await shot("18-map-coo");
   await logout();
 
-  // f.danjuma: audit -> verify chain
-  await login("f.danjuma");
+  // group.audit: audit -> verify chain
+  await login("group.audit");
   await page.waitForURL("**/audit");
   check((await page.locator('a[href="/dashboard"]').count()) === 0, "auditor has no dashboard nav");
   await page.waitForSelector('[data-testid="audit-row"]');

@@ -81,18 +81,16 @@ def test_prefill_plan_covers_built_assistant_questions_for_both_users() -> None:
         q for q in questions["questions"] if q["status"] == "built" and q["pathway"] != "audit"
     ]
     for entry in built:
-        for user in ("a.bello", "t.adeyemi"):
+        for user in ("owner", "coo"):
             assert (user, entry["question"]) in seen
-    assert not any(pair.user == "f.danjuma" for pair in pairs)  # audit viewer, not the assistant
+    assert not any(pair.user == "group.audit" for pair in pairs)  # audit viewer, not the assistant
 
 
 def test_record_then_cache_only_answers_every_pair(client, pipeline) -> None:
     module = _load_prefill()
     questions = json.loads((REPO / "data/demo_questions.json").read_text(encoding="utf-8"))
     pairs = module.plan_pairs(questions["questions"])
-    pairs += [
-        module.Pair(u, SHORT_KNOWLEDGE_QUESTION, ("short",)) for u in ("a.bello", "t.adeyemi")
-    ]
+    pairs += [module.Pair(u, SHORT_KNOWLEDGE_QUESTION, ("short",)) for u in ("owner", "coo")]
     state, cache, fake = pipeline
 
     for pair in pairs:
@@ -116,7 +114,7 @@ def test_record_then_cache_only_answers_every_pair(client, pipeline) -> None:
 def test_cache_only_miss_is_provider_unavailable_not_a_made_up_answer(client, pipeline) -> None:
     state, cache, fake = pipeline
     state["gateway"] = AIGateway(fake, cache=cache, cache_only=True)
-    response = _ask(client, "a.bello", SHORT_KNOWLEDGE_QUESTION)
+    response = _ask(client, "owner", SHORT_KNOWLEDGE_QUESTION)
     assert response.status_code == 503
     assert fake.calls == 0
     with pytest.raises(ProviderUnavailableError):
@@ -127,7 +125,7 @@ def test_recorded_prompts_hold_only_what_the_user_may_see(client, pipeline) -> N
     """Principle Zero in the cache: a recorded request is the exact prompt sent to the
     model, so it must never contain a source the asking user is not cleared for."""
     state, cache, fake = pipeline
-    assert _ask(client, "t.adeyemi", SHORT_KNOWLEDGE_QUESTION).status_code == 200
+    assert _ask(client, "coo", SHORT_KNOWLEDGE_QUESTION).status_code == 200
     recorded = json.loads(cache.path.read_text(encoding="utf-8"))
     assert recorded
     for entry in recorded.values():

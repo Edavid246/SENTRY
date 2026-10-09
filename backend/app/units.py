@@ -15,5 +15,5 @@ def unit_names(conn: Connection) -> dict[str, str]:
 
 
 def unit_slug(unit_path: str) -> str:
-    """The last path segment, upper-cased: '/command-a/bde-2/bn-4/' -> 'BN-4'."""
+    """The last path segment, upper-cased: '/eib-group/stratoc/site-4/' -> 'SITE-4'."""
     return unit_path.strip("/").split("/")[-1].upper()

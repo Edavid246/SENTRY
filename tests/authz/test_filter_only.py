@@ -19,21 +19,21 @@ from sqlalchemy.engine import Engine
 from test_rls_only import CONTEXTS, USERNAMES
 
 ROLES: dict[str, str] = {
-    "a.bello": "commander",
-    "a.okafor": "logistics",
-    "t.adeyemi": "training",
-    "k.musa": "uas_ops",
-    "s.eze": "sysadmin",
-    "f.danjuma": "auditor",
+    "owner": "commander",
+    "logistics.head": "logistics",
+    "coo": "training",
+    "briech.lead": "uas_ops",
+    "group.it": "sysadmin",
+    "group.audit": "auditor",
 }
 
 CLEARANCE_CODES: dict[str, str | None] = {
-    "a.bello": "secret",
-    "a.okafor": "confidential",
-    "t.adeyemi": "restricted",
-    "k.musa": "confidential",
-    "s.eze": None,
-    "f.danjuma": "restricted",
+    "owner": "secret",
+    "logistics.head": "confidential",
+    "coo": "restricted",
+    "briech.lead": "confidential",
+    "group.it": None,
+    "group.audit": "restricted",
 }
 
 POLICY = LocalPolicy()

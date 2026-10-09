@@ -42,7 +42,7 @@ const ASK_TIMEOUT_MS = 30_000;
 const STARTERS = [
   "Find the documents relating to the vehicle maintenance policy and summarize the key requirements.",
   "Show me the equipment currently awaiting maintenance.",
-  "Prepare a summary of training activity for this command over the last quarter.",
+  "Prepare a summary of training activity for this group over the last quarter.",
 ];
 
 let counter = 0;

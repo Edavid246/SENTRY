@@ -33,8 +33,8 @@ export interface paths {
          * @description UI-facing identity read: exactly the context fields the shell needs.
          *
          *     `unit_breadcrumb` resolves the caller's unit path to readable unit names
-         *     (oldest ancestor first) so the top bar can show "Command A > Brigade 2 >
-         *     Battalion 4"; `permissions` is what the nav may offer — the server still
+         *     (oldest ancestor first) so the top bar can show "EIB Group > EIB Stratoc >
+         *     Stratoc Site Team 4"; `permissions` is what the nav may offer — the server still
          *     enforces every action itself (SPEC 7.1).
          */
         get: operations["me_api_v1_me_get"];
@@ -541,7 +541,7 @@ export interface components {
         FindingOut: {
             /**
              * Id
-             * @description stable finding id, e.g. FND-RISING-FAULTS-BN-4
+             * @description stable finding id, e.g. FND-RISING-FAULTS-SITE-4
              */
             id: string;
             /** Analysis */

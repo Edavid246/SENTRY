@@ -95,12 +95,12 @@ All names, units and documents are fictitious.
 
 | User | Role | Unit | Clearance | Compartments |
 |---|---|---|---|---|
-| Lt Col A. Bello (`a.bello`) | Commander | Command A | Secret | UAS-OPS, FORENSICS |
-| Maj. A. Okafor (`a.okafor`) | Logistics Officer | Command A › Bde 2 | Confidential | — |
-| Capt. T. Adeyemi (`t.adeyemi`) | Training Officer | Command A › Bde 2 › Bn 4 | Restricted | — |
-| Lt. K. Musa (`k.musa`) | UAS Operations Officer | Command A › UAS Wing | Confidential | UAS-OPS |
-| Mr. S. Eze (`s.eze`) | System Administrator | HQ IT | None (no data access) | — |
-| Mrs. F. Danjuma (`f.danjuma`) | Auditor | HQ Inspectorate | Restricted (audit only) | — |
+| Group Owner (`owner`) | Commander role | EIB Group | Government-sensitive | UAS-OPS, FORENSICS, CLIENT-A..D |
+| Head of Production & Logistics (`logistics.head`) | Logistics | EIB Group › EIB Stratoc | Confidential | — |
+| Group COO, limited view (`coo`) | Training | EIB Group › EIB Stratoc › Stratoc Site Team 4 | Internal | — |
+| Briech UAS Lead (`briech.lead`) | UAS operations | EIB Group › Briech UAS | Confidential | UAS-OPS |
+| Group IT (`group.it`) | System administrator | Group IT | None (no data access) | — |
+| Group Audit (`group.audit`) | Auditor | Group Audit | Internal (audit only) | — |
 
 Shared demo password: `Demo!Gateway2026` (dev seed only).
 

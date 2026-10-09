@@ -48,7 +48,7 @@ async function assertCalm() {
 
 try {
   await page.goto(BASE);
-  await page.fill("#username", "a.bello");
+  await page.fill("#username", "owner");
   await page.fill("#password", PASSWORD);
   await page.click("button[type=submit]");
   await page.waitForURL("**/dashboard");

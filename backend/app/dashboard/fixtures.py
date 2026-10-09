@@ -37,10 +37,10 @@ class FixtureTile:
     items: tuple[FixtureItem, ...]
 
 
-_CMD = "/command-a/"
-_BDE2 = "/command-a/bde-2/"
-_BN4 = "/command-a/bde-2/bn-4/"
-_UAS = "/command-a/uas-wing/"
+_CMD = "/eib-group/"
+_STRATOC = "/eib-group/stratoc/"
+_SITE4 = "/eib-group/stratoc/site-4/"
+_UAS = "/eib-group/briech/"
 _SOURCE = "placeholder fixtures (demo data, not yet connected)"
 
 READINESS = FixtureTile(
@@ -49,7 +49,7 @@ READINESS = FixtureTile(
     items=(
         FixtureItem(
             "RDY-CMD",
-            "Command A overall",
+            "EIB Group overall",
             "restricted",
             _CMD,
             value=82,
@@ -57,19 +57,19 @@ READINESS = FixtureTile(
             trend=(78, 79, 80, 81, 81, 82),
         ),
         FixtureItem(
-            "RDY-BDE2",
-            "Brigade 2",
+            "RDY-STRATOC",
+            "EIB Stratoc",
             "restricted",
-            _BDE2,
+            _STRATOC,
             value=79,
             unit="%",
             trend=(80, 80, 79, 79, 78, 79),
         ),
         FixtureItem(
-            "RDY-BN4",
-            "Battalion 4",
+            "RDY-SITE4",
+            "Stratoc Site Team 4",
             "restricted",
-            _BN4,
+            _SITE4,
             value=68,
             unit="%",
             severity="medium",
@@ -77,7 +77,7 @@ READINESS = FixtureTile(
         ),
         FixtureItem(
             "RDY-UAS",
-            "UAS Wing",
+            "Briech UAS",
             "confidential",
             _UAS,
             value=88,

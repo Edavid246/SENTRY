@@ -5,7 +5,7 @@
     "title": "Vehicle Maintenance Policy",
     "classification": "confidential",
     "compartments": [],
-    "unit_path": "/command-a/bde-2/",
+    "unit_path": "/eib-group/stratoc/",
     "format": "pdf"
   },
   {
@@ -14,7 +14,7 @@
     "title": "Training Directive TD-2026-07",
     "classification": "unclassified",
     "compartments": [],
-    "unit_path": "/command-a/bde-2/bn-4/",
+    "unit_path": "/eib-group/stratoc/site-4/",
     "format": "docx"
   },
   {
@@ -23,16 +23,16 @@
     "title": "Logistics Standard Operating Procedure",
     "classification": "restricted",
     "compartments": [],
-    "unit_path": "/command-a/bde-2/",
+    "unit_path": "/eib-group/stratoc/",
     "format": "docx"
   },
   {
     "source_ref": "DOC-204",
-    "file": "DOC-204_bn4_vehicle_servicing_orders.docx",
-    "title": "Battalion 4 Vehicle Servicing Standing Orders",
+    "file": "DOC-204_site4_vehicle_servicing_orders.docx",
+    "title": "Stratoc Site Team 4 Vehicle Servicing Standing Orders",
     "classification": "restricted",
     "compartments": [],
-    "unit_path": "/command-a/bde-2/bn-4/",
+    "unit_path": "/eib-group/stratoc/site-4/",
     "format": "docx"
   }
 ]

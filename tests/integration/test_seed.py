@@ -20,10 +20,10 @@ from sqlalchemy.engine import Engine
 
 EXPECTED_COUNTS = {
     ClassificationLevel: 4,
-    Compartment: 2,
-    Unit: 6,
+    Compartment: 6,
+    Unit: 8,
     User: 6,
-    UserCompartment: 3,
+    UserCompartment: 7,
     SourceSystem: 6,
     Document: 16,
     Chunk: 32,
@@ -101,12 +101,12 @@ def test_demo_user_scopes_and_clearances(seeded: None, owner_engine: Engine) -> 
             text("SELECT username, data_scope, clearance_code FROM users ORDER BY username")
         ).all()
     assert rows == [
-        ("a.bello", "standard", "secret"),
-        ("a.okafor", "standard", "confidential"),
-        ("f.danjuma", "audit", "restricted"),
-        ("k.musa", "standard", "confidential"),
-        ("s.eze", "none", None),
-        ("t.adeyemi", "standard", "restricted"),
+        ("briech.lead", "standard", "confidential"),
+        ("coo", "standard", "restricted"),
+        ("group.audit", "audit", "restricted"),
+        ("group.it", "none", None),
+        ("logistics.head", "standard", "confidential"),
+        ("owner", "standard", "secret"),
     ]
 
 

@@ -66,13 +66,13 @@ def test_prefill_events_are_tagged_and_prompts_are_not_affected(
 ) -> None:
     _set_source(monkeypatch, None)
     start = _tip(owner_engine)
-    assert _ask(client, "a.bello", QUESTION).status_code == 200
+    assert _ask(client, "owner", QUESTION).status_code == 200
     plain_events = _events_after(owner_engine, start)
     assert plain_events and all("source" not in event for event in plain_events)
 
     _set_source(monkeypatch, "prefill")
     start = _tip(owner_engine)
-    assert _ask(client, "a.bello", QUESTION).status_code == 200
+    assert _ask(client, "owner", QUESTION).status_code == 200
     tagged_events = _events_after(owner_engine, start)
     assert tagged_events and all(event.get("source") == "prefill" for event in tagged_events)
 

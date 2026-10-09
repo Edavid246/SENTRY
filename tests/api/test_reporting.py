@@ -56,8 +56,8 @@ def _report(client, username: str, question: str = REPORT_QUESTION):
     return response.json()
 
 
-def test_bello_gets_a_marked_draft_with_the_derived_label(client, gateway) -> None:
-    body = _report(client, "a.bello")
+def test_owner_gets_a_marked_draft_with_the_derived_label(client, gateway) -> None:
+    body = _report(client, "owner")
     assert body["report"]["draft"] is True
     assert set(body["report"]["record_ids"]) == {"REC-002", "REC-043", "REC-044"}
     assert body["report"]["classification_code"] in {"confidential", "secret"}
@@ -70,25 +70,23 @@ def test_bello_gets_a_marked_draft_with_the_derived_label(client, gateway) -> No
     assert {row["id"] for row in body["result_table"]["rows"]} == {"REC-002", "REC-043", "REC-044"}
 
 
-def test_adeyemi_draft_is_smaller_and_the_model_never_saw_uas_ops(client, gateway) -> None:
-    body = _report(client, "t.adeyemi")
+def test_coo_draft_is_smaller_and_the_model_never_saw_uas_ops(client, gateway) -> None:
+    body = _report(client, "coo")
     assert body["report"]["record_ids"] == ["REC-002"]
     assert "UAS-OPS" not in body["report"]["compartments"]
     assert body["report"]["classification_code"] in {"unclassified", "restricted"}
     prompt = gateway.prompts[-1]
     assert "REC-044" not in prompt and "REC-043" not in prompt
-    assert "UAS-OPS" not in prompt and "UAS Wing" not in prompt
+    assert "UAS-OPS" not in prompt and "Briech UAS" not in prompt
     # Her evidence is limited too: the confidential Q3 readiness summary never reaches the model.
     assert "Training Readiness Summary Q3" not in prompt
-    assert "Training Readiness Summary Q3" in str(
-        _report(client, "a.bello") and gateway.prompts[-1]
-    )
+    assert "Training Readiness Summary Q3" in str(_report(client, "owner") and gateway.prompts[-1])
 
 
 def test_a_citation_outside_the_inputs_blocks_the_draft(client, models) -> None:
     stub = StubGateway(cite_extra="Also (REC-999).")
     models(stub)
-    body = _report(client, "t.adeyemi")
+    body = _report(client, "coo")
     assert body["refused"] is True and body["found"] is False
     assert "Draft blocked" in body["answer"]
     assert body["citations"] == []
@@ -99,40 +97,40 @@ def test_a_fabricated_chunk_citation_blocks_the_draft(client, models) -> None:
     fake = "[00000000-0000-0000-0000-000000000000: Fake, page 1]"
     stub = StubGateway(cite_extra=fake)
     models(stub)
-    assert _report(client, "a.bello")["refused"] is True
+    assert _report(client, "owner")["refused"] is True
 
 
 def test_model_outage_is_a_503_and_nothing_is_invented(client, models) -> None:
     stub = StubGateway(fail=True)
     models(stub)
-    assert _ask(client, "a.bello", REPORT_QUESTION).status_code == 503
+    assert _ask(client, "owner", REPORT_QUESTION).status_code == 503
 
 
-@pytest.mark.parametrize("username", ["s.eze", "f.danjuma"])
+@pytest.mark.parametrize("username", ["group.it", "group.audit"])
 def test_roles_without_data_access_are_refused(client, gateway, username) -> None:
     assert _ask(client, username, REPORT_QUESTION).status_code == 403
     assert gateway.prompts == []
 
 
 def test_report_is_audited_with_its_provenance(client, gateway) -> None:
-    body = _report(client, "t.adeyemi")
+    body = _report(client, "coo")
     events = _audit(client)
-    answer = _latest(events, actor="t.adeyemi", action="answer", pathway="report")
+    answer = _latest(events, actor="coo", action="answer", pathway="report")
     payload = answer["payload"]
     assert payload["record_ids"] == ["REC-002"]
     assert payload["classification"] == body["report"]["classification_code"]
     assert payload["provider"] == "stub" and payload["blocked"] is False
     assert set(payload["citations"]) <= set(payload["chunk_ids"])
-    retrieval = _latest(events, actor="t.adeyemi", action="retrieve")
+    retrieval = _latest(events, actor="coo", action="retrieve")
     assert retrieval["seq"] < answer["seq"]
     assert "REC-044" not in str(payload)
 
 
 def test_stored_conversation_inherits_the_derived_label(client, gateway) -> None:
-    body = _report(client, "a.bello")
+    body = _report(client, "owner")
     detail = client.get(
         f"/api/v1/assistant/conversations/{body['conversation_id']}",
-        headers=auth_header(client, "a.bello"),
+        headers=auth_header(client, "owner"),
     ).json()
     assert detail["classification_code"] == body["report"]["classification_code"]
     assert "UAS-OPS" in detail["compartments"]
@@ -163,11 +161,11 @@ def test_report_needs_retrieve_decided_before_any_chunk_is_read(
         context.ROLE_PERMISSIONS["commander"] - {"retrieve"},
     )
     before = max((e["seq"] for e in _audit(client)), default=-1)
-    assert _ask(client, "a.bello", REPORT_QUESTION).status_code == 403
+    assert _ask(client, "owner", REPORT_QUESTION).status_code == 403
     assert gateway.prompts == []
 
     new = [e["payload"] for e in _audit(client) if e["seq"] > before]
-    mine = [p for p in new if p.get("actor") == "a.bello"]
+    mine = [p for p in new if p.get("actor") == "owner"]
     assert not {"retrieve", "query", "answer"} & {p["action"] for p in mine}
     denied = [p for p in mine if p["action"] == "decide" and p["decision"] == "deny"]
     assert [(p["resource"], p["requested"]) for p in denied] == [("chunk", "retrieve")]

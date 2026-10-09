@@ -215,7 +215,7 @@ def _findings_tile(scope: Scope, names: dict[str, str]) -> DashboardTile:
     ]
     return DashboardTile(
         stub=False,
-        source="correlation job (rising_faults), run on demand by a commander",
+        source="correlation job (rising_faults), run on demand by the group owner",
         title="Recent findings",
         items=items,
     )

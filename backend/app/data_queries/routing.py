@@ -127,7 +127,7 @@ def route_question(question: str) -> RoutedTool | None:
         if depot:
             params["depot"] = depot.group(0).upper()
         return RoutedTool("stock_below_threshold", params)
-    # The connected-tech rules read the question without unit paths: '/command-a/uas-wing/'
+    # The connected-tech rules read the question without unit paths: '/eib-group/briech/'
     # names a unit, not a UAS request.
     prose = _PATH_RE.sub(" ", question)
     if _DETECTION_RE.search(prose):

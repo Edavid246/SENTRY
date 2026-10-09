@@ -31,14 +31,16 @@ def test_round_trip_resolves_full_context(
     app_engine: Engine, seeded: None, settings: Settings
 ) -> None:
     validator = _validator(settings)
-    token = validator.issue_token("a.bello")
+    token = validator.issue_token("owner")
     with app_engine.connect() as conn:
         ctx = validator.validate(token, conn=conn)
-    assert ctx.username == "a.bello"
+    assert ctx.username == "owner"
     assert ctx.role == "commander"
-    assert ctx.unit_path == "/command-a/"
+    assert ctx.unit_path == "/eib-group/"
     assert ctx.clearance_rank == 3
-    assert ctx.compartments == frozenset({"UAS-OPS", "FORENSICS"})
+    assert ctx.compartments == frozenset(
+        {"UAS-OPS", "FORENSICS", "CLIENT-A", "CLIENT-B", "CLIENT-C", "CLIENT-D"}
+    )
     assert ctx.data_scope == "standard"
     assert "read" in ctx.permissions and "query" in ctx.permissions
     assert ctx.auth_method == "dev-jwt"
@@ -68,13 +70,13 @@ def test_garbage_token_rejected(app_engine: Engine, settings: Settings) -> None:
 def test_token_signed_with_wrong_secret_rejected(app_engine: Engine, settings: Settings) -> None:
     forged = DevTokenValidator(
         secret="wrong-secret-deliberately-long-enough", settings=settings
-    ).issue_token("a.bello")
+    ).issue_token("owner")
     with app_engine.connect() as conn, pytest.raises(TokenError, match="invalid token"):
         _validator(settings).validate(forged, conn=conn)
 
 
 def test_expired_token_rejected(app_engine: Engine, settings: Settings) -> None:
-    token = _validator(settings).issue_token("a.bello", ttl_seconds=-5)
+    token = _validator(settings).issue_token("owner", ttl_seconds=-5)
     with app_engine.connect() as conn, pytest.raises(TokenError, match="invalid token"):
         _validator(settings).validate(token, conn=conn)
 
@@ -83,7 +85,7 @@ def test_alg_none_token_rejected(app_engine: Engine, settings: Settings) -> None
     now = 1_700_000_000
     token = (
         f"{_b64url({'alg': 'none', 'typ': 'JWT'})}"
-        f".{_b64url({'sub': 'a.bello', 'iat': now, 'exp': now + 3600, 'jti': 'x'})}."
+        f".{_b64url({'sub': 'owner', 'iat': now, 'exp': now + 3600, 'jti': 'x'})}."
     )
     with app_engine.connect() as conn, pytest.raises(TokenError, match="invalid token"):
         _validator(settings).validate(token, conn=conn)
@@ -99,14 +101,14 @@ def test_inactive_user_rejected(
     app_engine: Engine, owner_engine: Engine, seeded: None, settings: Settings
 ) -> None:
     with owner_engine.begin() as conn:
-        conn.execute(text("UPDATE users SET is_active = false WHERE username = 'f.danjuma'"))
+        conn.execute(text("UPDATE users SET is_active = false WHERE username = 'group.audit'"))
     try:
-        token = _validator(settings).issue_token("f.danjuma")
+        token = _validator(settings).issue_token("group.audit")
         with pytest.raises(TokenError, match="unknown or inactive"), app_engine.connect() as conn:
             _validator(settings).validate(token, conn=conn)
     finally:
         with owner_engine.begin() as conn:
-            conn.execute(text("UPDATE users SET is_active = true WHERE username = 'f.danjuma'"))
+            conn.execute(text("UPDATE users SET is_active = true WHERE username = 'group.audit'"))
 
 
 @pytest.mark.parametrize("jti", [None, "", 42], ids=["missing", "blank", "not-a-string"])
@@ -117,7 +119,7 @@ def test_token_without_a_token_id_rejected(
     import jwt
 
     now = int(time.time())
-    claims: dict = {"sub": "a.bello", "iat": now, "exp": now + 3600}
+    claims: dict = {"sub": "owner", "iat": now, "exp": now + 3600}
     if jti is not None:
         claims["jti"] = jti
     token = jwt.encode(claims, settings.dev_jwt_secret, algorithm="HS256")

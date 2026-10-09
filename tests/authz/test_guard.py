@@ -48,7 +48,7 @@ def written(monkeypatch, log) -> list[list[dict]]:
 
 @pytest.mark.parametrize(("on_deny", "status"), [("forbidden", 403), ("not_found", 404)])
 def test_deny_is_audited_then_answered(written, log, on_deny: str, status: int) -> None:
-    ctx = access_context("s.eze")
+    ctx = access_context("group.it")
     with (
         pytest.raises(HTTPException) as raised,
         guard.guarded(ctx, RecordingConn(log), "read", "document", on_deny=on_deny),
@@ -60,7 +60,7 @@ def test_deny_is_audited_then_answered(written, log, on_deny: str, status: int) 
 
 
 def test_empty_deny_yields_no_scope(written, log) -> None:
-    ctx = access_context("s.eze")
+    ctx = access_context("group.it")
     with guard.guarded_or_empty(
         ctx, RecordingConn(log), "retrieve", "record", audit_resource="connected_map"
     ) as scope:
@@ -71,7 +71,7 @@ def test_empty_deny_yields_no_scope(written, log) -> None:
 
 
 def test_allowed_request_audits_decide_and_reads_on_exit(written, log) -> None:
-    with guard.guarded(access_context("a.bello"), RecordingConn(log), "read", "document") as scope:
+    with guard.guarded(access_context("owner"), RecordingConn(log), "read", "document") as scope:
         assert scope.filter("document").where_sql
         scope.read("document", 3)
         assert written == []  # nothing is written until the block ends
@@ -80,14 +80,14 @@ def test_allowed_request_audits_decide_and_reads_on_exit(written, log) -> None:
 
 
 def test_the_rls_context_is_set_once_when_the_scope_opens(written, log) -> None:
-    with guard.guarded(access_context("a.bello"), RecordingConn(log), "read", "document"):
+    with guard.guarded(access_context("owner"), RecordingConn(log), "read", "document"):
         set_by_scope = list(log)
     assert set_by_scope and set(set_by_scope) == {"execute"}
     assert log == [*set_by_scope, "audit"]
 
 
 def test_allowed_request_is_audited_even_when_the_body_raises(written, log) -> None:
-    ctx = access_context("a.bello")
+    ctx = access_context("owner")
     with (
         pytest.raises(HTTPException),
         guard.guarded(ctx, RecordingConn(log), "read", "document") as scope,
@@ -102,7 +102,7 @@ def test_allowed_request_is_audited_even_when_the_body_raises(written, log) -> N
 
 def test_writes_are_committed_only_after_the_audit_batch(written, log) -> None:
     with scope_module.authorized(
-        access_context("a.bello"), RecordingConn(log), [("read", "document")]
+        access_context("owner"), RecordingConn(log), [("read", "document")]
     ) as scope:
         scope.commit()
         assert "commit" not in log
@@ -111,7 +111,7 @@ def test_writes_are_committed_only_after_the_audit_batch(written, log) -> None:
 
 
 def test_requirements_are_decided_in_order_and_the_first_deny_stops(written, log) -> None:
-    ctx = access_context("a.bello")
+    ctx = access_context("owner")
     with pytest.raises(scope_module.Forbidden):
         scope_module.authorize(
             ctx, [("read", "document"), ("manage", "document"), ("query", "record")]
@@ -124,8 +124,8 @@ def test_requirements_are_decided_in_order_and_the_first_deny_stops(written, log
 
 
 def test_permitted_audits_the_decision_alone(written) -> None:
-    guard.permitted(access_context("f.danjuma"), "read_audit", "audit")
+    guard.permitted(access_context("group.audit"), "read_audit", "audit")
     assert [[e["decision"] for e in batch] for batch in written] == [["allow"]]
     with pytest.raises(HTTPException) as raised:
-        guard.permitted(access_context("a.bello"), "read_audit", "audit")
+        guard.permitted(access_context("owner"), "read_audit", "audit")
     assert raised.value.status_code == 403

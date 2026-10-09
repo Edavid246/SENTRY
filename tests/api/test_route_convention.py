@@ -59,7 +59,7 @@ def test_healthz_stays_at_the_root(client) -> None:
     response = client.get("/healthz")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
-    assert login(client, "a.bello").status_code == 200
+    assert login(client, "owner").status_code == 200
 
 
 def test_no_cors_middleware_is_installed() -> None:

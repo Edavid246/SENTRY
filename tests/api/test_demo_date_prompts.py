@@ -65,7 +65,7 @@ def setup(monkeypatch, models, seed_day):
     get_settings.cache_clear()
 
 
-def _key(capture: Capture, client, user: str = "a.bello") -> str:
+def _key(capture: Capture, client, user: str = "owner") -> str:
     before = len(capture.requests)
     assert _ask(client, user, QUESTION).status_code == 200
     assert len(capture.requests) == before + 1
@@ -98,7 +98,7 @@ def test_demo_date_does_not_touch_the_real_clock(client, setup, owner_engine) ->
     pin("2020-01-01")
     before = datetime.now(UTC)
     login = client.post(
-        "/api/v1/auth/login", json={"username": "a.bello", "password": "Demo!Gateway2026"}
+        "/api/v1/auth/login", json={"username": "owner", "password": "Demo!Gateway2026"}
     )
     assert login.status_code == 200
     with owner_engine.connect() as conn:

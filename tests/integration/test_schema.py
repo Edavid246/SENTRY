@@ -228,7 +228,7 @@ def test_cleared_context_on_real_table_returns_zero_not_error(
             user_id=uuid4(),
             clearance_rank=3,
             compartments=["UAS-OPS", "FORENSICS"],
-            unit_path="/command-a/",
+            unit_path="/eib-group/",
             data_scope="standard",
             session_id="test-schema-session",
         )

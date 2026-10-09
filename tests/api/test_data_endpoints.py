@@ -10,7 +10,7 @@ from test_auth_endpoints import auth_header
 from test_rls_only import USERNAMES
 
 # Users whose decide() denies data actions entirely: lists answer 403, detail 404.
-NO_DATA_USERS = frozenset({"s.eze", "f.danjuma"})
+NO_DATA_USERS = frozenset({"group.it", "group.audit"})
 
 
 @pytest.mark.parametrize("username", USERNAMES)
@@ -42,7 +42,7 @@ def test_records_gold_set(client, username: str) -> None:
 
 
 def test_visible_document_detail(client) -> None:
-    response = client.get("/api/v1/documents/DOC-001", headers=auth_header(client, "a.bello"))
+    response = client.get("/api/v1/documents/DOC-001", headers=auth_header(client, "owner"))
     assert response.status_code == 200
     body = response.json()
     assert set(body) == {"source_ref", "title", "classification_code"}
@@ -50,21 +50,21 @@ def test_visible_document_detail(client) -> None:
 
 
 def test_restricted_document_probed_returns_404_not_403(client) -> None:
-    # k.musa may read documents, but DOC-001 sits outside their unit: 404, no
+    # briech.lead may read documents, but DOC-001 sits outside their unit: 404, no
     # confirmation that the document exists.
-    response = client.get("/api/v1/documents/DOC-001", headers=auth_header(client, "k.musa"))
+    response = client.get("/api/v1/documents/DOC-001", headers=auth_header(client, "briech.lead"))
     assert response.status_code == 404
     assert response.json() == {"detail": "not found"}
 
 
 def test_user_without_read_permission_gets_404_on_detail(client) -> None:
-    response = client.get("/api/v1/documents/DOC-001", headers=auth_header(client, "s.eze"))
+    response = client.get("/api/v1/documents/DOC-001", headers=auth_header(client, "group.it"))
     assert response.status_code == 404
     assert response.json() == {"detail": "not found"}
 
 
 def test_unknown_document_returns_404(client) -> None:
-    response = client.get("/api/v1/documents/DOC-999", headers=auth_header(client, "a.bello"))
+    response = client.get("/api/v1/documents/DOC-999", headers=auth_header(client, "owner"))
     assert response.status_code == 404
     assert response.json() == {"detail": "not found"}
 
@@ -91,19 +91,18 @@ def test_documents_without_token_uses_generic_401(client) -> None:
 def test_record_detail_visible_and_hidden(client) -> None:
     from test_auth_endpoints import auth_header
 
-    bello = client.get("/api/v1/records/REC-023", headers=auth_header(client, "a.bello"))
-    assert bello.status_code == 200
-    body = bello.json()
+    owner = client.get("/api/v1/records/REC-023", headers=auth_header(client, "owner"))
+    assert owner.status_code == 200
+    body = owner.json()
     assert body["classification_code"] == "secret" and body["compartments"] == ["UAS-OPS"]
     assert body["data"]["certification"] == "UAS Pilot"
     # Not visible to a lower-cleared user: 404, same as a record that does not exist.
-    hidden = client.get("/api/v1/records/REC-023", headers=auth_header(client, "t.adeyemi"))
-    missing = client.get("/api/v1/records/REC-999", headers=auth_header(client, "t.adeyemi"))
+    hidden = client.get("/api/v1/records/REC-023", headers=auth_header(client, "coo"))
+    missing = client.get("/api/v1/records/REC-999", headers=auth_header(client, "coo"))
     assert hidden.status_code == missing.status_code == 404
     assert hidden.json() == missing.json()
     assert (
-        client.get("/api/v1/records/REC-011", headers=auth_header(client, "t.adeyemi")).status_code
-        == 200
+        client.get("/api/v1/records/REC-011", headers=auth_header(client, "coo")).status_code == 200
     )
 
 
@@ -112,9 +111,9 @@ def test_record_detail_no_data_roles_and_audit(client) -> None:
     from test_auth_endpoints import auth_header
 
     assert (
-        client.get("/api/v1/records/REC-011", headers=auth_header(client, "s.eze")).status_code
+        client.get("/api/v1/records/REC-011", headers=auth_header(client, "group.it")).status_code
         == 404
     )
-    client.get("/api/v1/records/REC-011", headers=auth_header(client, "a.okafor"))
-    event = _latest(_audit(client), actor="a.okafor", action="query", resource="record")
+    client.get("/api/v1/records/REC-011", headers=auth_header(client, "logistics.head"))
+    event = _latest(_audit(client), actor="logistics.head", action="query", resource="record")
     assert event["payload"]["rows"] == 1

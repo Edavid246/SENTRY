@@ -79,8 +79,8 @@ def me(ctx: CurrentContext, conn: ConnDep) -> dict[str, Any]:
     """UI-facing identity read: exactly the context fields the shell needs.
 
     `unit_breadcrumb` resolves the caller's unit path to readable unit names
-    (oldest ancestor first) so the top bar can show "Command A > Brigade 2 >
-    Battalion 4"; `permissions` is what the nav may offer — the server still
+    (oldest ancestor first) so the top bar can show "EIB Group > EIB Stratoc >
+    Stratoc Site Team 4"; `permissions` is what the nav may offer — the server still
     enforces every action itself (SPEC 7.1).
     """
     breadcrumb = [

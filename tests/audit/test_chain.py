@@ -79,7 +79,7 @@ def test_canonical_json_is_sorted_and_compact() -> None:
 
 
 def test_genesis_hash_format() -> None:
-    payload = {"action": "login", "actor": "a.bello"}
+    payload = {"action": "login", "actor": "owner"}
     expected = hashlib.sha256((GENESIS_PREV_HASH + canonical_json(payload)).encode()).hexdigest()
     assert compute_hash(GENESIS_PREV_HASH, payload) == expected
     assert len(expected) == 64
