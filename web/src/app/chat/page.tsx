@@ -43,6 +43,8 @@ const STARTERS = [
   "Find the documents relating to the vehicle maintenance policy and summarize the key requirements.",
   "Show me the equipment currently awaiting maintenance.",
   "Prepare a summary of training activity for this group over the last quarter.",
+  "Which deliveries are overdue?",
+  "Trace serial BRC-0041.",
 ];
 
 let counter = 0;

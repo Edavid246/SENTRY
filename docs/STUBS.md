@@ -45,3 +45,14 @@ extract of the demo area, served by the web app (`web/public/basemap/README.md`)
 corpus (the generated files and manifest are committed). Runtime ingestion
 parses PDF/DOCX with `pypdf`/`python-docx` only; `reportlab` is not needed at
 runtime and should not ship in a production image.
+
+## Pivot data (Tasks 4-6)
+
+- **Contracts, deliveries, production runs, serials, group assets:** invented rows in the
+  `contracts-demo` and `production-demo` source systems, read through the demo reference
+  adapter. Swap point: real contract/ERP and MES/serial-tracking adapters implementing the
+  adapter interface (describe/search/get/stream/sync), read-only.
+- **Client agencies:** generic labels (Client Agency A-D) mapped to CLIENT-A..D compartments.
+  Swap point: the client's real agency list and compartment mapping.
+- **State filter:** lists every state and the FCT, but only the fictional rural Niger State
+  sites carry data.

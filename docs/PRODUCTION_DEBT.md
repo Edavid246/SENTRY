@@ -372,3 +372,14 @@ end-of-step report. Never silently log it.
   operations (vector tiles, ideally imagery and elevation from accredited sources), a
   controlled update and import process, Range-request serving instead of whole-file reads,
   fonts for every script in use, and a review of which basemap sources are cleared for use.
+
+## 2026-10-09 — Client separation by generic compartments (pivot)
+
+- **Issue:** client agencies are modelled as four generic compartments (CLIENT-A..D) and a
+  compartment-per-client scheme over invented contract data. The mapping of real agencies to
+  compartments, who may be granted each, and how a derived report spanning clients is
+  labelled have not been designed.
+- **Why acceptable:** demo data only; the mechanism (compartment subset check inside the
+  query, backed by RLS) is the real one and is covered by tests/authz.
+- **Production needs:** agreed client-to-compartment mapping, a grant/revoke process with
+  approval and audit, and review of cross-client aggregates such as the dashboard tile counts.
