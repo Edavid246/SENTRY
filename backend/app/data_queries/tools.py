@@ -35,6 +35,7 @@ _DEPOT_RE = re.compile(r"^DEP-[A-Z0-9]{1,8}(?:-[A-Z0-9]{1,8})?$")
 _SITE_RE = re.compile(r"^(?:DEP-[A-Z0-9]{1,8}|UAS-HANGAR)$")
 _CLIENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .&-]{0,39}$")
 CONTRACT_STATUSES = frozenset({"active", "at_risk", "completed"})
+_SERIAL_RE = re.compile(r"^[A-Z]{2,4}(?:-[A-Z]{2,4})?-\d{3,5}$")
 _UNIT_PATH_RE = re.compile(r"^/(?:[a-z0-9-]+/)+$")
 
 Column = Callable[[SourceRecord], Any]
@@ -415,6 +416,56 @@ def contracts_status(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
         {
             "id": _source_ref,
             **_fields("contract_ref", "client", "subject", "status", "end_date", "value_musd"),
+            "unit_path": _unit_path,
+        },
+    )
+
+
+def serial_trace(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    """One serial number's production run, QC state and delivery. A serial the caller may
+    not see is indistinguishable from one that does not exist: the result is simply empty."""
+    _check_names(params, frozenset({"unit_path", "serial"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    serial = params.get("serial")
+    if not isinstance(serial, str) or not _SERIAL_RE.match(serial):
+        raise ToolParamError("serial is not a valid serial number")
+    found = get_adapter().search(scope, RecordFilter(entity_type="SerialUnit", unit_path=unit_path))
+    records = [r for r in found if r.data.get("serial") == serial]
+    return _table(
+        "serial_trace",
+        {"unit_path": unit_path, "serial": serial},
+        records,
+        {
+            "id": _source_ref,
+            **_fields("serial", "product", "run_ref", "qc_status", "delivered_to", "delivery_ref"),
+            "unit_path": _unit_path,
+        },
+    )
+
+
+def production_qc_holds(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    """Production runs on QC hold, with how many visible serials each affects."""
+    _check_names(params, frozenset({"unit_path"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    adapter = get_adapter()
+    runs = adapter.search(scope, RecordFilter(entity_type="ProductionRun", unit_path=unit_path))
+    serials = adapter.search(scope, RecordFilter(entity_type="SerialUnit", unit_path=unit_path))
+    held = sorted(
+        (r for r in runs if r.data.get("qc_status") == "hold"),
+        key=lambda r: (r.data["run_ref"], r.source_ref),
+    )
+    affected = {
+        r.data["run_ref"]: sum(1 for s in serials if s.data.get("run_ref") == r.data["run_ref"])
+        for r in held
+    }
+    return _table(
+        "production_qc_holds",
+        {"unit_path": unit_path},
+        held,
+        {
+            "id": _source_ref,
+            **_fields("run_ref", "product", "quantity", "qc_status", "hold_reason"),
+            "serials_traced": lambda r: affected[r.data["run_ref"]],
             "unit_path": _unit_path,
         },
     )

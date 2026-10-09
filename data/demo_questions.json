@@ -69,6 +69,26 @@
       "status": "built"
     },
     {
+      "id": "data-serial-trace",
+      "spec_step": "18.3",
+      "pathway": "data",
+      "asked_by": "owner",
+      "tool": "serial_trace",
+      "question": "Trace serial BRC-0041.",
+      "expected": "One row (id, serial, product, run_ref, qc_status, delivered_to, delivery_ref, unit_path) from the typed tool serial_trace: production run PR-BR-014, released, delivered to Client Agency A on DL-101. A serial the user may not see returns an empty table, the same as one that does not exist.",
+      "status": "built"
+    },
+    {
+      "id": "data-qc-holds",
+      "spec_step": "18.3",
+      "pathway": "data",
+      "asked_by": "owner",
+      "tool": "production_qc_holds",
+      "question": "Which production runs are on QC hold?",
+      "expected": "Result table (id, run_ref, product, quantity, qc_status, hold_reason, serials_traced, unit_path) from the typed tool production_qc_holds: 2 runs for owner (Briech PR-BR-015, Poctova PR-PO-032), 1 for briech.lead, none for coo.",
+      "status": "built"
+    },
+    {
       "id": "data-expired-certifications",
       "spec_step": "18.3",
       "pathway": "data",

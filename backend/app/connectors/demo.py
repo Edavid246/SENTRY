@@ -36,6 +36,8 @@ ENTITY_TYPES: tuple[str, ...] = (
     "CustodyEvent",
     "Contract",
     "Delivery",
+    "ProductionRun",
+    "SerialUnit",
 )
 
 _SELECT = (

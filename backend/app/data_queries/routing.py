@@ -64,6 +64,10 @@ _OVERDUE_RE = re.compile(r"\b(overdue|late|delayed|behind schedule|past due)\b",
 _CONTRACT_RE = re.compile(r"\bcontracts?\b", re.IGNORECASE)
 _CLIENT_NAME_RE = re.compile(r"\bClient Agency ([A-Z])\b", re.IGNORECASE)
 _CONTRACT_STATUS_RE = re.compile(r"\b(at[ -]risk|active|completed)\b", re.IGNORECASE)
+_SERIAL_WORD_RE = re.compile(r"\b(serial|trace|traceability|provenance)\b", re.IGNORECASE)
+_SERIAL_NO_RE = re.compile(r"\b([A-Z]{2,4}(?:-[A-Z]{2,4})?-\d{3,5})\b", re.IGNORECASE)
+_HOLD_RE = re.compile(r"\bholds?\b", re.IGNORECASE)
+_PRODUCTION_RE = re.compile(r"\b(qc|quality|production|batch(?:es)?|lots?|runs?)\b", re.IGNORECASE)
 _PATH_RE = re.compile(r"(?<![\w])(?:\.\.?/|/)[\w./-]+")
 
 
@@ -112,9 +116,15 @@ def route_question(question: str) -> RoutedTool | None:
         return None
     if _FINDING_RE.search(question) or (_FAULT_RE.search(question) and _RISING_RE.search(question)):
         return RoutedTool("correlation_findings", {})
-    if not _REQUEST_RE.search(question):
+    if not _REQUEST_RE.search(question) and not _SERIAL_WORD_RE.search(question):
         return None
     params = _unit_path_params(question)
+    serial = _SERIAL_NO_RE.search(question)
+    if serial and _SERIAL_WORD_RE.search(question):
+        params["serial"] = serial.group(1).upper()
+        return RoutedTool("serial_trace", params)
+    if _HOLD_RE.search(question) and _PRODUCTION_RE.search(question):
+        return RoutedTool("production_qc_holds", params)
     # Contract rules come before the stock and UAS rules: "deliver" and "inventory" overlap.
     is_delivery = _DELIVERY_RE.search(question) and _OVERDUE_RE.search(question)
     if is_delivery or _CONTRACT_RE.search(question):
