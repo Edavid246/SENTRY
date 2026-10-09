@@ -218,6 +218,7 @@ export default function ChatPage() {
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
@@ -331,8 +332,10 @@ export default function ChatPage() {
 
   return (
     <Shell>
-      <div className="flex h-full">
-        <aside className="flex w-[280px] shrink-0 flex-col border-r border-rule bg-surface">
+      <div className="relative flex h-full">
+        <aside
+          className={`${historyOpen ? "flex" : "hidden"} absolute inset-y-0 left-0 z-30 w-[280px] max-w-[85%] shrink-0 flex-col border-r border-rule bg-surface md:static md:z-auto md:flex md:max-w-none`}
+        >
           <div className="border-b border-rule p-3">
             <button
               type="button"
@@ -352,7 +355,10 @@ export default function ChatPage() {
                 <li key={c.id}>
                   <button
                     type="button"
-                    onClick={() => void openConversation(c.id)}
+                    onClick={() => {
+                      setHistoryOpen(false);
+                      void openConversation(c.id);
+                    }}
                     aria-current={active ? "true" : undefined}
                     className={`block w-full border-l-[3px] px-4 py-2.5 text-left text-[0.85rem] ${
                       active ? "border-amber bg-raised text-amber" : "border-transparent hover:bg-raised"
@@ -373,6 +379,11 @@ export default function ChatPage() {
         </aside>
 
         <section className="flex min-w-0 flex-1 flex-col">
+          <div className="border-b border-rule px-3 py-2 md:hidden">
+            <button type="button" onClick={() => setHistoryOpen((o) => !o)} className="btn" aria-expanded={historyOpen}>
+              {historyOpen ? "Hide conversations" : "Conversations"}
+            </button>
+          </div>
           <Thread
             messages={messages}
             pending={pending}

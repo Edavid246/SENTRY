@@ -180,8 +180,8 @@ function AuditView() {
   }
 
   return (
-    <div className="flex h-full gap-4 p-4">
-      <section className="flex min-w-0 flex-1 flex-col border border-rule bg-surface">
+    <div className="flex h-full flex-col gap-4 overflow-y-auto p-3 md:flex-row md:overflow-visible md:p-4">
+      <section className="flex min-h-[28rem] min-w-0 flex-1 flex-col border border-rule bg-surface">
         <div className="flex items-center justify-between border-b border-rule px-5 py-3">
           <div className="flex items-center gap-4">
             <IconLog size={28} className="text-sage" />
@@ -266,7 +266,7 @@ function AuditView() {
         </div>
       </section>
 
-      <aside className="flex w-[360px] shrink-0 flex-col gap-4">
+      <aside className="flex shrink-0 flex-col gap-4 md:w-[360px]">
         <div className="border border-rule bg-surface p-5">
           <div className="flex items-center gap-3">
             <IconShieldCheck size={30} className="text-sage" />

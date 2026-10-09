@@ -15,7 +15,7 @@ export function PassagePanel({ state, onClose }: { state: PanelState; onClose: (
     <aside
       data-testid="passage-panel"
       aria-label="Cited passage"
-      className="flex w-[440px] shrink-0 flex-col border-l border-rule bg-surface"
+      className="fixed inset-0 z-40 flex shrink-0 flex-col bg-surface md:static md:z-auto md:w-[440px] md:border-l md:border-rule"
     >
       <div className="flex items-center justify-between border-b border-rule px-5 py-3">
         <div>

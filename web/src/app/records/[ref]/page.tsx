@@ -59,7 +59,7 @@ export default function RecordPage() {
                 </span>
               ))}
             </div>
-            <dl className="grid grid-cols-[12rem_1fr] gap-x-4 gap-y-2 px-4 py-4 text-[0.9rem]">
+            <dl className="grid grid-cols-1 gap-x-4 gap-y-1 md:grid-cols-[12rem_1fr] md:gap-y-2 px-4 py-4 text-[0.9rem]">
               <dt className="text-mute">Source system</dt>
               <dd>{record.source_system}</dd>
               <dt className="text-mute">Owning unit</dt>

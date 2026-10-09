@@ -210,8 +210,8 @@ export default function MapPage() {
 
   return (
     <Shell>
-      <div className="flex h-full">
-        <div className="relative min-w-0 flex-1">
+      <div className="flex h-full flex-col md:flex-row">
+        <div className="relative h-[55%] min-w-0 shrink-0 md:h-auto md:flex-1">
           <div ref={container} data-testid="map-canvas" data-ready={ready}
             style={{ position: "absolute", inset: 0 }} />
           <div className="absolute left-3 top-3 border border-rule bg-surface/90 px-3 py-1 text-[0.75rem] tracking-[0.12em] text-sage">
@@ -223,7 +223,7 @@ export default function MapPage() {
             </p>
           )}
         </div>
-        <aside className="w-80 shrink-0 overflow-y-auto border-l border-rule bg-surface p-4">
+        <aside className="min-h-0 flex-1 overflow-y-auto border-t border-rule bg-surface p-4 md:w-80 md:flex-none md:shrink-0 md:border-l md:border-t-0">
           <h1 className="label">Connected sensors and UAS</h1>
           <p className="mt-1 text-[0.75rem] text-mute">
             Only what your clearance and compartments allow is returned by the API.

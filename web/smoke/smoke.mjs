@@ -95,6 +95,22 @@ try {
   await page.waitForSelector('[data-testid="division-briech"]');
   check(true, "back to the group home works");
 
+  // phone width: the shell collapses (menu + bottom tabs) and nothing scrolls sideways
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const route of ["/home", "/d/poctova", "/dashboard", "/chat", "/map"]) {
+    await page.goto(BASE + route);
+    await page.waitForSelector('nav[aria-label="Main"]');
+    const [scrollW, innerW] = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
+    check(scrollW <= innerW, `${route} does not scroll sideways on a phone (${scrollW} <= ${innerW})`);
+  }
+  await page.goto(BASE + "/home");
+  await page.waitForSelector('[data-testid="division-briech"]');
+  check(await page.locator("text=Menu").isVisible(), "phone shows a Menu button for the identity strip");
+  await shot("12c-home-phone");
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto(BASE + "/home");
+  await page.waitForSelector('[data-testid="division-briech"]');
+
   // overview: every stub tile is tagged; the Secret finding is shown
   await page.click('a[href="/dashboard"]');
   await page.waitForSelector('[data-testid="tile-recent_findings"]');

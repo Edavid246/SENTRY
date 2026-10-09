@@ -89,7 +89,7 @@ export default function FindingPage() {
             </div>
             <div className="border-t border-rule px-4 py-4">
               <h2 className="label mb-2">Analysis</h2>
-              <dl className="grid grid-cols-[14rem_1fr] gap-x-4 gap-y-2 text-[0.85rem]">
+              <dl className="grid grid-cols-1 gap-x-4 gap-y-1 md:grid-cols-[14rem_1fr] md:gap-y-2 text-[0.85rem]">
                 <dt className="text-mute">analysis</dt>
                 <dd className="font-mono">{finding.analysis}</dd>
                 {Object.entries(finding.details).map(([key, value]) => (

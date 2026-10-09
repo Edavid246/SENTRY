@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "@/lib/session";
 import { Clock } from "./Clock";
 import { ClearanceBadge } from "./ClearanceBadge";
@@ -19,7 +19,7 @@ function Segment({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col justify-center gap-1.5 border-l border-rule px-6 py-3">
+    <div className="flex flex-col justify-center gap-1.5 border-t border-rule px-4 py-3 md:border-l md:border-t-0 md:px-6">
       <div className="flex items-center gap-2 text-sage">
         {icon}
         <span className="label">{label}</span>
@@ -33,6 +33,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const { status, me, logout, can } = useSession();
   const router = useRouter();
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (status === "anon") router.replace("/");
@@ -57,16 +58,32 @@ export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen flex-col">
       {/* Identity strip, after the reference: person | unit | clearance | access | session */}
-      <header className="flex min-h-[88px] shrink-0 items-stretch border-b border-rule bg-surface">
-        <div className="flex items-center gap-4 px-6 py-3">
+      <header className="flex shrink-0 flex-col border-b border-rule bg-surface md:min-h-[88px] md:flex-row md:items-stretch">
+        <div className="flex items-center gap-3 px-4 py-3 md:gap-4 md:px-6">
           <Emblem size={34} />
           <div className="leading-tight">
-            <div className="text-[1rem] font-bold tracking-[0.12em]">DEFENCE GATEWAY</div>
-            <div className="text-[0.8rem] tracking-[0.12em] text-sage">SECURE ASSISTANT</div>
+            <div className="text-[0.9rem] font-bold tracking-[0.12em] md:text-[1rem]">DEFENCE GATEWAY</div>
+            <div className="text-[0.75rem] tracking-[0.12em] text-sage md:text-[0.8rem]">SECURE ASSISTANT</div>
+          </div>
+          {/* Phone: the clearance stays visible; the rest of the identity strip opens on demand. */}
+          <div className="ml-auto flex items-center gap-2 md:hidden">
+            <ClearanceBadge code={me.clearance_code} />
+            <button
+              type="button"
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-expanded={menuOpen}
+              aria-controls="identity-strip"
+              className="btn px-3"
+            >
+              {menuOpen ? "Close" : "Menu"}
+            </button>
           </div>
         </div>
-        <div className="flex flex-1 items-stretch">
-          <div className="flex flex-col justify-center border-l border-rule px-6 py-3">
+        <div
+          id="identity-strip"
+          className={`${menuOpen ? "flex" : "hidden"} min-w-0 flex-col md:flex md:flex-1 md:flex-row md:items-stretch`}
+        >
+          <div className="flex flex-col justify-center border-t border-rule px-4 py-3 md:border-l md:border-t-0 md:px-6">
             <div className="text-[0.8rem] uppercase tracking-[0.12em] text-sage">
               {me.role.replace("_", " ")}
             </div>
@@ -103,7 +120,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </div>
           </Segment>
         </div>
-        <div className="flex items-center gap-5 border-l border-rule px-6">
+        <div
+          className={`${menuOpen ? "flex" : "hidden"} items-center justify-between gap-5 border-t border-rule px-4 py-3 md:flex md:justify-start md:border-l md:border-t-0 md:px-6 md:py-0`}
+        >
           <div className="flex flex-col gap-1 text-[0.85rem]">
             <span className="flex items-center gap-2">
               <span className="inline-block h-2 w-2 rounded-full bg-ok" />
@@ -120,8 +139,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
-        <nav className="flex w-52 shrink-0 flex-col border-r border-rule bg-surface py-3">
+      <div className="flex min-h-0 flex-1 flex-col-reverse md:flex-row">
+        <nav
+          aria-label="Main"
+          className="flex shrink-0 border-t border-rule bg-surface md:w-52 md:flex-col md:border-r md:border-t-0 md:py-3"
+        >
           {nav.map((n) => {
             const active = pathname.startsWith(n.href) || (n.also !== undefined && pathname.startsWith(n.also));
             return (
@@ -129,7 +151,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 key={n.href}
                 href={n.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-3 border-l-[3px] px-5 py-3 text-[0.9rem] uppercase tracking-[0.12em] ${
+                className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 border-t-[3px] px-1 py-2 text-[0.7rem] uppercase tracking-[0.08em] md:flex-none md:flex-row md:justify-start md:gap-3 md:border-l-[3px] md:border-t-0 md:px-5 md:py-3 md:text-[0.9rem] md:tracking-[0.12em] ${
                   active
                     ? "border-amber bg-raised text-amber"
                     : "border-transparent text-sage hover:text-ink"
