@@ -130,6 +130,16 @@ export default function DivisionPage() {
                     <span className="text-sage">Nothing needs attention here.</span>
                   )}
                 </p>
+                {view && view.facts.length > 0 && (
+                  <dl data-testid="division-facts" className="relative mt-5 flex flex-wrap gap-x-10 gap-y-3">
+                    {view.facts.map((fact) => (
+                      <div key={fact.label}>
+                        <dt className="text-[0.8rem] text-mute">{fact.label}</dt>
+                        <dd className="mt-0.5 text-[1.05rem]">{fact.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
               </header>
 
               {view && view.sections.length > 0 && (

@@ -60,7 +60,6 @@ def test_hidden_and_unknown_divisions_read_the_same(client) -> None:
     unknown = _get(client, "briech.lead", "nonesuch")
     assert hidden.status_code == unknown.status_code == 404
     assert hidden.json() == unknown.json()
-    assert _get(client, "owner", "field-ops").status_code == 404  # no unit path of its own
 
 
 def test_a_division_without_sections_yet_is_empty_not_missing(client) -> None:
@@ -137,3 +136,29 @@ def test_coo_never_sees_the_secret_finding_on_the_stratoc_page(client) -> None:
     sections = _sections(client, "coo", "stratoc")
     assert sections["findings"]["rows"] == []
     assert sections["findings"]["classification"] is None
+
+
+def test_field_operations_owner_view(client) -> None:
+    body = _get(client, "owner", "field-ops").json()
+    assert body["facts"] == [
+        {"label": "Field sites", "value": "Stratoc Site Team 4"},
+        {"label": "Supporting", "value": "EIB Stratoc"},
+        {"label": "Personnel", "value": "5"},
+    ]
+    sections = {s["key"]: s for s in body["sections"]}
+    assert list(sections) == ["personnel", "training", "stock", "maintenance"]
+    # Site Team 4 rows only: Stratoc-level (REC-021/022) and Briech (REC-023) people are not here.
+    assert _refs(sections["personnel"]) == ["REC-019", "REC-041", "REC-020", "REC-042", "REC-025"]
+    assert [r["flagged"] for r in sections["personnel"]["rows"]] == [True, True, True, True, False]
+    assert _refs(sections["stock"]) == ["REC-026"]
+
+
+def test_field_operations_for_the_site_commander_hides_the_confidential_row(client) -> None:
+    sections = _sections(client, "coo", "field-ops")
+    assert "REC-015" not in _refs(sections["maintenance"])  # Confidential: absent, not locked
+    assert sections["maintenance"]["classification"] == "restricted"
+
+
+def test_field_operations_hidden_from_a_division_lead(client) -> None:
+    assert _get(client, "briech.lead", "field-ops").status_code == 404
+    assert _get(client, "group.audit", "field-ops").status_code == 404

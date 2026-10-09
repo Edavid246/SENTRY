@@ -610,10 +610,22 @@ export interface components {
             /** Generated At */
             generated_at: string;
             /**
+             * Facts
+             * @description a few plain figures for the header, may be empty
+             */
+            facts: components["schemas"]["Fact"][];
+            /**
              * Sections
              * @description empty until this division's dashboard exists
              */
             sections: components["schemas"]["Section"][];
+        };
+        /** Fact */
+        Fact: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
         };
         /** FindingOut */
         FindingOut: {

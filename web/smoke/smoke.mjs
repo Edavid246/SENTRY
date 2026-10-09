@@ -107,6 +107,11 @@ try {
   check((await page.locator('[data-testid="service-gauge"]').count()) >= 1, "briech fleet shows a service gauge");
   check((await page.locator('[data-testid="open-map"]').count()) === 1, "briech links to the map");
   await shot("12d-division-briech");
+  await page.goto(BASE + "/d/field-ops");
+  await page.waitForSelector('[data-testid="section-personnel"]');
+  check((await page.textContent('[data-testid="division-facts"]')).includes("Stratoc Site Team 4"), "field operations names its site and who it supports");
+  check((await page.locator('[data-testid="section-personnel"] [data-testid="row-link"]').count()) === 5, "field operations lists its five people");
+  await shot("12f-division-field-ops");
   await page.goto(BASE + "/d/stratoc");
   await page.waitForSelector('[data-testid="section-findings"]');
   await page.click('[data-testid="run-correlation"]');

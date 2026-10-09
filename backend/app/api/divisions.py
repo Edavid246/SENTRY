@@ -26,6 +26,7 @@ from app.authz.labels import Labels
 from app.authz.scope import Scope
 from app.clock import demo_today
 from app.data_queries.registry import ToolOutcome, execute_tool
+from app.units import unit_names
 
 from .home import DIVISIONS
 
@@ -54,11 +55,17 @@ class Section(BaseModel):
     rows: list[SectionRow]
 
 
+class Fact(BaseModel):
+    label: str
+    value: str
+
+
 class DivisionView(BaseModel):
     key: str
     name: str
     tagline: str
     generated_at: str
+    facts: list[Fact] = Field(description="a few plain figures for the header, may be empty")
     sections: list[Section] = Field(description="empty until this division's dashboard exists")
 
 
@@ -121,6 +128,42 @@ def _fleet_meter(row: Row) -> float | None:
 
 
 SECTIONS: dict[str, tuple[SectionSpec, ...]] = {
+    "field-ops": (
+        SectionSpec(
+            "personnel",
+            "Personnel and certifications",
+            "field_personnel",
+            "No personnel are visible to you.",
+            lambda r: str(r["name"]),
+            lambda r: (
+                f"{r['rank']} · {r['certification']} · "
+                + ("expired " if r["status"] == "expired" else "valid until ")
+                + str(r["expires"])
+            ),
+            lambda r: r["status"] == "expired",
+        ),
+        SectionSpec(
+            "training",
+            "Training, last 90 days",
+            "training_activity",
+            "No training in the last 90 days.",
+            lambda r: str(r["course"]),
+            lambda r: f"{r['start_date']} · {r['attendees']} attendees",
+            lambda r: False,
+        ),
+        SectionSpec(
+            "stock",
+            "Stock below threshold",
+            "stock_below_threshold",
+            "No stock line is short.",
+            lambda r: str(r["item"]),
+            lambda r: (
+                f"{r['depot']} · {r['quantity']} on hand, threshold {r['threshold']} "
+                f"(short by {r['shortfall']})"
+            ),
+        ),
+        _COMPLIANCE[0],
+    ),
     "stratoc": (
         SectionSpec(
             "findings",
@@ -254,13 +297,15 @@ def _run(scope: Scope, spec: SectionSpec, unit_path: str) -> ToolOutcome:
     return execute_tool(scope, spec.tool, params)
 
 
-def _build(labels: Labels, spec: SectionSpec, outcome: ToolOutcome, unit_path: str) -> Section:
+def _build(
+    labels: Labels, spec: SectionSpec, outcome: ToolOutcome, keep: Callable[[str], bool]
+) -> Section:
     result = outcome.result
     rows: list[SectionRow] = []
     kept: list[Any] = []
     if result is not None:
         for row, record in zip(result.rows, result.records, strict=True):
-            if not record.unit_path.startswith(unit_path):
+            if not keep(record.unit_path):
                 continue  # the division's own records only (matters for unscoped tools)
             kept.append(record)
             rows.append(
@@ -286,25 +331,63 @@ def _build(labels: Labels, spec: SectionSpec, outcome: ToolOutcome, unit_path: s
     )
 
 
-def _division(key: str, scope: Scope) -> tuple[Any, str]:
-    """The division and the unit its tools are scoped to; 404 unless the caller's unit overlaps."""
-    division = next((d for d in DIVISIONS if d.key == key and d.path is not None), None)
+def _is_site(unit_path: str) -> bool:
+    """A field site is a unit below a subsidiary: /eib-group/<subsidiary>/<site>/."""
+    parts = unit_path.strip("/").split("/")
+    return parts[0] == "eib-group" and len(parts) >= 3
+
+
+def _reach(path: str, caller: str) -> bool:
+    return path.startswith(caller) or caller.startswith(path)
+
+
+def _division(
+    key: str, scope: Scope, names: Mapping[str, str]
+) -> tuple[Any, str, Callable[[str], bool]]:
+    """The division, the unit its tools run on, and which records count as its own.
+
+    404 unless the caller's unit overlaps the division. Field Operations has no unit of its own:
+    it is every site unit the caller can reach, so its tools run on the caller's unit and the
+    rows are narrowed to site units afterwards.
+    """
+    division = next((d for d in DIVISIONS if d.key == key), None)
     caller = scope.ctx.unit_path
-    if division is None or not (
-        division.path.startswith(caller) or caller.startswith(division.path)
-    ):
+    if division is None:
         raise HTTPException(status_code=404, detail="not found")
-    return division, division.path if division.path.startswith(caller) else caller
+    if division.path is None:
+        if not any(_is_site(p) and _reach(p, caller) for p in names):
+            raise HTTPException(status_code=404, detail="not found")
+        return division, caller, _is_site
+    if not _reach(division.path, caller):
+        raise HTTPException(status_code=404, detail="not found")
+    unit_path = division.path if division.path.startswith(caller) else caller
+    return division, unit_path, lambda path: path.startswith(unit_path)
+
+
+def _facts(key: str, sections: list[Section], names: Mapping[str, str], caller: str) -> list[Fact]:
+    if key != "field-ops":
+        return []
+    sites = sorted(p for p in names if _is_site(p) and _reach(p, caller))
+    owners = {next(d.name for d in DIVISIONS if d.key == p.split("/")[2]) for p in sites}
+    by_key = {s.key: s for s in sections}
+    people = {r.label for r in by_key["personnel"].rows} if "personnel" in by_key else set()
+    return [
+        Fact(label="Field sites", value=", ".join(names[p] for p in sites)),
+        Fact(label="Supporting", value=", ".join(sorted(owners))),
+        Fact(label="Personnel", value=str(len(people))),
+    ]
 
 
 @router.get("/{key}", response_model=DivisionView)
 def division_view(key: str, ctx: CurrentContext, conn: ConnDep) -> DivisionView:
     with guarded(ctx, conn, "read", "dashboard", on_deny="not_found") as scope:
-        division, unit_path = _division(key, scope)
+        names = unit_names(conn)
+        division, unit_path, keep = _division(key, scope, names)
         labels = Labels.load(conn)
         sections = [
-            _build(labels, s, _run(scope, s, unit_path), unit_path) for s in SECTIONS.get(key, ())
+            _build(labels, s, _run(scope, s, unit_path), keep) for s in SECTIONS.get(key, ())
         ]
+        facts = _facts(key, sections, names, scope.ctx.unit_path)
         scope.read(
             "dashboard",
             sum(len(s.rows) for s in sections),
@@ -315,6 +398,7 @@ def division_view(key: str, ctx: CurrentContext, conn: ConnDep) -> DivisionView:
         name=division.name,
         tagline=division.tagline,
         generated_at=utc_now_iso(),
+        facts=facts,
         sections=sections,
     )
 
@@ -328,7 +412,7 @@ def serial_trace(
 ) -> Section:
     """One serial number's run, QC state and delivery. Unseen and nonexistent read the same."""
     with guarded(ctx, conn, "read", "dashboard", on_deny="not_found") as scope:
-        _, unit_path = _division(key, scope)
+        _, unit_path, keep = _division(key, scope, unit_names(conn))
         spec = SectionSpec(
             "trace",
             f"Serial {serial}",
@@ -345,6 +429,6 @@ def serial_trace(
         outcome = _run(scope, spec, unit_path)
         if outcome.refused:
             raise HTTPException(status_code=422, detail=outcome.refusal)
-        section = _build(Labels.load(conn), spec, outcome, unit_path)
+        section = _build(Labels.load(conn), spec, outcome, keep)
         scope.read("dashboard", len(section.rows), item_ids=[r.ref for r in section.rows])
     return section

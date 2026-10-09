@@ -537,3 +537,25 @@ def sensors_status(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
             "unit_path": _unit_path,
         },
     )
+
+
+def field_personnel(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    """Personnel certifications the caller may see, each marked valid or expired."""
+    _check_names(params, frozenset({"unit_path"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    records = get_adapter().search(
+        scope, RecordFilter(entity_type="Qualification", unit_path=unit_path)
+    )
+    records.sort(key=lambda r: (str(r.data.get("name", "")), r.data["expires"], r.source_ref))
+    today = demo_today().isoformat()
+    return _table(
+        "field_personnel",
+        {"unit_path": unit_path},
+        records,
+        {
+            "id": _source_ref,
+            **_fields("name", "rank", "certification", "expires"),
+            "status": lambda r: "expired" if r.data["expires"] < today else "valid",
+            "unit_path": _unit_path,
+        },
+    )
