@@ -80,7 +80,7 @@ try {
 
   // dashboard: login lands here; every stub tile is tagged; the Secret finding is shown
   await page.waitForSelector('[data-testid="tile-recent_findings"]');
-  check((await page.locator('[data-testid="placeholder-tag"]').count()) === 1, "only the readiness tile is tagged PLACEHOLDER DATA");
+  check((await page.locator('[data-testid="placeholder-tag"]').count()) === 0, "no tile is tagged placeholder: every tile is counted from typed tools");
   // the finding exists once a commander runs the correlation job
   await page.click('[data-testid="run-correlation"]');
   await page.waitForSelector('[data-testid="finding-link"]');

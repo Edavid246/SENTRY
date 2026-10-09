@@ -1,8 +1,7 @@
-"""Dashboard summary (Part C): permission-aware, audited, placeholder data.
+"""Dashboard summary: permission-aware, audited, every tile counted from typed tools.
 
-The fixtures carry classification/compartments/unit and are filtered through
-LocalPolicy.item_visible, so different users get different dashboards and the
-Secret finding never reaches a Restricted caller.
+Counts come from audited typed tools filtered by the adapter, so different users get
+different dashboards and the Secret finding never reaches a Restricted caller.
 """
 
 from __future__ import annotations
@@ -63,8 +62,15 @@ def test_shape_is_the_contract_for_every_tile(client) -> None:
 def test_owner_and_coo_get_different_dashboards(client) -> None:
     owner = _summary(client, "owner").json()
     coo = _summary(client, "coo").json()
-    assert _ids(owner, "readiness") == {"RDY-CMD", "RDY-STRATOC", "RDY-SITE4", "RDY-UAS"}
-    assert _ids(coo, "readiness") == {"RDY-SITE4"}
+    # group status: one item per subsidiary; Giga and Poctova have nothing open (0 items)
+    assert _ids(owner, "readiness") == {
+        "GRP-STRATOC",
+        "GRP-BRIECH",
+        "GRP-EIB-GROUP",
+        "GRP-GIGA",
+        "GRP-POCTOVA",
+    }
+    assert _ids(coo, "readiness") == {"GRP-STRATOC"}
     # real tiles: overdue equipment REC-011 (Site 4) and REC-014 (Stratoc)
     assert _ids(owner, "maintenance_backlog") == {"MNT-SITE-4", "MNT-STRATOC"}
     assert _ids(coo, "maintenance_backlog") == {"MNT-SITE-4"}
@@ -92,7 +98,7 @@ def test_secret_finding_is_visible_to_owner_and_absent_for_coo(client) -> None:
 def test_tiles_are_real_exactly_where_the_data_is_real(client) -> None:
     tiles = _summary(client, "owner").json()["tiles"]
     assert {k: t["stub"] for k, t in tiles.items()} == {
-        "readiness": True,
+        "readiness": False,
         "maintenance_backlog": False,
         "expiring_certifications": False,
         "recent_findings": False,
@@ -114,6 +120,30 @@ def test_real_tile_items_are_derived_and_inherit_classification(client) -> None:
     assert items["CRT-SITE-4"]["detail"] == "REC-019, REC-020, REC-041, REC-042"
 
 
+def test_group_status_counts_and_inherited_labels(client) -> None:
+    def items(user):
+        tile = _summary(client, user).json()["tiles"]["readiness"]
+        return {i["id"]: i for i in tile["items"]}
+
+    owner = items("owner")
+    # Stratoc: REC-011/014 equipment, 019-022/041/042 certs, 010/026 stock = 10 (Confidential)
+    assert owner["GRP-STRATOC"]["value"] == 10
+    assert owner["GRP-STRATOC"]["classification"] == "confidential"
+    # Briech: REC-023 cert (Secret, UAS-OPS) + cancelled missions 056/057/060 (060 Secret)
+    assert owner["GRP-BRIECH"]["value"] == 4
+    assert owner["GRP-BRIECH"]["classification"] == "secret"
+    assert owner["GRP-BRIECH"]["compartments"] == ["UAS-OPS"]
+    # a subsidiary with nothing open: zero inputs, lowest label, no compartments
+    assert owner["GRP-GIGA"]["value"] == 0
+    assert owner["GRP-GIGA"]["classification"] == "unclassified"
+    assert owner["GRP-GIGA"]["compartments"] == []
+    # the limited user's count covers only what that user may see (Site 4 rows)
+    assert items("coo")["GRP-STRATOC"]["value"] == 6
+    assert items("coo")["GRP-STRATOC"]["classification"] == "restricted"
+    assert items("briech.lead")["GRP-BRIECH"]["value"] == 2  # cert 023 and mission 060 hidden
+    assert items("briech.lead")["GRP-BRIECH"]["classification"] == "confidential"
+
+
 def test_real_tiles_call_the_audited_typed_tools(client) -> None:
     _summary(client, "coo")
     tools = {
@@ -121,7 +151,12 @@ def test_real_tiles_call_the_audited_typed_tools(client) -> None:
         for e in _audit(client)
         if e["payload"].get("action") == "data_query" and e["payload"]["actor"] == "coo"
     }
-    assert {"equipment_due_for_maintenance", "expired_certifications"} <= tools
+    assert {
+        "equipment_due_for_maintenance",
+        "expired_certifications",
+        "stock_below_threshold",
+        "uas_missions",
+    } <= tools
 
 
 def test_confidential_user_sees_confidential_but_not_secret(client) -> None:
@@ -129,14 +164,14 @@ def test_confidential_user_sees_confidential_but_not_secret(client) -> None:
     _run_correlation(client)
     assert _ids(_summary(client, "logistics.head").json(), "recent_findings") == set()
     # Briech UAS is outside The logistics head's unit scope (and needs UAS-OPS).
-    assert "RDY-UAS" not in _ids(logistics_head, "readiness")
+    assert _ids(logistics_head, "readiness") == {"GRP-STRATOC"}
 
 
 def test_compartment_item_needs_the_compartment(client) -> None:
     briech_lead = _summary(client, "briech.lead").json()
     # The Briech lead holds UAS-OPS and is in the Briech UAS: sees only that unit's items.
     # (the Secret expired UAS certification is above The Briech lead's clearance)
-    assert _all_ids(briech_lead) == {"RDY-UAS"}
+    assert _all_ids(briech_lead) == {"GRP-BRIECH"}
 
 
 def test_no_data_roles_get_403(client) -> None:
@@ -182,4 +217,5 @@ def test_tool_queries_are_audited_after_the_decision_that_allowed_them(client) -
         for e in sorted(_audit(client), key=lambda e: e["seq"])
         if e["seq"] > tip and e["payload"]["actor"] == "owner" and e["payload"]["action"] != "login"
     ]
-    assert mine == ["decide", "data_query", "data_query", "query"]
+    # maintenance + certifications tiles, then the four group-status tools
+    assert mine == ["decide", *["data_query"] * 6, "query"]

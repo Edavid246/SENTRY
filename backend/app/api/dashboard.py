@@ -25,13 +25,10 @@ from pydantic import BaseModel, Field
 from app.api.deps import ConnDep, CurrentContext
 from app.api.guard import guarded
 from app.audit.chain import utc_now_iso
-from app.authz.context import AccessContext
 from app.authz.labels import Labels
-from app.authz.policy import get_policy
 from app.authz.scope import Scope
 from app.connectors.base import SourceRecord
 from app.correlation.store import list_findings
-from app.dashboard.fixtures import READINESS, FixtureTile
 from app.data_queries.registry import execute_tool
 from app.units import unit_names, unit_slug
 
@@ -53,7 +50,7 @@ class DashboardItem(BaseModel):
 
 
 class DashboardTile(BaseModel):
-    stub: bool = Field(description="true while the tile's data is placeholder fixtures")
+    stub: bool = Field(description="true while the tile's data is placeholder data")
     source: str
     title: str
     items: list[DashboardItem]
@@ -98,37 +95,6 @@ def _item(
         unit_path=unit_path,
         unit_name=names.get(unit_path, unit_path),
     )
-
-
-def _fixture_tile(
-    ctx: AccessContext, tile: FixtureTile, labels: Labels, names: dict[str, str]
-) -> DashboardTile:
-    """A placeholder tile, every item run through the SPEC 7.1 rule first (stub=true)."""
-    items = [
-        _item(
-            item.id,
-            item.label,
-            item.detail,
-            item.classification,
-            item.compartments,
-            item.unit_path,
-            names,
-            value=item.value,
-            unit=item.unit,
-            severity=item.severity,
-            trend=item.trend,
-        )
-        for item in tile.items
-        # An unknown classification code has no rank: fail closed (never shown).
-        if (rank := labels.rank(item.classification)) is not None
-        and get_policy().item_visible(
-            ctx,
-            classification_rank=rank,
-            compartments=item.compartments,
-            unit_path=item.unit_path,
-        )
-    ]
-    return DashboardTile(stub=True, source=tile.source, title=tile.title, items=items)
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,6 +164,71 @@ def _tool_tile(
     )
 
 
+GROUP_STATUS_TOOLS = (
+    ("equipment_due_for_maintenance", {"within_days": 0}, "equipment overdue"),
+    ("expired_certifications", {}, "certifications expired"),
+    ("stock_below_threshold", {}, "stock lines short"),
+    ("uas_missions", {"status": "cancelled"}, "UAS missions cancelled"),
+)
+_GROUP_ROOT = "/eib-group/"
+
+
+def _subsidiary_path(unit_path: str) -> str:
+    """'/eib-group/stratoc/site-4/' -> '/eib-group/stratoc/'; other units stand for themselves."""
+    parts = unit_path.strip("/").split("/")
+    if len(parts) >= 2 and unit_path.startswith(_GROUP_ROOT):
+        return f"{_GROUP_ROOT}{parts[1]}/"
+    return unit_path
+
+
+def _group_status_tile(scope: Scope, labels: Labels, names: dict[str, str]) -> DashboardTile:
+    """One item per subsidiary: open items counted from the typed tools (stub=false).
+
+    Each tool is audited and filtered by the adapter, so only rows the caller may see are
+    counted. An item is a derived count: it takes the highest classification and the
+    union of compartments of the records behind it. A subsidiary with nothing open shows
+    0 only when it lies inside the caller's unit scope; its count then has no inputs, so
+    it carries the lowest classification and no compartments.
+    """
+    groups: dict[str, dict[str, list[SourceRecord]]] = {}
+    for tool, params, what in GROUP_STATUS_TOOLS:
+        for record in execute_tool(scope, tool, params).records:
+            by_what = groups.setdefault(_subsidiary_path(record.unit_path), {})
+            by_what.setdefault(what, []).append(record)
+    ctx = scope.ctx
+    for path in names:
+        parts = path.strip("/").split("/")
+        if path.startswith(_GROUP_ROOT) and len(parts) == 2 and path.startswith(ctx.unit_path):
+            groups.setdefault(path, {})
+    items = []
+    for path in sorted(groups):
+        by_what = groups[path]
+        members = [r for rows in by_what.values() for r in rows]
+        label = labels.derive(members, empty_ok=True)
+        breakdown = ", ".join(f"{len(rows)} {what}" for what, rows in by_what.items())
+        refs = ", ".join(sorted(r.source_ref for r in members))
+        items.append(
+            _item(
+                f"GRP-{unit_slug(path)}",
+                f"{names.get(path, path)}: open items",
+                f"{breakdown}. Records: {refs}" if members else "Nothing open",
+                label.code,
+                label.compartments,
+                path,
+                names,
+                value=len(members),
+                unit="items",
+            )
+        )
+    return DashboardTile(
+        stub=False,
+        source="typed tools (maintenance, certifications, stock, UAS missions) via the demo "
+        "reference adapter, counted per subsidiary",
+        title="Group status",
+        items=items,
+    )
+
+
 def _findings_tile(scope: Scope, names: dict[str, str]) -> DashboardTile:
     """Findings the caller may see (row filter + RLS inside the query)."""
     items = [
@@ -226,7 +257,7 @@ def dashboard_summary(ctx: CurrentContext, conn: ConnDep) -> DashboardSummary:
     with guarded(ctx, conn, "read", "dashboard") as scope:
         labels, names = Labels.load(conn), unit_names(conn)
         tiles = DashboardTiles(
-            readiness=_fixture_tile(ctx, READINESS, labels, names),
+            readiness=_group_status_tile(scope, labels, names),
             maintenance_backlog=_tool_tile(scope, MAINTENANCE_BACKLOG, labels, names),
             expiring_certifications=_tool_tile(scope, EXPIRED_CERTIFICATIONS, labels, names),
             recent_findings=_findings_tile(scope, names),
