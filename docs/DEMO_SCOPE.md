@@ -1,6 +1,6 @@
 # Demo scope — what works today
 
-Living inventory for the demo build (DEMO CUT deadline: Monday 12 October 2026).
+Living inventory for the demo build.
 Updated at every step. Component-level swap points live in `docs/STUBS.md`;
 accepted production shortcuts live in `docs/PRODUCTION_DEBT.md` and are repeated
 in each step's report.
@@ -54,7 +54,7 @@ in each step's report.
 | Real live feeds (replay of synthetic detections is built) | §18.5 |
 | Evaluation additions beyond the current authorization/retrieval/adversarial suite | §16 |
 
-## Not built (spec modules outside the Monday demo)
+## Not built (spec modules outside the demo)
 
 > All module data is demo data standing in for the client's existing systems.
 
@@ -105,9 +105,9 @@ What to know (facts, not rules):
 Follow-up questions have their own cache keys, so lead with the scripted wording. Ad-lib
 questions are fine when the live model is on.
 
-## Demo-day checklist
+## Run checklist
 
-Must (the demo does not work without these):
+Required (the demo does not work without these):
 1. `docker compose -f infra/compose.yaml up -d db`, then `cd backend && uv run alembic upgrade head`.
 2. Seed and ingest: `set -a && . ./.env && set +a; uv run python -m app.seed`, then
    `uv run python scripts/ingest_documents.py`.
@@ -120,7 +120,7 @@ Must (the demo does not work without these):
    ledger path is `C:\Users\PC\projects\gateway-audit-ledger` on this machine; elsewhere run
    `scripts/setup_audit_ledger.sh <path>` and set `AUDIT_LEDGER_PATH`.
 
-Should (cheap insurance, skip if short of time):
+Recommended (cheap insurance):
 6. `prefill_cache.py`, then `--verify`, if anything that affects keys changed since the last
    good run.
 7. One click-through of the scripted questions, as the users who ask them.

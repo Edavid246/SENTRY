@@ -47,7 +47,7 @@ def test_seed_corpus_counts(seeded: None, owner_engine: Engine, settings) -> Non
     from app.seed import run as run_seed
 
     audit_before = _counts(owner_engine)["AuditEvent"]
-    run_seed(settings.test_owner_database_url)
+    run_seed(settings.test_owner_database_url, include_archived=True)
     counts = _counts(owner_engine)
     for table, expected in EXPECTED_COUNTS.items():
         assert counts[table.__name__] == expected, table.__name__
@@ -60,7 +60,7 @@ def test_seed_is_idempotent(seeded: None, owner_engine: Engine, settings) -> Non
     from app.seed import run as run_seed
 
     before = _counts(owner_engine)
-    run_seed(settings.test_owner_database_url)
+    run_seed(settings.test_owner_database_url, include_archived=True)
     after = _counts(owner_engine)
     assert after == before
 

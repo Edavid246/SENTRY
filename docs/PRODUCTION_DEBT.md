@@ -1,7 +1,6 @@
 # Production debt
 
-Shortcuts accepted **for the demo build only** (DEMO CUT deadline: Monday 12 October
-2026). Each entry says what is wrong, why it is acceptable now, and what production
+Shortcuts accepted **for the demo build only**. Each entry says what is wrong, why it is acceptable now, and what production
 requires. Grouped by area.
 
 **Standing rule (AGENTS.md):** whenever a demo-acceptable production flaw is identified —

@@ -85,6 +85,12 @@ USERS = [
         ],
         "data_scope": "standard",
     },
+]
+
+# ARCHIVED accounts: not seeded, so they cannot log in. The authorization test matrix
+# still needs them (tests seed with include_archived=True). To restore one for the
+# product, move its entry back into USERS above and reseed.
+ARCHIVED_USERS = [
     {
         "username": "logistics.head",
         "display_name": "Head of Production & Logistics",
@@ -131,6 +137,7 @@ USERS = [
         "data_scope": "audit",
     },
 ]
+
 
 SOURCE_SYSTEMS = [
     {"name": "documents-ref", "adapter_type": "documents", "status": "connected"},
@@ -1223,7 +1230,7 @@ def _chunk_texts(doc_ref: str, title: str, unit_path: str) -> list[tuple[str, st
     return [(summary, "Summary", 1), (body, "Section 1", 2)]
 
 
-def _rows() -> dict[type, list[dict]]:
+def _rows(include_archived: bool = False) -> dict[type, list[dict]]:
     unit_rows = [
         {
             "id": _unit_id(u["path"]),
@@ -1238,7 +1245,7 @@ def _rows() -> dict[type, list[dict]]:
     hasher = PasswordHasher()
     user_rows = []
     user_compartment_rows = []
-    for u in USERS:
+    for u in USERS + (ARCHIVED_USERS if include_archived else []):
         user_id = _id(f"user:{u['username']}")
         user_rows.append(
             {
@@ -1360,11 +1367,11 @@ _DELETE_ORDER = (
 )
 
 
-def run(url: str) -> None:
+def run(url: str, include_archived: bool = False) -> None:
     """Replace the demo corpus atomically (idempotent; owner role required)."""
     engine = create_engine(url)
     try:
-        rows = _rows()
+        rows = _rows(include_archived)
         with engine.begin() as conn:
             for table in _DELETE_ORDER:
                 conn.execute(delete(table))

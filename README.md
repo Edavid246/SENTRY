@@ -96,11 +96,11 @@ All names, units and documents are fictitious.
 | User | Role | Unit | Clearance | Compartments |
 |---|---|---|---|---|
 | Group Owner (`owner`) | Commander role | EIB Group | Government-sensitive | UAS-OPS, FORENSICS, CLIENT-A..D |
-| Head of Production & Logistics (`logistics.head`) | Logistics | EIB Group › EIB Stratoc | Confidential | — |
-| Group COO, limited view (`coo`) | Training | EIB Group › EIB Stratoc › Stratoc Site Team 4 | Internal | — |
-| Briech UAS Lead (`briech.lead`) | UAS operations | EIB Group › Briech UAS | Confidential | UAS-OPS |
-| Group IT (`group.it`) | System administrator | Group IT | None (no data access) | — |
-| Group Audit (`group.audit`) | Auditor | Group Audit | Internal (audit only) | — |
+
+Only `owner` is seeded and can log in. Five restricted accounts (`logistics.head`, `coo`,
+`briech.lead`, `group.it`, `group.audit`) are archived in `ARCHIVED_USERS` in `backend/app/seed.py`;
+only the authorization tests load them (`include_archived=True`). To restore one, move its entry
+back into `USERS` and reseed.
 
 Shared demo password: `Demo!Gateway2026` (dev seed only).
 

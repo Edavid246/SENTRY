@@ -6,6 +6,9 @@ needs a conversation first.
 
 Format: `YYYY-MM-DD — what changed — why`
 
+- 2026-10-09 — No deadline: every deadline/cut-line reference removed from the docs; work is not trimmed for time.
+- 2026-10-09 — One product account: only `owner` is seeded; the other five users live in `ARCHIVED_USERS` (app/seed.py) and are loaded only by tests (`include_archived=True`) so the authorization matrix keeps running. `scripts/prefill_cache.py` skips archived users.
+- 2026-10-09 — Planned: owner-first group home (Briech UAS, EIB Stratoc, Giga Forensics, Poctova, Field Operations cards) with per-division dashboards, forensic case workspace and per-division reports with export; workflows/approvals stay cut. Plan: ~/.claude/plans/i-didn-t-tell-you-functional-lantern.md.
 - 2026-10-09 — AGENTS.md split into invariants vs defaults; spec binds only on invariants — spec is a v0.1 draft and "stop and ask" on every difference was blocking work.
 - 2026-10-09 — Pivot Task 3: readiness fixture tile replaced by a real per-subsidiary "Group status" tile (api key `readiness` kept); fixtures module deleted — no real readiness source exists, open-item counts are honest and audited.
 - 2026-10-09 — Pivot Task 1: units renamed to the client's group (EIB Group, Briech UAS, EIB Stratoc, Stratoc Site Team 4, Giga Forensics, Poctova, Group IT, Group Audit); users renamed by role (`owner`, `coo`, ...); classification keys unchanged, display names Open/Internal/Confidential/Government-sensitive; compartments CLIENT-A..D added (generic agency labels) — demo is for one private group owner, not an army HQ; role strings kept because authz/policy.py and the shell depend on them.

@@ -33,6 +33,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 QUESTIONS_FILE = REPO / "data" / "demo_questions.json"
 DEFAULT_USERS = ("owner", "coo")
+# Only these accounts are seeded for the product; the rest are archived (app.seed.ARCHIVED_USERS).
+ACTIVE_USERS = ("owner",)
 DEMO_PASSWORD = "Demo!Gateway2026"  # README: dev seed password, not a secret
 # Pathways that are not assistant queries (the audit viewer asks no model).
 NON_ASSISTANT_PATHWAYS = frozenset({"audit"})
@@ -244,7 +246,7 @@ def main() -> None:
 
     questions = json.loads(QUESTIONS_FILE.read_text(encoding="utf-8"))["questions"]
     users = tuple(name.strip() for name in args.users.split(",") if name.strip())
-    pairs = plan_pairs(questions, users)
+    pairs = [p for p in plan_pairs(questions, users) if p.user in ACTIVE_USERS]
 
     _prepare_environment(args.verify)
     os.chdir(REPO)  # the cache path in settings is relative to the repo root

@@ -106,7 +106,7 @@ def migrated(settings: Settings) -> Iterator[None]:
 def seeded(migrated: None, settings: Settings) -> Iterator[None]:
     from app.seed import run as run_seed
 
-    run_seed(settings.test_owner_database_url)
+    run_seed(settings.test_owner_database_url, include_archived=True)
     yield
 
 

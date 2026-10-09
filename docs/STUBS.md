@@ -46,6 +46,12 @@ corpus (the generated files and manifest are committed). Runtime ingestion
 parses PDF/DOCX with `pypdf`/`python-docx` only; `reportlab` is not needed at
 runtime and should not ship in a production image.
 
+## Archived accounts
+
+Only `owner` is seeded. `logistics.head`, `coo`, `briech.lead`, `group.it`, `group.audit` are kept in
+`ARCHIVED_USERS` (`backend/app/seed.py`); tests seed them with `include_archived=True`. Restore one by
+moving its entry to `USERS` and reseeding.
+
 ## Pivot data (Tasks 4-6)
 
 - **Contracts, deliveries, production runs, serials, group assets:** invented rows in the

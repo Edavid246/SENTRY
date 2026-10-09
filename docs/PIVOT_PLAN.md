@@ -9,7 +9,7 @@ him. The mismatch is the surrounding layer: Brigade/Battalion hierarchy, army-st
 "Secret" naming, a Readiness/Training/Certification-first dashboard, and no concept of contracts,
 production/serials, client separation or state.
 
-Intended outcome by Mon 12 Oct 2026: same real engine, but it reads as HIS group, with new
+Intended outcome: same real engine, but it reads as HIS group, with new
 contract/delivery, manufacturing-traceability and asset views, and a state filter.
 Decisions already taken with the user: use real subsidiary names over fictitious, labelled-demo
 data; full rename including unit paths; owner-first login with a restricted second user kept in
@@ -25,9 +25,8 @@ in docs/DECISIONS.md.
   to seed rows, unit names, system prompts or documents changes cache keys
   (ai_gateway/cache.py key = model + messages + params). Task 1 therefore invalidates most entries.
   Plan: do ALL data/prompt changes first, run prefill (user step, needs their key) once after the last
-  data change, with the Sunday quota as buffer. Cache is a convenience; live Gemini is the fallback.
+  data change, Cache is a convenience; live Gemini is the fallback.
 - Per working protocol: one task at a time, scripts/check.sh green, commit, then stop for go-ahead.
-- Cut line: Tasks 1-2 must; 3-4 should; 5-6 nice; 7 always.
 
 ## Tasks
 
@@ -113,9 +112,9 @@ Verify: scripts/check.sh green (ruff, pytest incl. tests/authz, web lint/typeche
   only for security-relevant items (e.g. generic-agency mapping, placeholder tiles).
 - Update memory notes (project pivot, new unit names/usernames).
 - Handoff: give the user the prefill commands (record, then --verify) to run with their key after the
-  last data change; re-run the demo-day checklist.
+  last data change; re-run the run checklist.
 
-## Explicitly deferred (post-Monday, after discovery)
+## Explicitly deferred (after discovery)
 Field-site/troop rosters and check-ins, forensic case UI beyond current evidence view, Poctova
 complement-vs-replace question, real systems/adapters, connectivity/offline mode, local model.
 Do NOT derive real deployment locations from open sources.
