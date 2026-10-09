@@ -45,6 +45,8 @@ uv sync
 # 3. Schema + demo corpus (idempotent)
 cd backend && uv run alembic upgrade head && cd ..
 uv run python -m app.seed
+# optional: also seed the archived restricted accounts (restricted-view demos, web smoke test)
+# uv run python -m app.seed --include-archived
 uv run python scripts/ingest_documents.py   # parses DOC-201..204, embeds locally (first run downloads the model)
 
 # 4. Run the API (http://localhost:8001, docs at /docs)

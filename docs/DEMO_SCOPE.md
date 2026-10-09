@@ -133,7 +133,7 @@ locally hosted map tiles"); nothing is fetched from an external tile service.
 
 ## Trimmed demo script (spec §18)
 
-1. Login lands on the dashboard (permission-aware tiles) — **works**.
+1. Login lands on the group home: a card per business the caller can see, alerts only where something needs attention; a card opens that business (`/d/<division>`) — **works**. Per-division dashboards are being built (Phase C).
 2. Knowledge pathway with citations + open a cited page — **works against the API today**.
 3. Data pathway — **works against the API today** (equipment due for maintenance, expired certifications, overdue deliveries, contracts by client, serial trace, production QC holds; map state filter). Needs a live or cached model for the explanation; the table is deterministic.
 4. Reporting — built. "Prepare a summary of training activity for this command over the last quarter" drafts a report (`app/reporting/training.py`) from the `training_activity` rows plus retrieved training documents, both under the caller's row filter + RLS. The draft is bannered DRAFT FOR HUMAN REVIEW, carries the highest classification and union of compartments of every input (also stored on the conversation), cites passages, lists its source records and documents, and is blocked if it cites anything outside its inputs. Plain "show me the training activity" stays a data query. Audited as pathway `report` with record ids, chunk ids and provider. The wording is cached like other answers: run the prefill (user step) for it to work without a live model.

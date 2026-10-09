@@ -51,7 +51,7 @@ try {
   await page.fill("#username", "owner");
   await page.fill("#password", PASSWORD);
   await page.click("button[type=submit]");
-  await page.waitForURL("**/dashboard");
+  await page.waitForURL("**/home");
   await page.click('a[href="/chat"]');
   await page.waitForURL("**/chat");
   await page.waitForSelector('[data-testid="user-name"]');

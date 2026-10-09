@@ -47,7 +47,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }
 
   const nav = [
-    { href: "/dashboard", label: "Dashboard", icon: <IconDashboard />, show: can("read") },
+    { href: "/home", label: "Home", icon: <IconOrg />, show: can("read"), also: "/d/" },
+    { href: "/dashboard", label: "Overview", icon: <IconDashboard />, show: can("read") },
     { href: "/chat", label: "Assistant", icon: <IconChat />, show: true },
     { href: "/map", label: "Map", icon: <IconMap />, show: can("read") },
     { href: "/audit", label: "Audit log", icon: <IconLog />, show: can("read_audit") },
@@ -122,7 +123,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-0 flex-1">
         <nav className="flex w-52 shrink-0 flex-col border-r border-rule bg-surface py-3">
           {nav.map((n) => {
-            const active = pathname.startsWith(n.href);
+            const active = pathname.startsWith(n.href) || (n.also !== undefined && pathname.startsWith(n.also));
             return (
               <Link
                 key={n.href}

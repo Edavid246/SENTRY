@@ -1,4 +1,6 @@
 // UI smoke test. Needs the web dev server on :3000 and the stub API on :8001.
+// It also logs in as the archived restricted accounts (coo, group.audit), so seed the dev DB with
+// `python -m app.seed --include-archived` first (see README).
 // Playwright is the existing install in the npx cache; set PLAYWRIGHT_DIR to override.
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
@@ -72,13 +74,29 @@ try {
 
   // owner: policy question -> cited answer -> open citation
   await login("owner");
-  await page.waitForURL("**/dashboard");
+  await page.waitForURL("**/home");
   await page.waitForSelector('[data-testid="user-name"]');
   check((await page.textContent('[data-testid="clearance-badge"]')).includes("GOVERNMENT-SENSITIVE"), "owner clearance badge is GOVERNMENT-SENSITIVE");
   check((await page.locator("text=UAS-OPS").count()) > 0, "compartment tags shown");
   check((await page.locator('a[href="/audit"]').count()) === 0, "audit nav hidden without read_audit");
 
-  // dashboard: login lands here; every stub tile is tagged; the Secret finding is shown
+  // group home: login lands here; five cards, alerts only where something needs attention
+  await page.waitForSelector('[data-testid="division-briech"]');
+  for (const key of ["briech", "stratoc", "giga", "poctova", "field-ops"]) {
+    check((await page.locator(`[data-testid="division-${key}"]`).count()) === 1, `owner home has the ${key} card`);
+  }
+  check(Number(await page.getAttribute('[data-testid="division-poctova"]', "data-alert")) > 0, "poctova card carries an alert count");
+  await shot("12-home-owner");
+  await page.click('[data-testid="division-poctova"]');
+  await page.waitForSelector('[data-testid="division-title"]');
+  check((await page.textContent('[data-testid="division-title"]')) === "Poctova", "a card opens that business");
+  await shot("12b-division-poctova");
+  await page.click('[data-testid="back-to-group"]');
+  await page.waitForSelector('[data-testid="division-briech"]');
+  check(true, "back to the group home works");
+
+  // overview: every stub tile is tagged; the Secret finding is shown
+  await page.click('a[href="/dashboard"]');
   await page.waitForSelector('[data-testid="tile-recent_findings"]');
   check((await page.locator('[data-testid="placeholder-tag"]').count()) === 0, "no tile is tagged placeholder: every tile is counted from typed tools");
   // the finding exists once a commander runs the correlation job
@@ -154,7 +172,14 @@ try {
 
   // coo: same questions -> fewer results
   await login("coo");
-  await page.waitForURL("**/dashboard");
+  await page.waitForURL("**/d/field-ops");
+  await page.waitForSelector('[data-testid="division-title"]');
+  check((await page.locator('[data-testid="division-title"]').count()) === 1, "coo sees one business, so lands in it directly");
+  await shot("14a-division-coo");
+  await page.goto(BASE + "/d/briech");
+  await page.waitForSelector('[data-testid="division-not-found"]');
+  check(true, "coo gets 'not found' for a business outside their unit");
+  await page.click('a[href="/dashboard"]');
   await page.waitForSelector('[data-testid="tile-recent_findings"]');
   check((await page.locator('[data-testid="finding-link"]').count()) === 0, "coo does not see the Secret finding");
   check((await page.locator('[data-testid="run-correlation"]').count()) === 0, "coo has no run-correlation button");

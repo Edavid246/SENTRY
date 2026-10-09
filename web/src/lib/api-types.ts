@@ -265,6 +265,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/home/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Home Summary */
+        get: operations["home_summary_api_v1_home_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/correlation/run": {
         parameters: {
             query?: never;
@@ -383,6 +400,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AlertPart */
+        AlertPart: {
+            /**
+             * What
+             * @description what is counted, e.g. 'deliveries overdue'
+             */
+            what: string;
+            /** Count */
+            count: number;
+        };
         /** AssistantQueryRequest */
         AssistantQueryRequest: {
             /** Question */
@@ -577,6 +604,38 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HomeAlert */
+        HomeAlert: {
+            /**
+             * Count
+             * @description everything in this division that needs attention
+             */
+            count: number;
+            /** Parts */
+            parts: components["schemas"]["AlertPart"][];
+            /** Classification */
+            classification: string;
+            /** Compartments */
+            compartments: string[];
+        };
+        /** HomeDivision */
+        HomeDivision: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Tagline */
+            tagline: string;
+            /** @description null when nothing needs attention */
+            alert: components["schemas"]["HomeAlert"] | null;
+        };
+        /** HomeSummary */
+        HomeSummary: {
+            /** Generated At */
+            generated_at: string;
+            /** Divisions */
+            divisions: components["schemas"]["HomeDivision"][];
         };
         /** LoginRequest */
         LoginRequest: {
@@ -1098,6 +1157,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    home_summary_api_v1_home_summary_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeSummary"];
                 };
             };
             /** @description Validation Error */

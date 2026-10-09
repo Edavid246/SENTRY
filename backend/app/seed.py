@@ -12,6 +12,7 @@ Tests: app.seed.run(test_owner_database_url)
 from __future__ import annotations
 
 import hashlib
+import sys
 from datetime import UTC, datetime, timedelta
 from uuid import NAMESPACE_URL, UUID, uuid5
 
@@ -1392,8 +1393,11 @@ def run(url: str, include_archived: bool = False) -> None:
 
 
 def main() -> None:
-    run(get_settings().owner_database_url)
-    counts = {t.__name__: len(r) for t, r in _rows().items()}
+    # --include-archived also seeds the archived restricted accounts, for restricted-view
+    # demos and the web smoke test. The product seed (no flag) has the owner only.
+    include_archived = "--include-archived" in sys.argv[1:]
+    run(get_settings().owner_database_url, include_archived)
+    counts = {t.__name__: len(r) for t, r in _rows(include_archived).items()}
     print(f"seeded demo corpus: {counts}; audit_events untouched ({AuditEvent.__tablename__})")
 
 
