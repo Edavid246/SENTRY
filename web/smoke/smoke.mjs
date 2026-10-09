@@ -90,7 +90,18 @@ try {
   await page.click('[data-testid="division-poctova"]');
   await page.waitForSelector('[data-testid="division-title"]');
   check((await page.textContent('[data-testid="division-title"]')) === "Poctova", "a card opens that business");
+  await page.waitForSelector('[data-testid="section-qc-holds"]');
+  check((await page.locator('[data-testid="section-runs"] [data-testid="row-link"]').count()) === 2, "poctova lists its two production runs");
+  await page.fill('[aria-label="Serial number"]', "PCT-ARM-0007");
+  await page.click('[data-testid="serial-lookup"] button[type="submit"]');
+  await page.waitForSelector('[data-testid="trace-row"]');
+  check(true, "a serial number traces to its run and delivery");
   await shot("12b-division-poctova");
+  await page.click('[data-testid="section-qc-holds"] [data-testid="row-link"]');
+  await page.waitForURL("**/records/REC-086");
+  check(true, "a section row opens its record");
+  await page.goBack();
+  await page.waitForSelector('[data-testid="division-title"]');
   await page.click('[data-testid="back-to-group"]');
   await page.waitForSelector('[data-testid="division-briech"]');
   check(true, "back to the group home works");

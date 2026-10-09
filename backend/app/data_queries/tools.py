@@ -469,3 +469,28 @@ def production_qc_holds(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
             "unit_path": _unit_path,
         },
     )
+
+
+def production_runs(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    """Every production run the caller may see, with how many visible serials each traces to."""
+    _check_names(params, frozenset({"unit_path"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    adapter = get_adapter()
+    runs = adapter.search(scope, RecordFilter(entity_type="ProductionRun", unit_path=unit_path))
+    serials = adapter.search(scope, RecordFilter(entity_type="SerialUnit", unit_path=unit_path))
+    runs.sort(key=lambda r: (r.data["run_ref"], r.source_ref))
+    traced = {
+        r.data["run_ref"]: sum(1 for s in serials if s.data.get("run_ref") == r.data["run_ref"])
+        for r in runs
+    }
+    return _table(
+        "production_runs",
+        {"unit_path": unit_path},
+        runs,
+        {
+            "id": _source_ref,
+            **_fields("run_ref", "product", "quantity", "qc_status", "hold_reason"),
+            "serials_traced": lambda r: traced[r.data["run_ref"]],
+            "unit_path": _unit_path,
+        },
+    )

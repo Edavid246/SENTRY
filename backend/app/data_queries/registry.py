@@ -28,6 +28,7 @@ from app.data_queries.tools import (
     equipment_due_for_maintenance,
     expired_certifications,
     production_qc_holds,
+    production_runs,
     serial_trace,
     stock_below_threshold,
     training_activity,
@@ -48,6 +49,7 @@ REGISTRY: dict[str, ToolFn] = {
     "contracts_status": contracts_status,
     "serial_trace": serial_trace,
     "production_qc_holds": production_qc_holds,
+    "production_runs": production_runs,
 }
 
 # The policy decisions a caller needs before a tool runs. Tools read source records;

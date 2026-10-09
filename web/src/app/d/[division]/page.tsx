@@ -8,12 +8,14 @@ import {
   type DashboardItem,
   type DashboardSummary,
   type DashboardTile,
+  type DivisionView,
   type HomeSummary,
 } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { BarList, Findings, TileFrame } from "@/components/DashboardTiles";
 import { DivisionGlyph } from "@/components/DivisionGlyph";
+import { SectionCard, SerialLookup } from "@/components/DivisionSections";
 
 // Which business an item belongs to: a site team (a unit below a subsidiary) is Field
 // Operations; a finding about a site stays with the subsidiary that raised it. Mirrors
@@ -33,18 +35,20 @@ export default function DivisionPage() {
   const { division } = useParams<{ division: string }>();
   const { me } = useSession();
   const [home, setHome] = useState<HomeSummary | null>(null);
+  const [view, setView] = useState<DivisionView | null>(null);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!me) return;
-    Promise.all([api.home(), api.dashboard()])
-      .then(([h, s]) => {
+    Promise.all([api.home(), api.dashboard(), api.division(division).catch(() => null)])
+      .then(([h, s, v]) => {
         setHome(h);
         setSummary(s);
+        setView(v);
       })
       .catch(() => setError("This business could not be loaded."));
-  }, [me]);
+  }, [me, division]);
 
   const current = home?.divisions.find((d) => d.key === division);
   const t = summary?.tiles;
@@ -115,7 +119,16 @@ export default function DivisionPage() {
                 </p>
               </header>
 
-              {t && (
+              {view && view.sections.length > 0 && (
+                <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-2">
+                  {view.key === "poctova" && <SerialLookup division={view.key} />}
+                  {view.sections.map((section) => (
+                    <SectionCard key={section.key} section={section} />
+                  ))}
+                </div>
+              )}
+
+              {t && !(view && view.sections.length > 0) && (
                 <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-2">
                   {(
                     [

@@ -282,6 +282,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/divisions/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Division View */
+        get: operations["division_view_api_v1_divisions__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/divisions/{key}/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Serial Trace
+         * @description One serial number's run, QC state and delivery. Unseen and nonexistent read the same.
+         */
+        get: operations["serial_trace_api_v1_divisions__key__trace_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/correlation/run": {
         parameters: {
             query?: never;
@@ -562,6 +599,22 @@ export interface components {
             overdue_deliveries: components["schemas"]["DashboardTile"];
             recent_findings: components["schemas"]["DashboardTile"];
         };
+        /** DivisionView */
+        DivisionView: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Tagline */
+            tagline: string;
+            /** Generated At */
+            generated_at: string;
+            /**
+             * Sections
+             * @description empty until this division's dashboard exists
+             */
+            sections: components["schemas"]["Section"][];
+        };
         /** FindingOut */
         FindingOut: {
             /**
@@ -696,6 +749,48 @@ export interface components {
             analysis: string;
             /** Findings */
             findings: components["schemas"]["FindingOut"][];
+        };
+        /** Section */
+        Section: {
+            /** Key */
+            key: string;
+            /** Title */
+            title: string;
+            /**
+             * Tool
+             * @description the typed tool that produced the rows
+             */
+            tool: string;
+            /** Empty Text */
+            empty_text: string;
+            /** Flagged */
+            flagged: number;
+            /**
+             * Classification
+             * @description null when the section has no rows
+             */
+            classification: string | null;
+            /** Compartments */
+            compartments: string[];
+            /** Rows */
+            rows: components["schemas"]["SectionRow"][];
+        };
+        /** SectionRow */
+        SectionRow: {
+            /**
+             * Ref
+             * @description source record reference; links to /records/{ref}
+             */
+            ref: string;
+            /** Label */
+            label: string;
+            /** Detail */
+            detail: string;
+            /**
+             * Flagged
+             * @description true when this row needs attention
+             */
+            flagged: boolean;
         };
         /** TurnOut */
         TurnOut: {
@@ -1188,6 +1283,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HomeSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    division_view_api_v1_divisions__key__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DivisionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    serial_trace_api_v1_divisions__key__trace_get: {
+        parameters: {
+            query: {
+                serial: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Section"];
                 };
             };
             /** @description Validation Error */

@@ -16,6 +16,9 @@ export type DashboardItem = Schemas["DashboardItem"];
 export type HomeSummary = Schemas["HomeSummary"];
 export type HomeDivision = Schemas["HomeDivision"];
 export type HomeAlert = Schemas["HomeAlert"];
+export type DivisionView = Schemas["DivisionView"];
+export type DivisionSection = Schemas["Section"];
+export type SectionRow = Schemas["SectionRow"];
 
 // These endpoints return free-form dicts in OpenAPI, so their shapes are
 // declared here (kept in step with backend/app/api/endpoints.py).
@@ -184,6 +187,11 @@ export const api = {
     request<RecordDetail>(`/records/${encodeURIComponent(sourceRef)}`),
   dashboard: () => request<DashboardSummary>("/dashboard/summary"),
   home: () => request<HomeSummary>("/home/summary"),
+  division: (key: string) => request<DivisionView>(`/divisions/${encodeURIComponent(key)}`),
+  serialTrace: (key: string, serial: string) =>
+    request<DivisionSection>(
+      `/divisions/${encodeURIComponent(key)}/trace?serial=${encodeURIComponent(serial)}`,
+    ),
   connectedMap: (state?: string) =>
     request<ConnectedMap>(`/connected/map${state ? `?state=${encodeURIComponent(state)}` : ""}`),
   replay: (after: string | null, upto: string, state?: string) =>
