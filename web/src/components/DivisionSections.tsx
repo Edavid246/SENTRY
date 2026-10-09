@@ -27,12 +27,24 @@ function ServiceGauge({ fraction }: { fraction: number }) {
 
 // One section of a division dashboard: the rows of a typed tool, each linking to its record
 // (and from there to the evidence panel). Flagged rows are the ones needing attention.
-export function SectionCard({ section }: { section: DivisionSection }) {
+export function SectionCard({
+  section,
+  action,
+  lead = false,
+}: {
+  section: DivisionSection;
+  action?: React.ReactNode;
+  lead?: boolean;
+}) {
   return (
-    <section data-testid={`section-${section.key}`} className="border border-rule bg-surface">
+    <section
+      data-testid={`section-${section.key}`}
+      className={`border bg-surface ${lead ? "border-amber xl:col-span-2" : "border-rule"}`}
+    >
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-rule px-4 py-3">
         <h2 className="label">{section.title}</h2>
-        <span className="font-mono text-[0.85rem]">
+        <span className="flex items-center gap-4 font-mono text-[0.85rem]">
+          {action}
           {section.flagged > 0 ? (
             <span className="text-amber">{section.flagged} need attention</span>
           ) : (
@@ -48,9 +60,9 @@ export function SectionCard({ section }: { section: DivisionSection }) {
             {section.rows.map((row) => (
               <li key={row.ref} className="py-3 first:pt-0 last:pb-0">
                 <Link
-                  href={`/records/${encodeURIComponent(row.ref)}`}
+                  href={row.href}
                   data-testid="row-link"
-                  className={`block text-[0.95rem] hover:underline ${row.flagged ? "text-amber" : ""}`}
+                  className={`block hover:underline ${lead ? "text-[1.2rem] font-medium" : "text-[0.95rem]"} ${row.flagged ? "text-amber" : ""}`}
                 >
                   {row.label}
                 </Link>

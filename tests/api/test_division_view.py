@@ -112,3 +112,28 @@ def test_briech_lead_sees_fewer_rows_and_a_lower_label(client) -> None:
     assert sections["fleet"]["classification"] == "confidential"
     assert sections["deliveries"]["compartments"] == ["CLIENT-A"]
     assert _refs(sections["maintenance"]) == []
+
+
+def test_stratoc_sections_and_finding_link(client) -> None:
+    from test_home_summary import _run_correlation
+
+    _run_correlation(client)
+    sections = _sections(client, "owner", "stratoc")
+    assert list(sections) == ["findings", "detections", "sensors", "maintenance", "certifications"]
+    (finding,) = sections["findings"]["rows"]
+    assert finding["href"] == "/findings/FND-RISING-FAULTS-SITE-4"
+    assert sections["findings"]["classification"] == "secret"  # inherits its Secret input
+    assert _refs(sections["sensors"]) == ["REC-047", "REC-046"]
+    assert set(_refs(sections["detections"])) == {
+        "REC-048", "REC-049", "REC-051", "REC-052", "REC-054",
+    }  # fmt: skip
+    assert all(not r["flagged"] for r in sections["detections"]["rows"])
+
+
+def test_coo_never_sees_the_secret_finding_on_the_stratoc_page(client) -> None:
+    from test_home_summary import _run_correlation
+
+    _run_correlation(client)
+    sections = _sections(client, "coo", "stratoc")
+    assert sections["findings"]["rows"] == []
+    assert sections["findings"]["classification"] is None

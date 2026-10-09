@@ -779,9 +779,14 @@ export interface components {
         SectionRow: {
             /**
              * Ref
-             * @description source record reference; links to /records/{ref}
+             * @description source record reference
              */
             ref: string;
+            /**
+             * Href
+             * @description where the row opens: its record, or its finding
+             */
+            href: string;
             /** Label */
             label: string;
             /** Detail */

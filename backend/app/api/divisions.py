@@ -35,7 +35,8 @@ Row = Mapping[str, Any]
 
 
 class SectionRow(BaseModel):
-    ref: str = Field(description="source record reference; links to /records/{ref}")
+    ref: str = Field(description="source record reference")
+    href: str = Field(description="where the row opens: its record, or its finding")
     label: str
     detail: str
     flagged: bool = Field(description="true when this row needs attention")
@@ -72,6 +73,8 @@ class SectionSpec:
     flagged: Callable[[Row], bool] = lambda row: True
     params: Mapping[str, Any] = field(default_factory=dict)
     meter: Callable[[Row], float | None] = lambda row: None
+    href: Callable[[str], str] = lambda ref: f"/records/{ref}"
+    scoped: bool = True  # False for tools that take no unit_path (the findings store)
 
 
 def _run_detail(row: Row) -> str:
@@ -118,6 +121,39 @@ def _fleet_meter(row: Row) -> float | None:
 
 
 SECTIONS: dict[str, tuple[SectionSpec, ...]] = {
+    "stratoc": (
+        SectionSpec(
+            "findings",
+            "Correlation findings",
+            "correlation_findings",
+            "No findings yet. Run the correlation to look for patterns.",
+            lambda r: str(r["title"]),
+            lambda r: f"{r['severity']} severity · {r['summary']}",
+            href=lambda ref: f"/findings/{ref}",
+            scoped=False,
+        ),
+        SectionSpec(
+            "detections",
+            "Detections, last 48 hours",
+            "detections_near_site",
+            "No detections in the last 48 hours.",
+            lambda r: f"{str(r['object_type']).capitalize()} at {r['site']}",
+            lambda r: (
+                f"{r['observed_at']} · {r['sensor_id']} · confidence {float(r['confidence']):.0%}"
+            ),
+            lambda r: False,
+        ),
+        SectionSpec(
+            "sensors",
+            "Sensors and sites",
+            "sensors_status",
+            "No sensors are visible to you.",
+            lambda r: f"{r['sensor_id']} · {r['site']}",
+            lambda r: f"{r['kind']} · {r['status']}",
+            lambda r: r["status"] != "online",
+        ),
+        *_COMPLIANCE,
+    ),
     "briech": (
         SectionSpec(
             "fleet",
@@ -214,24 +250,30 @@ SECTIONS: dict[str, tuple[SectionSpec, ...]] = {
 
 
 def _run(scope: Scope, spec: SectionSpec, unit_path: str) -> ToolOutcome:
-    return execute_tool(scope, spec.tool, {**spec.params, "unit_path": unit_path})
+    params = {**spec.params, "unit_path": unit_path} if spec.scoped else dict(spec.params)
+    return execute_tool(scope, spec.tool, params)
 
 
-def _build(labels: Labels, spec: SectionSpec, outcome: ToolOutcome) -> Section:
+def _build(labels: Labels, spec: SectionSpec, outcome: ToolOutcome, unit_path: str) -> Section:
     result = outcome.result
     rows: list[SectionRow] = []
+    kept: list[Any] = []
     if result is not None:
         for row, record in zip(result.rows, result.records, strict=True):
+            if not record.unit_path.startswith(unit_path):
+                continue  # the division's own records only (matters for unscoped tools)
+            kept.append(record)
             rows.append(
                 SectionRow(
                     ref=record.source_ref,
+                    href=spec.href(record.source_ref),
                     label=spec.label(row),
                     detail=spec.detail(row),
                     flagged=spec.flagged(row),
                     meter=spec.meter(row),
                 )
             )
-    label = labels.derive(list(outcome.records)) if outcome.records else None
+    label = labels.derive(kept) if kept else None
     return Section(
         key=spec.key,
         title=spec.title,
@@ -260,7 +302,9 @@ def division_view(key: str, ctx: CurrentContext, conn: ConnDep) -> DivisionView:
     with guarded(ctx, conn, "read", "dashboard", on_deny="not_found") as scope:
         division, unit_path = _division(key, scope)
         labels = Labels.load(conn)
-        sections = [_build(labels, s, _run(scope, s, unit_path)) for s in SECTIONS.get(key, ())]
+        sections = [
+            _build(labels, s, _run(scope, s, unit_path), unit_path) for s in SECTIONS.get(key, ())
+        ]
         scope.read(
             "dashboard",
             sum(len(s.rows) for s in sections),
@@ -301,6 +345,6 @@ def serial_trace(
         outcome = _run(scope, spec, unit_path)
         if outcome.refused:
             raise HTTPException(status_code=422, detail=outcome.refusal)
-        section = _build(Labels.load(conn), spec, outcome)
+        section = _build(Labels.load(conn), spec, outcome, unit_path)
         scope.read("dashboard", len(section.rows), item_ids=[r.ref for r in section.rows])
     return section

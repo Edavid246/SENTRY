@@ -33,7 +33,8 @@ function only(tile: DashboardTile, key: string, finding = false): DashboardTile 
 
 export default function DivisionPage() {
   const { division } = useParams<{ division: string }>();
-  const { me } = useSession();
+  const { me, can } = useSession();
+  const [running, setRunning] = useState(false);
   const [home, setHome] = useState<HomeSummary | null>(null);
   const [view, setView] = useState<DivisionView | null>(null);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -49,6 +50,18 @@ export default function DivisionPage() {
       })
       .catch(() => setError("This business could not be loaded."));
   }, [me, division]);
+
+  async function runCorrelation() {
+    setRunning(true);
+    try {
+      await api.runCorrelation();
+      setView(await api.division(division));
+    } catch {
+      setError("The correlation job could not be run.");
+    } finally {
+      setRunning(false);
+    }
+  }
 
   const current = home?.divisions.find((d) => d.key === division);
   const t = summary?.tiles;
@@ -132,9 +145,40 @@ export default function DivisionPage() {
                       <span aria-hidden className="text-amber">→</span>
                     </Link>
                   )}
-                  {view.sections.map((section) => (
-                    <SectionCard key={section.key} section={section} />
-                  ))}
+                  {view.sections.map((section) =>
+                    section.key === "findings" ? (
+                      <SectionCard
+                        key={section.key}
+                        section={section}
+                        lead
+                        action={
+                          can("run_correlation") && (
+                            <button
+                              type="button"
+                              data-testid="run-correlation"
+                              onClick={runCorrelation}
+                              disabled={running}
+                              className="btn"
+                            >
+                              {running ? "Running…" : "Run correlation"}
+                            </button>
+                          )
+                        }
+                      />
+                    ) : (
+                      <SectionCard key={section.key} section={section} />
+                    ),
+                  )}
+                  {view.key === "stratoc" && (
+                    <Link
+                      href="/d/field-ops"
+                      data-testid="open-field-ops"
+                      className="flex items-center justify-between gap-4 border border-rule bg-surface px-4 py-3 text-[0.95rem] hover:border-amber xl:col-span-2"
+                    >
+                      <span>Field Operations: the sites and people Stratoc supports</span>
+                      <span aria-hidden className="text-amber">→</span>
+                    </Link>
+                  )}
                 </div>
               )}
 

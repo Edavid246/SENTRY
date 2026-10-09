@@ -519,3 +519,21 @@ def uas_fleet(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
             "unit_path": _unit_path,
         },
     )
+
+
+def sensors_status(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    """Every sensor the caller may see, with its site and whether it is online."""
+    _check_names(params, frozenset({"unit_path"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    records = get_adapter().search(scope, RecordFilter(entity_type="Sensor", unit_path=unit_path))
+    records.sort(key=lambda r: (r.data["site"], r.data["sensor_id"], r.source_ref))
+    return _table(
+        "sensors_status",
+        {"unit_path": unit_path},
+        records,
+        {
+            "id": _source_ref,
+            **_fields("sensor_id", "site", "kind", "status"),
+            "unit_path": _unit_path,
+        },
+    )
