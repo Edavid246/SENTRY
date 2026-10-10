@@ -123,7 +123,7 @@ def test_every_forensic_record_carries_its_cases_label() -> None:
 
 
 def test_forensic_tool_parameters_are_validated(client) -> None:
-    from app.data_queries import tools
+    from app.data_queries.tools import forensics as tools
 
     assert tools._EVIDENCE_RE.match("EV-014-01") and not tools._EVIDENCE_RE.match("EV-14-1")
     assert tools._CASE_RE.match("FR-2026-014") and not tools._CASE_RE.match("FR-26-14")

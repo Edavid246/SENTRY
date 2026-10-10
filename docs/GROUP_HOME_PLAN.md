@@ -47,7 +47,7 @@ and maintenance stay, but as background compliance, not headline tiles.
 
 ## Phase C - division dashboards (route `/d/[division]`)
 All figures link through to a list (`/d/[division]/list?...`) and on to `/records/[ref]` and the evidence panel.
-Reuse existing typed tools in `backend/app/data_queries/tools.py` and registry; add small tools only where
+Reuse existing typed tools in `backend/app/data_queries/tools/ (one module per domain, `@tool`)` and registry; add small tools only where
 missing.
 - **Briech UAS:** fleet availability, missions (`uas_missions`), aircraft due for maintenance
   (`equipment_due_for_maintenance`), airframe hours, deliveries/contracts (`deliveries_overdue`,

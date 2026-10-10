@@ -83,7 +83,7 @@ Verify: scripts/check.sh green (ruff, pytest incl. tests/authz, web lint/typeche
 - Seed: entity types `Contract`, `Delivery` (~8 and ~12 fictional rows, labelled demo; generic agencies
   "Client Agency A-D" mapped to the client compartments; values illustrative).
 - Add to `ENTITY_TYPES` and `DATE_FIELDS` (due_date) in connectors/demo.py.
-- Tools in data_queries/tools.py: `deliveries_overdue` and `contracts_status` (optional `client`,
+- Tools in data_queries/tools/commercial.py: `deliveries_overdue` and `contracts_status` (optional `client`,
   `status` params, validated); register in registry.py; routing regexes in routing.py placed BEFORE
   `_STOCK_RE`/`_UAS_RE` (they overlap "inventory", "deliver"); add scripted question in
   data/demo_questions.json.

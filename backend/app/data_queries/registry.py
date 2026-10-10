@@ -11,7 +11,7 @@ ToolParamError (no SQL ran).
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,52 +19,10 @@ from app.audit.events import event
 from app.authz.scope import Requirement, Scope
 from app.connectors.base import SourceRecord
 from app.data_queries.errors import ToolParamError
-from app.data_queries.tools import (
-    ToolResult,
-    contracts_status,
-    correlation_findings,
-    custody_gaps,
-    custody_trail,
-    deliveries_overdue,
-    detections_near_site,
-    equipment_due_for_maintenance,
-    evidence_items,
-    expired_certifications,
-    field_personnel,
-    forensic_cases,
-    production_qc_holds,
-    production_runs,
-    sensors_status,
-    serial_trace,
-    stock_below_threshold,
-    training_activity,
-    uas_fleet,
-    uas_missions,
-)
+from app.data_queries.tools import TOOLS, ToolResult
 
-ToolFn = Callable[[Scope, Mapping[str, Any]], ToolResult]
-
-REGISTRY: dict[str, ToolFn] = {
-    "equipment_due_for_maintenance": equipment_due_for_maintenance,
-    "expired_certifications": expired_certifications,
-    "stock_below_threshold": stock_below_threshold,
-    "correlation_findings": correlation_findings,
-    "training_activity": training_activity,
-    "uas_missions": uas_missions,
-    "uas_fleet": uas_fleet,
-    "field_personnel": field_personnel,
-    "sensors_status": sensors_status,
-    "detections_near_site": detections_near_site,
-    "deliveries_overdue": deliveries_overdue,
-    "contracts_status": contracts_status,
-    "serial_trace": serial_trace,
-    "production_qc_holds": production_qc_holds,
-    "production_runs": production_runs,
-    "forensic_cases": forensic_cases,
-    "evidence_items": evidence_items,
-    "custody_gaps": custody_gaps,
-    "custody_trail": custody_trail,
-}
+# name -> tool, filled as the domain modules in app.data_queries.tools are imported.
+REGISTRY = TOOLS
 
 # The policy decisions a caller needs before a tool runs. Tools read source records;
 # correlation_findings reads our own findings store, which `query` on records does not cover.
