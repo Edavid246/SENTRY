@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, ApiError, type RecordDetail } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { ClearanceBadge } from "@/components/ClearanceBadge";
+import { BackLink } from "@/components/BackLink";
 
 function show(value: unknown): string {
   if (value === null || value === undefined || value === "") return "—";
@@ -38,9 +38,7 @@ export default function RecordPage() {
   return (
     <Shell>
       <div className="h-full overflow-y-auto p-6">
-        <Link href="/chat" className="label hover:text-ink">
-          ← Back to assistant
-        </Link>
+        <BackLink fallback="/home" />
         <h1 className="mt-3 font-mono text-[1.3rem]">{ref}</h1>
         {error && (
           <p role="alert" data-testid="record-error" className="mt-4 border border-rule p-4">

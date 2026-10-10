@@ -7,6 +7,7 @@ import { api, ApiError, type Finding } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { ClearanceBadge } from "@/components/ClearanceBadge";
+import { BackLink } from "@/components/BackLink";
 
 function show(value: unknown): string {
   if (value === null || value === undefined || value === "") return "—";
@@ -39,9 +40,7 @@ export default function FindingPage() {
   return (
     <Shell>
       <div className="h-full overflow-y-auto p-6">
-        <Link href="/dashboard" className="label hover:text-ink">
-          ← Back to dashboard
-        </Link>
+        <BackLink fallback="/dashboard" />
         {error && (
           <p role="alert" data-testid="finding-error" className="mt-4 border border-rule p-4">
             {error}
