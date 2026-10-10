@@ -43,12 +43,6 @@ export const IconEyeOff = (p: P) => (
     <path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.4 6.6A17 17 0 0 0 2 12s3.6 7 10 7a10 10 0 0 0 4-.8M9.9 9.9a3 3 0 0 0 4.2 4.2" />
   </Svg>
 );
-export const IconWarning = (p: P) => (
-  <Svg {...p}>
-    <path d="M12 3 2 20h20L12 3Z" />
-    <path d="M12 10v4M12 17h.01" />
-  </Svg>
-);
 export const IconChat = (p: P) => (
   <Svg {...p}>
     <path d="M4 5h16v11H9l-5 4V5Z" />

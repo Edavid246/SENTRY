@@ -10,6 +10,7 @@ import { ClearanceBadge } from "@/components/ClearanceBadge";
 import { ResultTableView } from "@/components/ResultTableView";
 import { PassagePanel, type PanelState } from "@/components/PassagePanel";
 import { IconArrow, IconPlus } from "@/components/Icons";
+import { fmtTs } from "@/lib/format";
 
 interface Meta {
   report?: ReportInfo | null;
@@ -366,7 +367,7 @@ export default function ChatPage() {
                   >
                     <span className="line-clamp-2">{c.title}</span>
                     <span className="mt-0.5 block text-[0.7rem] text-mute">
-                      {c.updated_at.slice(0, 16).replace("T", " ")}
+                      {fmtTs(c.updated_at, 16)}
                     </span>
                   </button>
                 </li>

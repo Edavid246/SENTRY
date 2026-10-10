@@ -7,6 +7,7 @@ import { api, ApiError, type AuditEvent, type ChainTip, type VerifyReport } from
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { IconClose, IconLog, IconShieldCheck } from "@/components/Icons";
+import { fmtTs } from "@/lib/format";
 
 const str = (v: unknown): string => (typeof v === "string" ? v : v == null ? "—" : String(v));
 
@@ -327,7 +328,7 @@ function FragmentRow({
         className={`cursor-pointer border-b border-rule/60 hover:bg-raised ${mark}`}
       >
         <td className="whitespace-nowrap px-4 py-2.5 text-sage">{e.seq}</td>
-        <td className="whitespace-nowrap px-4 py-2.5">{e.created_at.slice(0, 19).replace("T", " ")}</td>
+        <td className="whitespace-nowrap px-4 py-2.5">{fmtTs(e.created_at)}</td>
         <td className="whitespace-nowrap px-4 py-2.5">{str(e.payload.actor)}</td>
         <td className="whitespace-nowrap px-4 py-2.5 uppercase tracking-[0.06em]">
           {str(e.payload.action)}

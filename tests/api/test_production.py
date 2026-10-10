@@ -13,7 +13,7 @@ from app.data_queries.routing import route_question
 from app.data_queries.tools import TOOLS
 from scoped import run_tool, scoped
 from test_assistant_endpoints import _ask
-from test_connected_data import _ctx, explain_calls  # noqa: F401
+from test_connected_data import _ctx
 
 SERIAL_COLUMNS = [
     "id",

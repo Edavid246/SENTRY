@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from test_assistant_endpoints import _ask, _audit, _latest
 from test_auth_endpoints import auth_header
-from test_data_pathway import _ctx, explain_calls  # noqa: F401  (fixture)
+from test_data_pathway import _ctx
 
 RUN = "/api/v1/correlation/run"
 FINDINGS = "/api/v1/correlation/findings"
