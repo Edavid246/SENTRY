@@ -89,7 +89,8 @@ def _section(section: Section, labels: Labels) -> ReportSection:
 
 def _build(ctx: CurrentContext, conn: ConnDep, key: str, *, export: str | None) -> DivisionReport:
     with guarded(ctx, conn, "read", "dashboard", on_deny="not_found") as scope:
-        division, sections, facts, labels = build_division(scope, conn, key)
+        built = build_division(scope, conn, key)
+        division, sections, labels = built.division, built.sections, built.labels
         parts = [
             _Part(s.classification, tuple(s.compartments)) for s in sections if s.classification
         ]
@@ -100,7 +101,7 @@ def _build(ctx: CurrentContext, conn: ConnDep, key: str, *, export: str | None) 
             tagline=division.tagline,
             generated_at=utc_now_iso()[:16].replace("T", " ") + " UTC",
             prepared_for=f"{scope.ctx.display_name}, {scope.ctx.unit_path}",
-            facts=tuple((f.label, f.value) for f in facts),
+            facts=tuple((f.label, f.value) for f in built.facts),
             sections=tuple(_section(s, labels) for s in sections),
             label=label,
             labels=labels,

@@ -13,21 +13,23 @@ To add a division's dashboard, add its entry to SECTIONS in division_specs.py. N
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Any
+from dataclasses import dataclass
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.engine import Connection
 
 from app.api.deps import ConnDep, CurrentContext
 from app.api.guard import guarded
 from app.audit.chain import utc_now_iso
 from app.authz.labels import Labels
 from app.authz.scope import Scope
+from app.connectors.base import SourceRecord
 from app.data_queries.registry import ToolOutcome, execute_tool
 from app.units import unit_names
 
 from .division_specs import COMPLIANCE, SECTIONS, SectionSpec, trace_spec
-from .home import DIVISIONS
+from .home import DIVISIONS, FIELD_OPS, Division
 
 router = APIRouter(prefix="/api/v1/divisions", tags=["divisions"])
 compliance_router = APIRouter(prefix="/api/v1/compliance", tags=["compliance"])
@@ -82,7 +84,7 @@ def _build(
 ) -> Section:
     result = outcome.result
     rows: list[SectionRow] = []
-    kept: list[Any] = []
+    kept: list[SourceRecord] = []
     if result is not None:
         for row, record in zip(result.rows, result.records, strict=True):
             if not keep(record.unit_path):
@@ -124,7 +126,7 @@ def _reach(path: str, caller: str) -> bool:
 
 def _division(
     key: str, scope: Scope, names: Mapping[str, str]
-) -> tuple[Any, str, Callable[[str], bool]]:
+) -> tuple[Division, str, Callable[[str], bool]]:
     """The division, the unit its tools run on, and which records count as its own.
 
     404 unless the caller's unit overlaps the division. Field Operations has no unit of its own:
@@ -145,9 +147,7 @@ def _division(
     return division, unit_path, lambda path: path.startswith(unit_path)
 
 
-def _facts(key: str, sections: list[Section], names: Mapping[str, str], caller: str) -> list[Fact]:
-    if key != "field-ops":
-        return []
+def _field_ops_facts(sections: list[Section], names: Mapping[str, str], caller: str) -> list[Fact]:
     sites = sorted(p for p in names if _is_site(p) and _reach(p, caller))
     owners = {next(d.name for d in DIVISIONS if d.key == p.split("/")[2]) for p in sites}
     by_key = {s.key: s for s in sections}
@@ -159,9 +159,15 @@ def _facts(key: str, sections: list[Section], names: Mapping[str, str], caller: 
     ]
 
 
-def build_division(
-    scope: Scope, conn: Any, key: str
-) -> tuple[Any, list[Section], list[Fact], Labels]:
+@dataclass(frozen=True, slots=True)
+class BuiltDivision:
+    division: Division
+    sections: list[Section]
+    facts: list[Fact]
+    labels: Labels
+
+
+def build_division(scope: Scope, conn: Connection, key: str) -> BuiltDivision:
     """The division and its sections, run as audited typed tools for the caller (404 if hidden).
 
     Shared by the dashboard and the report, so a report can never show more than the page does.
@@ -172,13 +178,15 @@ def build_division(
     sections = [
         _build(labels, s, _run(scope, s, unit_path), keep, names) for s in SECTIONS.get(key, ())
     ]
-    return division, sections, _facts(key, sections, names, scope.ctx.unit_path), labels
+    facts = _field_ops_facts(sections, names, scope.ctx.unit_path) if key == FIELD_OPS else []
+    return BuiltDivision(division, sections, facts, labels)
 
 
 @router.get("/{key}", response_model=DivisionView)
 def division_view(key: str, ctx: CurrentContext, conn: ConnDep) -> DivisionView:
     with guarded(ctx, conn, "read", "dashboard", on_deny="not_found") as scope:
-        division, sections, facts, _labels = build_division(scope, conn, key)
+        built = build_division(scope, conn, key)
+        division, sections = built.division, built.sections
         scope.read(
             "dashboard",
             sum(len(s.rows) for s in sections),
@@ -189,7 +197,7 @@ def division_view(key: str, ctx: CurrentContext, conn: ConnDep) -> DivisionView:
         name=division.name,
         tagline=division.tagline,
         generated_at=utc_now_iso(),
-        facts=facts,
+        facts=built.facts,
         sections=sections,
     )
 

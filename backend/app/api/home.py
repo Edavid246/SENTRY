@@ -60,7 +60,7 @@ class HomeSummary(BaseModel):
 
 
 @dataclass(frozen=True, slots=True)
-class _Division:
+class Division:
     key: str
     name: str
     tagline: str
@@ -68,11 +68,11 @@ class _Division:
 
 
 DIVISIONS = (
-    _Division("briech", "Briech UAS", "Drones and airborne surveillance", "/eib-group/briech/"),
-    _Division("stratoc", "EIB Stratoc", "Surveillance and intelligence", "/eib-group/stratoc/"),
-    _Division("giga", "Giga Forensics", "Digital forensics and evidence", "/eib-group/giga/"),
-    _Division("poctova", "Poctova", "Protective gear, made and traced", "/eib-group/poctova/"),
-    _Division("field-ops", "Field Operations", "Personnel and sites in the field", None),
+    Division("briech", "Briech UAS", "Drones and airborne surveillance", "/eib-group/briech/"),
+    Division("stratoc", "EIB Stratoc", "Surveillance and intelligence", "/eib-group/stratoc/"),
+    Division("giga", "Giga Forensics", "Digital forensics and evidence", "/eib-group/giga/"),
+    Division("poctova", "Poctova", "Protective gear, made and traced", "/eib-group/poctova/"),
+    Division("field-ops", "Field Operations", "Personnel and sites in the field", None),
 )
 FIELD_OPS = "field-ops"
 
