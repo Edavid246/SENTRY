@@ -5,9 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSession } from "@/lib/session";
 import { Clock } from "./Clock";
-import { ClearanceBadge } from "./ClearanceBadge";
 import { Emblem } from "./Emblem";
-import { IconChat, IconDashboard, IconLock, IconLog, IconLogout, IconMap, IconOrg, IconShield } from "./Icons";
+import { IconChat, IconDashboard, IconLog, IconLogout, IconMap, IconOrg, IconShield } from "./Icons";
 
 function Segment({
   icon,
@@ -58,7 +57,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen flex-col">
-      {/* Identity strip, after the reference: person | unit | clearance | access | session */}
+      {/* Identity strip, after the reference: person | unit | session */}
       <header className="flex shrink-0 flex-col border-b border-rule bg-surface md:min-h-[88px] md:flex-row md:items-stretch">
         <div className="flex items-center gap-3 px-4 py-3 md:gap-4 md:px-6">
           <Emblem size={34} />
@@ -66,9 +65,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <div className="text-[0.9rem] font-bold tracking-[0.12em] md:text-[1rem]">DEFENCE GATEWAY</div>
             <div className="text-[0.75rem] tracking-[0.12em] text-sage md:text-[0.8rem]">SECURE ASSISTANT</div>
           </div>
-          {/* Phone: the clearance stays visible; the rest of the identity strip opens on demand. */}
+          {/* Phone: the identity strip opens on demand. */}
           <div className="ml-auto flex items-center gap-2 md:hidden">
-            <ClearanceBadge code={me.clearance_code} />
             <button
               type="button"
               onClick={() => setMenuOpen((o) => !o)}
@@ -100,24 +98,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   {u.name}
                 </span>
               ))}
-            </div>
-          </Segment>
-          <Segment icon={<IconShield size={16} />} label="Clearance level">
-            <div data-testid="clearance-badge">
-              <ClearanceBadge code={me.clearance_code} large />
-            </div>
-          </Segment>
-          <Segment icon={<IconLock size={16} />} label="Special access">
-            <div data-testid="compartments" className="flex flex-wrap gap-1.5">
-              {me.compartments.length ? (
-                me.compartments.map((c) => (
-                  <span key={c} className="tag">
-                    {c}
-                  </span>
-                ))
-              ) : (
-                <span className="text-[0.85rem] text-mute">None</span>
-              )}
             </div>
           </Segment>
         </div>

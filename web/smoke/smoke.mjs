@@ -76,8 +76,6 @@ try {
   await login("owner");
   await page.waitForURL("**/home");
   await page.waitForSelector('[data-testid="user-name"]');
-  check((await page.textContent('[data-testid="clearance-badge"]')).includes("GOVERNMENT-SENSITIVE"), "owner clearance badge is GOVERNMENT-SENSITIVE");
-  check((await page.locator("text=UAS-OPS").count()) > 0, "compartment tags shown");
   check((await page.locator('a[href="/audit"]').count()) === 0, "audit nav hidden without read_audit");
 
   // group home: login lands here; five cards, alerts only where something needs attention
