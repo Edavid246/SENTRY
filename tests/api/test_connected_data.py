@@ -20,7 +20,6 @@ import pytest
 from app.authz.tokens import DevTokenValidator
 from app.data_queries.errors import ToolParamError
 from app.data_queries.routing import route_question
-from fakes import FakeLLM
 from scoped import run_tool, scoped
 from test_assistant_endpoints import _ask
 from test_auth_endpoints import auth_header
@@ -48,13 +47,6 @@ DETECTION_COLUMNS = [
     "confidence",
     "unit_path",
 ]
-
-
-@pytest.fixture
-def explain_calls(models) -> list:
-    llm = FakeLLM()
-    models(llm)
-    return llm.explained
 
 
 def _ids(body: dict) -> set[str]:

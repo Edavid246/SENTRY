@@ -9,15 +9,7 @@ from __future__ import annotations
 
 import pytest
 from app.data_queries.routing import route_question
-from fakes import FakeLLM
 from test_assistant_endpoints import _ask
-
-
-@pytest.fixture
-def explain_calls(models) -> list:
-    llm = FakeLLM()
-    models(llm)
-    return llm.explained
 
 
 @pytest.mark.parametrize(

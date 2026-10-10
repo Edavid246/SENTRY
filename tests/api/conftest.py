@@ -58,3 +58,13 @@ def models(client):
 
     yield install
     app.dependency_overrides.pop(get_models, None)
+
+
+@pytest.fixture
+def explain_calls(models) -> list:
+    """Install a FakeLLM; the returned list records which tools the model was asked to explain."""
+    from fakes import FakeLLM
+
+    llm = FakeLLM()
+    models(llm)
+    return llm.explained

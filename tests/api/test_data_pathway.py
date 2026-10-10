@@ -60,13 +60,6 @@ COO_CERTS = {"REC-019", "REC-020", "REC-041", "REC-042"}
 SITE4 = "/eib-group/stratoc/site-4/"
 
 
-@pytest.fixture
-def explain_calls(models) -> list:
-    llm = FakeLLM()
-    models(llm)
-    return llm.explained
-
-
 def _ids(body: dict) -> set[str]:
     return {row["id"] for row in body["result_table"]["rows"]}
 
