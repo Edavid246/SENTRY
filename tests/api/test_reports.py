@@ -66,6 +66,10 @@ def test_report_is_a_derived_item_and_inherits_the_marking(client) -> None:
     assert briech["marking"].startswith("GOVERNMENT-SENSITIVE (")
     assert "SECRET" not in briech["marking"]
     assert {"CLIENT-A", "UAS-OPS"} <= set(briech["compartments"])
+    # section markings use the same vocabulary; none leaks the internal code
+    markings = [s["marking"] for s in briech["sections"] if s["marking"]]
+    assert markings and all("SECRET" not in m for m in markings)
+    assert any(m.startswith("GOVERNMENT-SENSITIVE") for m in markings)
 
 
 def test_a_lower_cleared_caller_gets_a_lower_marked_report(client) -> None:

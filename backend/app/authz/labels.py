@@ -51,12 +51,12 @@ class Labels:
         rows = conn.execute(text("SELECT code, name, rank FROM classification_levels")).all()
         return cls(
             {str(row.code): int(row.rank) for row in rows},
-            {str(row.code): str(row.name) for row in rows},
+            {str(row.code): str(row.name) for row in rows if row.name},
         )
 
     def display(self, code: str) -> str:
         """The level's name as the UI and documents show it, upper case (the code if unnamed)."""
-        return self._names.get(code, code).upper()
+        return (self._names.get(code) or code).upper()
 
     def rank(self, code: str) -> int | None:
         """Rank of a level, or None for a code outside the scheme."""

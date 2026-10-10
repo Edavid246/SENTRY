@@ -68,7 +68,11 @@ _SERIAL_WORD_RE = re.compile(r"\b(serial|trace|traceability|provenance)\b", re.I
 _SERIAL_NO_RE = re.compile(r"\b([A-Z]{2,4}(?:-[A-Z]{2,4})?-\d{3,5})\b", re.IGNORECASE)
 _HOLD_RE = re.compile(r"\bholds?\b", re.IGNORECASE)
 _PRODUCTION_RE = re.compile(r"\b(qc|quality|production|batch(?:es)?|lots?|runs?)\b", re.IGNORECASE)
-_CUSTODY_RE = re.compile(r"\b(custody|chain of custody)\b", re.IGNORECASE)
+_CUSTODY_RE = re.compile(r"\bcustody\b", re.IGNORECASE)
+_EVIDENCE_PROSE_RE = re.compile(
+    r"\b(answers?|citations?|sources?|reports?|training|reasoning|basis|summary)\b|summar\w+",
+    re.IGNORECASE,
+)
 _CUSTODY_BREAK_RE = re.compile(
     r"\b(breaks?|broken|gaps?|discrepanc\w+|unexplained|inconsisten\w+)\b", re.IGNORECASE
 )
@@ -126,27 +130,37 @@ def route_question(question: str) -> RoutedTool | None:
         return None
     if _FINDING_RE.search(question) or (_FAULT_RE.search(question) and _RISING_RE.search(question)):
         return RoutedTool("correlation_findings", {})
-    if (
-        not _REQUEST_RE.search(question)
-        and not _SERIAL_WORD_RE.search(question)
-        and not _CUSTODY_RE.search(question)
-    ):
+    is_request = bool(_REQUEST_RE.search(question) or _SERIAL_WORD_RE.search(question))
+    is_custody = bool(_CUSTODY_RE.search(question))
+    if not is_request and not is_custody:
         return None
     params = _unit_path_params(question)
     # Forensic rules come before the serial rule: "EV-014-01" looks like a serial number.
     evidence_no = _EVIDENCE_NO_RE.search(question)
     case_no = _CASE_NO_RE.search(question)
-    if evidence_no and _CUSTODY_RE.search(question):
+    if evidence_no and is_custody:
         return RoutedTool("custody_trail", {**params, "evidence_ref": evidence_no.group(0).upper()})
-    if _CUSTODY_RE.search(question) and _CUSTODY_BREAK_RE.search(question):
+    if is_custody and _CUSTODY_BREAK_RE.search(question):
         return RoutedTool("custody_gaps", params)
-    if _EVIDENCE_RE.search(question) and _REQUEST_RE.search(question):
+    if not is_request:
+        # "custody" alone opened the gate; with no EV number and no break word it is a
+        # knowledge question, not a record request.
+        return None
+    # "evidence" is also ordinary prose ("the evidence behind this answer"): without a case or
+    # evidence number it must read as a forensic record request, not as talk about an answer.
+    if (
+        _EVIDENCE_RE.search(question)
+        and _REQUEST_RE.search(question)
+        and (case_no or not _EVIDENCE_PROSE_RE.search(question))
+    ):
         if case_no:
             params["case_ref"] = case_no.group(0).upper()
         return RoutedTool("evidence_items", params)
     if _REQUEST_RE.search(question) and (
         _CASES_RE.search(question) or (case_no and "case" in question.lower())
     ):
+        if case_no:
+            params["case_ref"] = case_no.group(0).upper()
         return RoutedTool("forensic_cases", params)
     serial = _SERIAL_NO_RE.search(question)
     if serial and _SERIAL_WORD_RE.search(question):

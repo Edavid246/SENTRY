@@ -57,8 +57,8 @@ class DivisionReportOut(BaseModel):
     generated_at: str
     prepared_for: str
     banner: str
-    marking: str
-    classification: str
+    marking: str = Field(description="banner text: the level as the UI names it, then compartments")
+    classification: str = Field(description="the internal classification code, not the UI name")
     compartments: list[str]
     facts: list[tuple[str, str]]
     summary: list[str]
@@ -103,7 +103,7 @@ def _build(ctx: CurrentContext, conn: ConnDep, key: str, *, export: str | None) 
             facts=tuple((f.label, f.value) for f in facts),
             sections=tuple(_section(s, labels) for s in sections),
             label=label,
-            label_name=labels.display(label.code),
+            labels=labels,
         )
         scope.read("dashboard", len(report.refs), item_ids=list(report.refs))
         if export:

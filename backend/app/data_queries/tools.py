@@ -601,9 +601,11 @@ def _forensics(scope: Scope, unit_path: str) -> tuple[list[SourceRecord], Chains
 
 def forensic_cases(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
     """Forensic cases, with how many evidence items and custody breaks the caller can see."""
-    _check_names(params, frozenset({"unit_path"}))
+    _check_names(params, frozenset({"unit_path", "case_ref"}))
     unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    case_ref = _pattern(params.get("case_ref"), _CASE_RE, "case_ref must look like FR-2026-014")
     cases = get_adapter().search(scope, RecordFilter(entity_type="Case", unit_path=unit_path))
+    cases = [c for c in cases if case_ref is None or c.data["case_ref"] == case_ref]
     evidence, chains = _forensics(scope, unit_path)
     cases.sort(key=lambda r: (r.data["state"] != "open", r.data["case_ref"]))
     items = {c.data["case_ref"]: 0 for c in cases}
@@ -617,7 +619,7 @@ def forensic_cases(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
                 breaks[event.data["case_ref"]] += 1
     return _table(
         "forensic_cases",
-        {"unit_path": unit_path},
+        {"unit_path": unit_path, **_given(case_ref=case_ref)},
         cases,
         {
             "id": _source_ref,

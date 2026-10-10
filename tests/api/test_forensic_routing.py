@@ -68,6 +68,33 @@ def test_unrelated_questions_do_not_reach_forensic_tools(question) -> None:
     assert routed is None or not routed.tool.startswith(("custody", "evidence", "forensic"))
 
 
+@pytest.mark.parametrize(
+    "question",
+    [
+        "What evidence is there for the training report?",
+        "Summarize the evidence behind this answer",
+        "What is the custody of the drone?",  # 'custody' alone, no EV number, no break word
+        "Who has custody",
+    ],
+)
+def test_prose_about_evidence_or_custody_stays_on_knowledge(question) -> None:
+    routed = route_question(question)
+    assert routed is None or not routed.tool.startswith(("custody", "evidence", "forensic"))
+
+
+def test_a_case_number_filters_the_case_list() -> None:
+    routed = route_question("Show case FR-2026-017")
+    assert routed is not None and routed.tool == "forensic_cases"
+    assert routed.params == {"case_ref": "FR-2026-017"}
+
+
+def test_the_case_tool_returns_only_the_requested_case(client, explain_calls) -> None:
+    every = _ask(client, "owner", "Show me the forensic cases").json()["result_table"]["rows"]
+    one = _ask(client, "owner", "Show case FR-2026-017").json()["result_table"]["rows"]
+    assert len(every) > 1
+    assert [row["case_ref"] for row in one] == ["FR-2026-017"]
+
+
 def test_the_owner_gets_the_planted_break_through_the_assistant(client, explain_calls) -> None:
     response = _ask(client, "owner", "Which evidence has a custody break?")
     assert response.status_code == 200

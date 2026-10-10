@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.authz.labels import Label
+from app.authz.labels import Label, Labels
 from app.reporting.training import DRAFT_BANNER
 
 DEMO_NOTICE = "All data is fictitious demo data. This report informs; people decide."
@@ -82,7 +82,7 @@ def build_division_report(
     facts: tuple[tuple[str, str], ...],
     sections: tuple[ReportSection, ...],
     label: Label,
-    label_name: str,
+    labels: Labels,
 ) -> DivisionReport:
     refs = tuple(sorted({row.ref for s in sections for row in s.rows}))
     return DivisionReport(
@@ -92,7 +92,7 @@ def build_division_report(
         generated_at=generated_at,
         prepared_for=prepared_for,
         banner=DRAFT_BANNER,
-        marking=marking(label_name, label.compartments),
+        marking=marking(labels.display(label.code), label.compartments),
         classification=label.code,
         compartments=label.compartments,
         facts=facts,
