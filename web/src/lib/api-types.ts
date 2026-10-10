@@ -248,23 +248,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/dashboard/summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Dashboard Summary */
-        get: operations["dashboard_summary_api_v1_dashboard_summary_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/home/summary": {
         parameters: {
             query?: never;
@@ -311,30 +294,6 @@ export interface paths {
          * @description One serial number's run, QC state and delivery. Unseen and nonexistent read the same.
          */
         get: operations["serial_trace_api_v1_divisions__key__trace_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/compliance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Group Compliance
-         * @description Certifications and maintenance across every business the caller can see.
-         *
-         *     The same two typed tools as each division's compliance section, run on the caller's own
-         *     unit instead of one division's. Rows carry the owning unit's name; the filter is in the
-         *     query, exactly as everywhere else.
-         */
-        get: operations["group_compliance_api_v1_compliance_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -602,13 +561,6 @@ export interface components {
             /** Classification Code */
             classification_code: string;
         };
-        /** ComplianceView */
-        ComplianceView: {
-            /** Generated At */
-            generated_at: string;
-            /** Sections */
-            sections: components["schemas"]["Section"][];
-        };
         /** ConversationDetail */
         ConversationDetail: {
             /** Id */
@@ -661,74 +613,6 @@ export interface components {
              * @description who the item should have been taken from, when the record says someone else
              */
             expected_holder: string | null;
-        };
-        /** DashboardItem */
-        DashboardItem: {
-            /** Id */
-            id: string;
-            /** Label */
-            label: string;
-            /**
-             * Value
-             * @description headline number, if the item has one
-             */
-            value: number | null;
-            /**
-             * Unit
-             * @description what value counts, e.g. '%' or 'items'
-             */
-            unit: string | null;
-            /** Detail */
-            detail: string;
-            /**
-             * Severity
-             * @description low | medium | high, where relevant
-             */
-            severity: string | null;
-            /**
-             * Trend
-             * @description oldest to newest, for a flat sparkline
-             */
-            trend: number[];
-            /** Classification */
-            classification: string;
-            /** Compartments */
-            compartments: string[];
-            /** Unit Path */
-            unit_path: string;
-            /**
-             * Unit Name
-             * @description readable name of the owning unit
-             */
-            unit_name: string;
-        };
-        /** DashboardSummary */
-        DashboardSummary: {
-            /** Generated At */
-            generated_at: string;
-            tiles: components["schemas"]["DashboardTiles"];
-        };
-        /** DashboardTile */
-        DashboardTile: {
-            /**
-             * Stub
-             * @description true while the tile's data is placeholder data
-             */
-            stub: boolean;
-            /** Source */
-            source: string;
-            /** Title */
-            title: string;
-            /** Items */
-            items: components["schemas"]["DashboardItem"][];
-        };
-        /** DashboardTiles */
-        DashboardTiles: {
-            readiness: components["schemas"]["DashboardTile"];
-            maintenance_backlog: components["schemas"]["DashboardTile"];
-            expiring_certifications: components["schemas"]["DashboardTile"];
-            overdue_deliveries: components["schemas"]["DashboardTile"];
-            recent_findings: components["schemas"]["DashboardTile"];
         };
         /** DivisionReportOut */
         DivisionReportOut: {
@@ -1479,37 +1363,6 @@ export interface operations {
             };
         };
     };
-    dashboard_summary_api_v1_dashboard_summary_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DashboardSummary"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     home_summary_api_v1_home_summary_get: {
         parameters: {
             query?: never;
@@ -1596,37 +1449,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Section"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    group_compliance_api_v1_compliance_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ComplianceView"];
                 };
             };
             /** @description Validation Error */

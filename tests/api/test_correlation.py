@@ -113,18 +113,6 @@ def test_no_data_roles_get_403_on_the_list(client) -> None:
     assert _get(client, "group.audit").status_code == 403
 
 
-def test_dashboard_findings_tile_is_real_and_hidden_for_coo(client) -> None:
-    _run(client)
-    owner = _get(client, "owner", "/api/v1/dashboard/summary").json()
-    coo = _get(client, "coo", "/api/v1/dashboard/summary").json()
-    tile = owner["tiles"]["recent_findings"]
-    items = {i["id"]: i for i in tile["items"]}
-    assert tile["stub"] is False and FINDING in items
-    assert items[FINDING]["classification"] == "secret"
-    assert coo["tiles"]["recent_findings"]["items"] == []
-    assert FINDING not in str(coo)
-
-
 def test_assistant_answers_about_visible_findings(client, explain_calls) -> None:  # noqa: F811
     _run(client)
     body = _ask(client, "owner", QUESTION).json()

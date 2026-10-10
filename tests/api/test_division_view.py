@@ -158,35 +158,3 @@ def test_field_operations_for_the_site_commander_hides_the_confidential_row(clie
 def test_field_operations_hidden_from_a_division_lead(client) -> None:
     assert _get(client, "briech.lead", "field-ops").status_code == 404
     assert _get(client, "group.audit", "field-ops").status_code == 404
-
-
-def _compliance(client, username: str) -> dict[str, dict]:
-    response = client.get("/api/v1/compliance", headers=auth_header(client, username))
-    assert response.status_code == 200, response.text
-    return {s["key"]: s for s in response.json()["sections"]}
-
-
-def test_group_compliance_requires_login(client) -> None:
-    assert client.get("/api/v1/compliance").status_code == 401
-
-
-def test_group_compliance_is_every_divisions_rows_plus_group_level_records(client) -> None:
-    group = _compliance(client, "owner")
-    assert list(group) == ["maintenance", "certifications"]
-    for key in group:
-        per_division = {
-            ref
-            for division in ("briech", "stratoc", "poctova", "giga", "field-ops")
-            for ref in _refs(_sections(client, "owner", division).get(key, {"rows": []}))
-        }
-        # REC-016 (recovery vehicle) and REC-024 (a driver's certification) belong to the group
-        # itself, so no division lists them.
-        group_level = {"maintenance": {"REC-016"}, "certifications": {"REC-024"}}[key]
-        assert set(_refs(group[key])) == per_division | group_level
-        assert all(r["unit_name"] for r in group[key]["rows"])
-
-
-def test_group_compliance_narrows_to_the_callers_unit_and_label(client) -> None:
-    owner, lead = _compliance(client, "owner"), _compliance(client, "briech.lead")
-    for key in owner:
-        assert set(_refs(lead[key])) <= set(_refs(owner[key]))

@@ -159,27 +159,3 @@ def test_existing_questions_still_route_where_they_did(question, tool) -> None:
 
 def test_contract_policy_questions_stay_on_the_knowledge_pathway() -> None:
     assert route_question("What does the contract policy document say about deliveries?") is None
-
-
-def test_dashboard_overdue_deliveries_tile(client) -> None:
-    from test_auth_endpoints import auth_header
-
-    def tile(user):
-        body = client.get("/api/v1/dashboard/summary", headers=auth_header(client, user)).json()
-        return {i["id"]: i for i in body["tiles"]["overdue_deliveries"]["items"]}
-
-    owner = tile("owner")
-    assert {k: v["value"] for k, v in owner.items()} == {
-        "DLV-BRIECH": 3,
-        "DLV-POCTOVA": 2,
-        "DLV-STRATOC": 1,
-        "DLV-GIGA": 1,
-    }
-    # derived counts inherit the highest classification and the union of compartments
-    assert owner["DLV-GIGA"]["classification"] == "secret"
-    assert owner["DLV-GIGA"]["compartments"] == ["CLIENT-D", "FORENSICS"]
-    assert owner["DLV-BRIECH"]["compartments"] == ["CLIENT-A", "CLIENT-B"]
-    lead = tile("briech.lead")
-    assert {k: v["value"] for k, v in lead.items()} == {"DLV-BRIECH": 2}
-    assert lead["DLV-BRIECH"]["compartments"] == ["CLIENT-A"]
-    assert tile("coo") == {}

@@ -28,11 +28,10 @@ from app.connectors.base import SourceRecord
 from app.data_queries.registry import ToolOutcome, execute_tool
 from app.units import is_site, unit_names
 
-from .division_specs import COMPLIANCE, SECTIONS, SectionSpec, trace_spec
+from .division_specs import SECTIONS, SectionSpec, trace_spec
 from .home import DIVISIONS, FIELD_OPS, Division
 
 router = APIRouter(prefix="/api/v1/divisions", tags=["divisions"])
-compliance_router = APIRouter(prefix="/api/v1/compliance", tags=["compliance"])
 
 
 class SectionRow(BaseModel):
@@ -214,30 +213,3 @@ def serial_trace(
         section = _build(Labels.load(conn), spec, outcome, keep, names)
         scope.read("dashboard", len(section.rows), item_ids=[r.ref for r in section.rows])
     return section
-
-
-class ComplianceView(BaseModel):
-    generated_at: str
-    sections: list[Section]
-
-
-@compliance_router.get("", response_model=ComplianceView)
-def group_compliance(ctx: CurrentContext, conn: ConnDep) -> ComplianceView:
-    """Certifications and maintenance across every business the caller can see.
-
-    The same two typed tools as each division's compliance section, run on the caller's own
-    unit instead of one division's. Rows carry the owning unit's name; the filter is in the
-    query, exactly as everywhere else.
-    """
-    with guarded(ctx, conn, "read", "dashboard", on_deny="not_found") as scope:
-        names, labels = unit_names(conn), Labels.load(conn)
-        sections = [
-            _build(labels, s, _run(scope, s, scope.ctx.unit_path), lambda _path: True, names)
-            for s in COMPLIANCE
-        ]
-        scope.read(
-            "dashboard",
-            sum(len(s.rows) for s in sections),
-            item_ids=[r.ref for s in sections for r in s.rows],
-        )
-    return ComplianceView(generated_at=utc_now_iso(), sections=sections)

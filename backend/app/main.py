@@ -6,8 +6,6 @@ from app.api.assistant import router as assistant_router
 from app.api.cases import router as cases_router
 from app.api.connected import router as connected_router
 from app.api.correlation import router as correlation_router
-from app.api.dashboard import router as dashboard_router
-from app.api.divisions import compliance_router
 from app.api.divisions import router as divisions_router
 from app.api.endpoints import router as api_router
 from app.api.home import router as home_router
@@ -24,10 +22,8 @@ def create_app() -> FastAPI:
     )
     application.include_router(api_router)
     application.include_router(assistant_router)
-    application.include_router(dashboard_router)
     application.include_router(home_router)
     application.include_router(divisions_router)
-    application.include_router(compliance_router)
     application.include_router(cases_router)
     application.include_router(reports_router)
     application.include_router(correlation_router)

@@ -9,15 +9,11 @@ export type ResultTable = Schemas["ResultTable"];
 export type Finding = Schemas["FindingOut"];
 export type RunResult = Schemas["RunResult"];
 export type RecordDetail = Schemas["RecordDetail"];
-export type DashboardSummary =Schemas["DashboardSummary"];
 export type ReportInfo = Schemas["ReportInfo"];
-export type DashboardTile = Schemas["DashboardTile"];
-export type DashboardItem = Schemas["DashboardItem"];
 export type HomeSummary = Schemas["HomeSummary"];
 export type HomeDivision = Schemas["HomeDivision"];
 export type DivisionView = Schemas["DivisionView"];
 export type DivisionSection = Schemas["Section"];
-export type ComplianceView = Schemas["ComplianceView"];
 export type CaseView = Schemas["CaseView"];
 export type DivisionReport = Schemas["DivisionReportOut"];
 
@@ -187,13 +183,11 @@ export const api = {
   finding: (id: string) => request<Finding>(`/correlation/findings/${encodeURIComponent(id)}`),
   record: (sourceRef: string) =>
     request<RecordDetail>(`/records/${encodeURIComponent(sourceRef)}`),
-  dashboard: () => request<DashboardSummary>("/dashboard/summary"),
   home: () => request<HomeSummary>("/home/summary"),
   division: (key: string) => request<DivisionView>(`/divisions/${encodeURIComponent(key)}`),
   forensicCase: (caseRef: string) => request<CaseView>(`/cases/${encodeURIComponent(caseRef)}`),
   divisionReport: (key: string) =>
     request<DivisionReport>(`/reports/${encodeURIComponent(key)}`),
-  compliance: () => request<ComplianceView>("/compliance"),
   serialTrace: (key: string, serial: string) =>
     request<DivisionSection>(
       `/divisions/${encodeURIComponent(key)}/trace?serial=${encodeURIComponent(serial)}`,

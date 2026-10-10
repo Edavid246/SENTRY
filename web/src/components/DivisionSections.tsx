@@ -32,12 +32,10 @@ export function SectionCard({
   section,
   action,
   lead = false,
-  showUnit = false,
 }: {
   section: DivisionSection;
   action?: React.ReactNode;
   lead?: boolean;
-  showUnit?: boolean;
 }) {
   const { flagged, rows } = section;
   return (
@@ -83,7 +81,6 @@ export function SectionCard({
                 <span className="shrink-0 text-[0.75rem] tabular-nums text-mute">{row.ref}</span>
               </div>
               <p className="mt-1 text-[0.85rem] leading-relaxed text-sage">{row.detail}</p>
-              {showUnit && <p className="mt-0.5 text-[0.8rem] text-mute">{row.unit_name}</p>}
               {row.meter != null && <ServiceGauge fraction={row.meter} />}
             </li>
           ))}

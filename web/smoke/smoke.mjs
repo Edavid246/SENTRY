@@ -129,10 +129,7 @@ try {
   await page.waitForSelector('[data-testid="division-briech"]');
   check(true, "back to the group home works");
 
-  // group compliance and the forensic case workspace
-  await page.goto(BASE + "/compliance");
-  await page.waitForSelector('[data-testid="compliance-tally"]');
-  check((await page.locator('[data-testid="section-maintenance"] [data-testid="row-link"]').count()) > 0, "compliance lists maintenance rows");
+  // the forensic case workspace
   await page.goto(BASE + "/d/giga");
   await page.waitForSelector('[data-testid="section-custody-breaks"]');
   await page.click('[data-testid="section-custody-breaks"] [data-testid="row-link"]');
@@ -151,7 +148,7 @@ try {
 
   // phone width: the shell collapses (menu + bottom tabs) and nothing scrolls sideways
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const route of ["/home", "/d/poctova", "/compliance", "/cases/FR-2026-017", "/reports/briech", "/dashboard", "/chat", "/map"]) {
+  for (const route of ["/home", "/d/poctova", "/findings", "/cases/FR-2026-017", "/reports/briech", "/chat", "/map"]) {
     await page.goto(BASE + route);
     await page.waitForSelector('nav[aria-label="Main"]');
     const [scrollW, innerW] = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
@@ -165,16 +162,13 @@ try {
   await page.goto(BASE + "/home");
   await page.waitForSelector('[data-testid="division-briech"]');
 
-  // overview: every stub tile is tagged; the Secret finding is shown
-  await page.goto(BASE + "/dashboard"); // no menu entry any more
-  await page.waitForSelector('[data-testid="tile-recent_findings"]');
-  check((await page.locator('[data-testid="placeholder-tag"]').count()) === 0, "no tile is tagged placeholder: every tile is counted from typed tools");
-  // the finding exists once a commander runs the correlation job
+  // findings: they exist once a commander runs the correlation job
+  await page.click('a[href="/findings"]');
+  await page.waitForSelector('[data-testid="run-correlation"]');
   await page.click('[data-testid="run-correlation"]');
   await page.waitForSelector('[data-testid="finding-link"]');
   check((await page.locator('[data-testid="item-FND-RISING-FAULTS-SITE-4"]').count()) === 1, "owner sees the Secret finding after running correlation");
-  const ownerItems = await page.locator('[data-testid^="item-"]').count();
-  await shot("13-dashboard-owner");
+  await shot("13-findings-owner");
   await page.click('[data-testid="item-FND-RISING-FAULTS-SITE-4"] [data-testid="finding-link"]');
   await page.waitForSelector('[data-testid="finding-detail"]');
   const evidence = await page.locator('[data-testid="evidence-link"]').count();
@@ -189,8 +183,6 @@ try {
   await page.waitForSelector('[data-testid="findings-list"]');
   const listed = await page.locator('[data-testid="findings-list"] > li').count();
   check(listed === 4, `the Findings page lists the four findings (${listed})`);
-  await page.goto(BASE + "/dashboard"); // no menu entry any more
-  await page.waitForSelector('[data-testid="tile-recent_findings"]');
   await page.click('a[href="/chat"]');
   await page.waitForURL("**/chat");
   await shot("03-chat-empty");
@@ -254,13 +246,11 @@ try {
   await page.goto(BASE + "/d/briech");
   await page.waitForSelector('[data-testid="division-not-found"]');
   check(true, "coo gets 'not found' for a division outside their unit");
-  await page.goto(BASE + "/dashboard"); // no menu entry any more
-  await page.waitForSelector('[data-testid="tile-recent_findings"]');
-  check((await page.locator('[data-testid="finding-link"]').count()) === 0, "coo does not see the Secret finding");
+  await page.click('a[href="/findings"]');
+  await page.waitForSelector('[data-testid="no-findings"]');
+  check((await page.locator('[data-testid="finding-link"]').count()) === 0, "coo does not see any finding");
   check((await page.locator('[data-testid="run-correlation"]').count()) === 0, "coo has no run-correlation button");
-  const cooItems = await page.locator('[data-testid^="item-"]').count();
-  check(cooItems < ownerItems, `coo dashboard is smaller (${cooItems} < ${ownerItems} items)`);
-  await shot("14-dashboard-coo");
+  await shot("14-findings-coo");
   await page.click('a[href="/chat"]');
   await page.waitForURL("**/chat");
   await page.waitForSelector('[data-testid="user-name"]');
@@ -294,7 +284,6 @@ try {
   // group.audit: audit -> verify chain
   await login("group.audit");
   await page.waitForURL("**/audit");
-  check((await page.locator('a[href="/dashboard"]').count()) === 0, "auditor has no dashboard nav");
   await page.waitForSelector('[data-testid="audit-row"]');
   check((await page.locator('[data-testid="audit-row"]').count()) > 0, "audit table lists events");
   await shot("08-audit-table");

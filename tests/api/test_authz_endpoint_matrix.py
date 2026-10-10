@@ -1,4 +1,4 @@
-"""Authorization matrix for the group-home endpoints: divisions, compliance, cases, reports.
+"""Authorization matrix for the group-home endpoints: divisions, cases, reports.
 
 The oracle is independent of the code under test: expected statuses are hand-derived from each
 user's role and unit (a role without `read` gets 404, not 403, from these routes; a unit that does
@@ -68,12 +68,6 @@ def test_division_status_matrix(client, username: str, division: str) -> None:
     assert _get(client, username, f"reports/{division}/export?format=pdf").status_code == expected
 
 
-@pytest.mark.parametrize("username", ALL)
-def test_compliance_status_matrix(client, username: str) -> None:
-    expected = 200 if username in CAN_READ else 404
-    assert _get(client, username, "compliance").status_code == expected
-
-
 @pytest.mark.parametrize("case_ref", CASES)
 @pytest.mark.parametrize("username", ALL)
 def test_case_status_matrix(client, username: str, case_ref: str) -> None:
@@ -85,8 +79,6 @@ def test_case_status_matrix(client, username: str, case_ref: str) -> None:
 def test_every_returned_record_is_in_the_gold_visibility_set(client, username: str) -> None:
     gold = GOLD_RECORDS[username]
     seen: set[str] = set()
-    sections = _get(client, username, "compliance").json()["sections"]
-    seen |= {r["ref"] for s in sections for r in s["rows"]}
     for division in VISIBLE_DIVISIONS[username]:
         page = _get(client, username, f"divisions/{division}").json()
         seen |= {r["ref"] for s in page["sections"] for r in s["rows"]}

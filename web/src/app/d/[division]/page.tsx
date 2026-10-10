@@ -3,33 +3,11 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  api,
-  type DashboardItem,
-  type DashboardSummary,
-  type DashboardTile,
-  type DivisionView,
-  type HomeSummary,
-} from "@/lib/api";
+import { api, type DivisionView, type HomeSummary } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
-import { BarList, Findings, TileFrame } from "@/components/DashboardTiles";
 import { DivisionGlyph } from "@/components/DivisionGlyph";
 import { SectionCard, SerialLookup } from "@/components/DivisionSections";
-
-// Which division an item belongs to: a site team (a unit below a subsidiary) is Field
-// Operations; a finding about a site stays with the subsidiary that raised it. Mirrors
-// backend/app/api/home.py.
-function divisionOf(item: DashboardItem, finding: boolean): string | null {
-  const parts = item.unit_path.split("/").filter(Boolean);
-  if (parts[0] !== "eib-group" || parts.length < 2) return null;
-  if (parts.length >= 3 && !finding) return "field-ops";
-  return parts[1];
-}
-
-function only(tile: DashboardTile, key: string, finding = false): DashboardTile {
-  return { ...tile, items: tile.items.filter((i) => divisionOf(i, finding) === key) };
-}
 
 export default function DivisionPage() {
   const { division } = useParams<{ division: string }>();
@@ -37,15 +15,13 @@ export default function DivisionPage() {
   const [running, setRunning] = useState(false);
   const [home, setHome] = useState<HomeSummary | null>(null);
   const [view, setView] = useState<DivisionView | null>(null);
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!me) return;
-    Promise.all([api.home(), api.dashboard(), api.division(division).catch(() => null)])
-      .then(([h, s, v]) => {
+    Promise.all([api.home(), api.division(division).catch(() => null)])
+      .then(([h, v]) => {
         setHome(h);
-        setSummary(s);
         setView(v);
       })
       .catch(() => setError("This division could not be loaded."));
@@ -64,7 +40,6 @@ export default function DivisionPage() {
   }
 
   const current = home?.divisions.find((d) => d.key === division);
-  const t = summary?.tiles;
 
   return (
     <Shell>
@@ -199,31 +174,6 @@ export default function DivisionPage() {
                 </div>
               )}
 
-              {t && !(view && view.sections.length > 0) && (
-                <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-2">
-                  {(
-                    [
-                      ["maintenance_backlog", false],
-                      ["overdue_deliveries", false],
-                      ["recent_findings", true],
-                      ["readiness", false],
-                      ["expiring_certifications", false],
-                    ] as const
-                  ).map(([name, finding]) => {
-                    const tile = only(t[name], current.key, finding);
-                    if (tile.items.length === 0) return null;
-                    return (
-                      <TileFrame key={name} tileKey={name} tile={tile}>
-                        {name === "recent_findings" ? (
-                          <Findings items={tile.items} />
-                        ) : (
-                          <BarList items={tile.items} />
-                        )}
-                      </TileFrame>
-                    );
-                  })}
-                </div>
-              )}
             </>
           )}
         </div>

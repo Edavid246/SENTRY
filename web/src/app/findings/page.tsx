@@ -67,7 +67,7 @@ export default function FindingsPage() {
         {findings && findings.length > 0 && (
           <ul data-testid="findings-list" className="max-w-4xl divide-y divide-rule border border-rule bg-surface">
             {findings.map((f) => (
-              <li key={f.id} className="px-4 py-4">
+              <li key={f.id} data-testid={`item-${f.id}`} className="px-4 py-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="border border-bad px-2 py-0.5 text-[0.7rem] uppercase tracking-[0.1em] text-bad">
                     {f.severity}
