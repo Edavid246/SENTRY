@@ -15,6 +15,7 @@ silently dropped here.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -124,6 +125,173 @@ def route_report(question: str) -> RoutedTool | None:
     return RoutedTool("training_activity", params)
 
 
+@dataclass(frozen=True, slots=True)
+class _Question:
+    """A question as the rules read it."""
+
+    text: str
+    unit: dict[str, Any]  # the `unit_path` parameter, if the question names a unit
+
+    @property
+    def prose(self) -> str:
+        """The question without unit paths: '/eib-group/briech/' names a unit, not a UAS request."""
+        return _PATH_RE.sub(" ", self.text)
+
+    def has(self, pattern: re.Pattern[str]) -> bool:
+        return pattern.search(self.text) is not None
+
+    def tool(self, name: str, **params: Any) -> RoutedTool:
+        return RoutedTool(name, {**self.unit, **params})
+
+
+Rule = Callable[[_Question], RoutedTool | None]
+
+
+def _custody_trail(q: _Question) -> RoutedTool | None:
+    evidence_no = _EVIDENCE_NO_RE.search(q.text)
+    return (
+        q.tool("custody_trail", evidence_ref=evidence_no.group(0).upper()) if evidence_no else None
+    )
+
+
+def _custody_gaps(q: _Question) -> RoutedTool | None:
+    return q.tool("custody_gaps") if q.has(_CUSTODY_BREAK_RE) else None
+
+
+def _case_ref(q: _Question) -> dict[str, str]:
+    case_no = _CASE_NO_RE.search(q.text)
+    return {"case_ref": case_no.group(0).upper()} if case_no else {}
+
+
+def _evidence_items(q: _Question) -> RoutedTool | None:
+    # "evidence" is also ordinary prose ("the evidence behind this answer"): without a case number
+    # it must read as a forensic record request, not as talk about an answer.
+    if not (q.has(_EVIDENCE_RE) and q.has(_REQUEST_RE)):
+        return None
+    case = _case_ref(q)
+    if q.has(_EVIDENCE_PROSE_RE) and not case:
+        return None
+    return q.tool("evidence_items", **case)
+
+
+def _forensic_cases(q: _Question) -> RoutedTool | None:
+    case = _case_ref(q)
+    named_case = bool(case) and "case" in q.text.lower()
+    if q.has(_REQUEST_RE) and (q.has(_CASES_RE) or named_case):
+        return q.tool("forensic_cases", **case)
+    return None
+
+
+def _serial_trace(q: _Question) -> RoutedTool | None:
+    serial = _SERIAL_NO_RE.search(q.text)
+    if serial and q.has(_SERIAL_WORD_RE):
+        return q.tool("serial_trace", serial=serial.group(1).upper())
+    return None
+
+
+def _production_holds(q: _Question) -> RoutedTool | None:
+    return q.tool("production_qc_holds") if q.has(_HOLD_RE) and q.has(_PRODUCTION_RE) else None
+
+
+def _client(q: _Question) -> dict[str, str]:
+    client = _CLIENT_NAME_RE.search(q.text)
+    return {"client": f"Client Agency {client.group(1).upper()}"} if client else {}
+
+
+# Contract rules come before the stock and UAS rules: "deliver" and "inventory" overlap.
+def _deliveries(q: _Question) -> RoutedTool | None:
+    if q.has(_DELIVERY_RE) and q.has(_OVERDUE_RE):
+        return q.tool("deliveries_overdue", **_client(q))
+    return None
+
+
+def _contracts(q: _Question) -> RoutedTool | None:
+    if not q.has(_CONTRACT_RE):
+        return None
+    status = _CONTRACT_STATUS_RE.search(q.text)
+    params: dict[str, Any] = _client(q)
+    if status:
+        params["status"] = status.group(1).lower().replace(" ", "_").replace("-", "_")
+    return q.tool("contracts_status", **params)
+
+
+def _maintenance(q: _Question) -> RoutedTool | None:
+    if not (q.has(_EQUIPMENT_RE) and q.has(_MAINTENANCE_RE)):
+        return None
+    within = _WITHIN_RE.search(q.text)
+    return q.tool(
+        "equipment_due_for_maintenance",
+        **({"within_days": int(within.group(1) or within.group(2))} if within else {}),
+    )
+
+
+def _certifications(q: _Question) -> RoutedTool | None:
+    return q.tool("expired_certifications") if q.has(_CERT_RE) and q.has(_EXPIRED_RE) else None
+
+
+def _training(q: _Question) -> RoutedTool | None:
+    if not (q.has(_TRAINING_RE) and q.has(_ACTIVITY_RE)):
+        return None
+    period_days = _period_days(q.text)
+    return q.tool(
+        "training_activity", **({} if period_days is None else {"period_days": period_days})
+    )
+
+
+def _stock(q: _Question) -> RoutedTool | None:
+    if not (q.has(_STOCK_RE) and q.has(_LOW_RE)):
+        return None
+    depot = _DEPOT_RE.search(q.text)
+    return q.tool("stock_below_threshold", **({"depot": depot.group(0).upper()} if depot else {}))
+
+
+# The connected-tech rules read the question without unit paths.
+def _detections(q: _Question) -> RoutedTool | None:
+    if _DETECTION_RE.search(q.prose) is None:
+        return None
+    params: dict[str, Any] = {}
+    if site := _SITE_RE.search(q.text):
+        params["site"] = site.group(0).upper()
+    if hours := _HOURS_RE.search(q.text):
+        params["period_hours"] = int(hours.group(1))
+    return q.tool("detections_near_site", **params)
+
+
+def _missions(q: _Question) -> RoutedTool | None:
+    if _UAS_RE.search(q.prose) is None:
+        return None
+    params: dict[str, Any] = {}
+    if q.has(_CANCELLED_RE):
+        params["status"] = "cancelled"
+    this = _THIS_PERIOD_RE.search(q.text)
+    period_days = _period_days(q.text)
+    if period_days is not None:
+        params["period_days"] = period_days
+    elif this:
+        params["period_days"] = _PERIOD_DAYS[this.group(1).lower()]
+    return q.tool("uas_missions", **params)
+
+
+# Tried in order, first hit wins; the order is part of the behavior.
+# Custody rules run when the question says "custody" even without a request verb.
+_CUSTODY_RULES: tuple[Rule, ...] = (_custody_trail, _custody_gaps)
+# Forensic rules come before the serial rule: "EV-014-01" looks like a serial number.
+_REQUEST_RULES: tuple[Rule, ...] = (
+    _evidence_items,
+    _forensic_cases,
+    _serial_trace,
+    _production_holds,
+    _deliveries,
+    _contracts,
+    _maintenance,
+    _certifications,
+    _training,
+    _stock,
+    _detections,
+    _missions,
+)
+
+
 def route_question(question: str) -> RoutedTool | None:
     """The data tool for a record-style request, or None (knowledge pathway)."""
     if _KNOWLEDGE_RE.search(question):
@@ -132,91 +300,10 @@ def route_question(question: str) -> RoutedTool | None:
         return RoutedTool("correlation_findings", {})
     is_request = bool(_REQUEST_RE.search(question) or _SERIAL_WORD_RE.search(question))
     is_custody = bool(_CUSTODY_RE.search(question))
-    if not is_request and not is_custody:
+    if not (is_request or is_custody):
         return None
-    params = _unit_path_params(question)
-    # Forensic rules come before the serial rule: "EV-014-01" looks like a serial number.
-    evidence_no = _EVIDENCE_NO_RE.search(question)
-    case_no = _CASE_NO_RE.search(question)
-    if evidence_no and is_custody:
-        return RoutedTool("custody_trail", {**params, "evidence_ref": evidence_no.group(0).upper()})
-    if is_custody and _CUSTODY_BREAK_RE.search(question):
-        return RoutedTool("custody_gaps", params)
-    if not is_request:
-        # "custody" alone opened the gate; with no EV number and no break word it is a
-        # knowledge question, not a record request.
-        return None
-    # "evidence" is also ordinary prose ("the evidence behind this answer"): without a case or
-    # evidence number it must read as a forensic record request, not as talk about an answer.
-    if (
-        _EVIDENCE_RE.search(question)
-        and _REQUEST_RE.search(question)
-        and (case_no or not _EVIDENCE_PROSE_RE.search(question))
-    ):
-        if case_no:
-            params["case_ref"] = case_no.group(0).upper()
-        return RoutedTool("evidence_items", params)
-    if _REQUEST_RE.search(question) and (
-        _CASES_RE.search(question) or (case_no and "case" in question.lower())
-    ):
-        if case_no:
-            params["case_ref"] = case_no.group(0).upper()
-        return RoutedTool("forensic_cases", params)
-    serial = _SERIAL_NO_RE.search(question)
-    if serial and _SERIAL_WORD_RE.search(question):
-        params["serial"] = serial.group(1).upper()
-        return RoutedTool("serial_trace", params)
-    if _HOLD_RE.search(question) and _PRODUCTION_RE.search(question):
-        return RoutedTool("production_qc_holds", params)
-    # Contract rules come before the stock and UAS rules: "deliver" and "inventory" overlap.
-    is_delivery = _DELIVERY_RE.search(question) and _OVERDUE_RE.search(question)
-    if is_delivery or _CONTRACT_RE.search(question):
-        client = _CLIENT_NAME_RE.search(question)
-        if client:
-            params["client"] = f"Client Agency {client.group(1).upper()}"
-    if is_delivery:
-        return RoutedTool("deliveries_overdue", params)
-    if _CONTRACT_RE.search(question):
-        status = _CONTRACT_STATUS_RE.search(question)
-        if status:
-            params["status"] = status.group(1).lower().replace(" ", "_").replace("-", "_")
-        return RoutedTool("contracts_status", params)
-    if _EQUIPMENT_RE.search(question) and _MAINTENANCE_RE.search(question):
-        within = _WITHIN_RE.search(question)
-        if within:
-            params["within_days"] = int(within.group(1) or within.group(2))
-        return RoutedTool("equipment_due_for_maintenance", params)
-    if _CERT_RE.search(question) and _EXPIRED_RE.search(question):
-        return RoutedTool("expired_certifications", params)
-    if _TRAINING_RE.search(question) and _ACTIVITY_RE.search(question):
-        period_days = _period_days(question)
-        if period_days is not None:
-            params["period_days"] = period_days
-        return RoutedTool("training_activity", params)
-    if _STOCK_RE.search(question) and _LOW_RE.search(question):
-        depot = _DEPOT_RE.search(question)
-        if depot:
-            params["depot"] = depot.group(0).upper()
-        return RoutedTool("stock_below_threshold", params)
-    # The connected-tech rules read the question without unit paths: '/eib-group/briech/'
-    # names a unit, not a UAS request.
-    prose = _PATH_RE.sub(" ", question)
-    if _DETECTION_RE.search(prose):
-        site = _SITE_RE.search(question)
-        if site:
-            params["site"] = site.group(0).upper()
-        hours = _HOURS_RE.search(question)
-        if hours:
-            params["period_hours"] = int(hours.group(1))
-        return RoutedTool("detections_near_site", params)
-    if _UAS_RE.search(prose):
-        if _CANCELLED_RE.search(question):
-            params["status"] = "cancelled"
-        period_days = _period_days(question)
-        this = _THIS_PERIOD_RE.search(question)
-        if period_days is not None:
-            params["period_days"] = period_days
-        elif this:
-            params["period_days"] = _PERIOD_DAYS[this.group(1).lower()]
-        return RoutedTool("uas_missions", params)
-    return None
+    q = _Question(question, _unit_path_params(question))
+    # "custody" alone opens the gate; with no EV number and no break word it is a knowledge
+    # question, not a record request.
+    rules = (_CUSTODY_RULES if is_custody else ()) + (_REQUEST_RULES if is_request else ())
+    return next((routed for rule in rules if (routed := rule(q)) is not None), None)
