@@ -31,6 +31,7 @@ from app.units import unit_names
 from .home import DIVISIONS
 
 router = APIRouter(prefix="/api/v1/divisions", tags=["divisions"])
+compliance_router = APIRouter(prefix="/api/v1/compliance", tags=["compliance"])
 
 Row = Mapping[str, Any]
 
@@ -42,6 +43,7 @@ class SectionRow(BaseModel):
     detail: str
     flagged: bool = Field(description="true when this row needs attention")
     meter: float | None = Field(description="0..1 gauge fill, e.g. hours flown of the interval")
+    unit_name: str = Field(description="readable name of the unit that owns the record")
 
 
 class Section(BaseModel):
@@ -298,7 +300,11 @@ def _run(scope: Scope, spec: SectionSpec, unit_path: str) -> ToolOutcome:
 
 
 def _build(
-    labels: Labels, spec: SectionSpec, outcome: ToolOutcome, keep: Callable[[str], bool]
+    labels: Labels,
+    spec: SectionSpec,
+    outcome: ToolOutcome,
+    keep: Callable[[str], bool],
+    names: Mapping[str, str],
 ) -> Section:
     result = outcome.result
     rows: list[SectionRow] = []
@@ -316,6 +322,7 @@ def _build(
                     detail=spec.detail(row),
                     flagged=spec.flagged(row),
                     meter=spec.meter(row),
+                    unit_name=names.get(record.unit_path, record.unit_path),
                 )
             )
     label = labels.derive(kept) if kept else None
@@ -385,7 +392,7 @@ def division_view(key: str, ctx: CurrentContext, conn: ConnDep) -> DivisionView:
         division, unit_path, keep = _division(key, scope, names)
         labels = Labels.load(conn)
         sections = [
-            _build(labels, s, _run(scope, s, unit_path), keep) for s in SECTIONS.get(key, ())
+            _build(labels, s, _run(scope, s, unit_path), keep, names) for s in SECTIONS.get(key, ())
         ]
         facts = _facts(key, sections, names, scope.ctx.unit_path)
         scope.read(
@@ -412,7 +419,8 @@ def serial_trace(
 ) -> Section:
     """One serial number's run, QC state and delivery. Unseen and nonexistent read the same."""
     with guarded(ctx, conn, "read", "dashboard", on_deny="not_found") as scope:
-        _, unit_path, keep = _division(key, scope, unit_names(conn))
+        names = unit_names(conn)
+        _, unit_path, keep = _division(key, scope, names)
         spec = SectionSpec(
             "trace",
             f"Serial {serial}",
@@ -429,6 +437,33 @@ def serial_trace(
         outcome = _run(scope, spec, unit_path)
         if outcome.refused:
             raise HTTPException(status_code=422, detail=outcome.refusal)
-        section = _build(Labels.load(conn), spec, outcome, keep)
+        section = _build(Labels.load(conn), spec, outcome, keep, names)
         scope.read("dashboard", len(section.rows), item_ids=[r.ref for r in section.rows])
     return section
+
+
+class ComplianceView(BaseModel):
+    generated_at: str
+    sections: list[Section]
+
+
+@compliance_router.get("", response_model=ComplianceView)
+def group_compliance(ctx: CurrentContext, conn: ConnDep) -> ComplianceView:
+    """Certifications and maintenance across every business the caller can see.
+
+    The same two typed tools as each division's compliance section, run on the caller's own
+    unit instead of one division's. Rows carry the owning unit's name; the filter is in the
+    query, exactly as everywhere else.
+    """
+    with guarded(ctx, conn, "read", "dashboard", on_deny="not_found") as scope:
+        names, labels = unit_names(conn), Labels.load(conn)
+        sections = [
+            _build(labels, s, _run(scope, s, scope.ctx.unit_path), lambda _path: True, names)
+            for s in _COMPLIANCE
+        ]
+        scope.read(
+            "dashboard",
+            sum(len(s.rows) for s in sections),
+            item_ids=[r.ref for s in sections for r in s.rows],
+        )
+    return ComplianceView(generated_at=utc_now_iso(), sections=sections)

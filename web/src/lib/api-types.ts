@@ -319,6 +319,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/compliance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Group Compliance
+         * @description Certifications and maintenance across every business the caller can see.
+         *
+         *     The same two typed tools as each division's compliance section, run on the caller's own
+         *     unit instead of one division's. Rows carry the owning unit's name; the filter is in the
+         *     query, exactly as everywhere else.
+         */
+        get: operations["group_compliance_api_v1_compliance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/correlation/run": {
         parameters: {
             query?: never;
@@ -498,6 +522,13 @@ export interface components {
             section: string | null;
             /** Classification Code */
             classification_code: string;
+        };
+        /** ComplianceView */
+        ComplianceView: {
+            /** Generated At */
+            generated_at: string;
+            /** Sections */
+            sections: components["schemas"]["Section"][];
         };
         /** ConversationDetail */
         ConversationDetail: {
@@ -813,6 +844,11 @@ export interface components {
              * @description 0..1 gauge fill, e.g. hours flown of the interval
              */
             meter: number | null;
+            /**
+             * Unit Name
+             * @description readable name of the unit that owns the record
+             */
+            unit_name: string;
         };
         /** TurnOut */
         TurnOut: {
@@ -1373,6 +1409,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Section"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    group_compliance_api_v1_compliance_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComplianceView"];
                 };
             };
             /** @description Validation Error */

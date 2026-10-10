@@ -18,7 +18,7 @@ function DivisionCard({ division, wide }: { division: HomeDivision; wide?: boole
       href={`/d/${division.key}`}
       data-testid={`division-${division.key}`}
       data-alert={alert ? alert.count : 0}
-      className={`group relative flex min-h-[210px] overflow-hidden border border-l-[3px] border-rule bg-surface p-6 transition-colors hover:border-sage ${
+      className={`group relative flex min-h-[210px] overflow-hidden border border-l-[3px] border-rule bg-surface p-7 transition-colors hover:border-sage hover:bg-raised ${
         alert ? "border-l-amber" : "border-l-transparent"
       } ${wide ? "md:col-span-2 md:min-h-[150px]" : ""}`}
     >
@@ -29,10 +29,10 @@ function DivisionCard({ division, wide }: { division: HomeDivision; wide?: boole
       <div className="relative flex w-full flex-col justify-between gap-6">
         <div className="flex items-start justify-between gap-6">
           <div>
-            <h2 className="text-[1.6rem] font-medium leading-tight tracking-[0.02em]">
+            <h2 className="text-[1.7rem] font-medium leading-tight tracking-[0.01em]">
               {division.name}
             </h2>
-            <p className="mt-1 text-[0.9rem] text-sage">{division.tagline}</p>
+            <p className="mt-1.5 max-w-[34ch] text-[0.9rem] leading-relaxed text-sage">{division.tagline}</p>
           </div>
           {alert && (
             <div className="text-right">
@@ -46,6 +46,12 @@ function DivisionCard({ division, wide }: { division: HomeDivision; wide?: boole
             </div>
           )}
         </div>
+        {!alert && (
+          <p className="flex items-center gap-2 text-[0.85rem] text-sage">
+            <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-ok" />
+            Nothing needs attention
+          </p>
+        )}
         {alert && (
           <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 pr-24">
             <ul className="text-[0.85rem] leading-relaxed text-ink">

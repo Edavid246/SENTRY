@@ -25,57 +25,72 @@ function ServiceGauge({ fraction }: { fraction: number }) {
   );
 }
 
-// One section of a division dashboard: the rows of a typed tool, each linking to its record
-// (and from there to the evidence panel). Flagged rows are the ones needing attention.
+// One section of a dashboard: the rows of a typed tool, each linking to its record (and from
+// there to the evidence panel). A flagged row carries an amber rule down its left edge, so the
+// ones needing attention can be found by running an eye down the page, not by reading colour.
 export function SectionCard({
   section,
   action,
   lead = false,
+  showUnit = false,
 }: {
   section: DivisionSection;
   action?: React.ReactNode;
   lead?: boolean;
+  showUnit?: boolean;
 }) {
+  const { flagged, rows } = section;
   return (
     <section
+      id={section.key}
       data-testid={`section-${section.key}`}
-      className={`border bg-surface ${lead ? "border-amber xl:col-span-2" : "border-rule"}`}
+      className={`scroll-mt-4 border bg-surface ${lead ? "border-amber xl:col-span-2" : "border-rule"}`}
     >
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-rule px-4 py-3">
-        <h2 className="label">{section.title}</h2>
-        <span className="flex items-center gap-4 font-mono text-[0.85rem]">
+      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 border-b border-rule px-5 py-3.5">
+        <h2 className="text-[1rem] font-medium">{section.title}</h2>
+        <span className="flex items-center gap-4 text-[0.85rem]">
           {action}
-          {section.flagged > 0 ? (
-            <span className="text-amber">{section.flagged} need attention</span>
+          {rows.length === 0 ? (
+            <span className="text-mute">none</span>
+          ) : flagged > 0 ? (
+            <span className="text-amber">
+              {flagged} of {rows.length} need attention
+            </span>
           ) : (
-            <span className="text-sage">{section.rows.length}</span>
+            <span className="text-sage">{rows.length} in order</span>
           )}
         </span>
       </header>
-      <div className="p-4">
-        {section.rows.length === 0 ? (
-          <p className="text-[0.85rem] text-mute">{section.empty_text}</p>
-        ) : (
-          <ul className="divide-y divide-rule">
-            {section.rows.map((row) => (
-              <li key={row.ref} className="py-3 first:pt-0 last:pb-0">
+      {rows.length === 0 ? (
+        <p className="px-5 py-4 text-[0.85rem] text-mute">{section.empty_text}</p>
+      ) : (
+        <ul>
+          {rows.map((row) => (
+            <li
+              key={row.ref}
+              className={`border-b border-l-[3px] border-b-rule px-5 py-3.5 last:border-b-0 ${
+                row.flagged ? "border-l-amber bg-raised" : "border-l-transparent"
+              }`}
+            >
+              <div className="flex items-baseline justify-between gap-4">
                 <Link
                   href={row.href}
                   data-testid="row-link"
-                  className={`block hover:underline ${lead ? "text-[1.2rem] font-medium" : "text-[0.95rem]"} ${row.flagged ? "text-amber" : ""}`}
+                  className={`min-w-0 hover:underline ${lead ? "text-[1.2rem] font-medium" : "text-[0.95rem]"} ${row.flagged ? "text-amber" : ""}`}
                 >
                   {row.label}
                 </Link>
-                <p className="mt-1 text-[0.85rem] text-sage">{row.detail}</p>
-                {row.meter != null && <ServiceGauge fraction={row.meter} />}
-                <p className="mt-1 font-mono text-[0.7rem] text-mute">{row.ref}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      <footer className="flex flex-wrap items-center gap-2 border-t border-rule px-4 py-2 text-[0.7rem] text-mute">
-        <span>Tool: {section.tool}</span>
+                <span className="shrink-0 text-[0.75rem] tabular-nums text-mute">{row.ref}</span>
+              </div>
+              <p className="mt-1 text-[0.85rem] leading-relaxed text-sage">{row.detail}</p>
+              {showUnit && <p className="mt-0.5 text-[0.8rem] text-mute">{row.unit_name}</p>}
+              {row.meter != null && <ServiceGauge fraction={row.meter} />}
+            </li>
+          ))}
+        </ul>
+      )}
+      <footer className="flex flex-wrap items-center gap-2 border-t border-rule px-5 py-2 text-[0.7rem] text-mute">
+        <span>Source: {section.tool}</span>
         {section.classification && <ClearanceBadge code={section.classification} />}
         {section.compartments.map((c) => (
           <span key={c} className="tag">
