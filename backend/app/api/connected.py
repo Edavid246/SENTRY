@@ -112,10 +112,11 @@ def connected_replay(
     ) as scope:
         if scope is None:
             return out
+        limit_ts = limit.strftime(UTC_TS_FORMAT)
         events = [
             r
             for r in get_adapter().stream(scope, max(since, window_start - timedelta(seconds=1)))
-            if r.data["observed_at"] <= limit.strftime(UTC_TS_FORMAT) and _in_state(r, state)
+            if r.data["observed_at"] <= limit_ts and _in_state(r, state)
         ]
         scope.read("connected_replay", len(events), record_ids=[r.source_ref for r in events])
     out["events"] = [_detection_feature(r) for r in events]

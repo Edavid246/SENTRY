@@ -17,28 +17,15 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from uuid import NAMESPACE_URL, UUID, uuid5
 
 from sqlalchemy import delete, text
 from sqlalchemy.engine import Engine
 
+from app.ids import entity_id, source_id, unit_id
 from app.knowledge.models import Chunk, Document
 from app.knowledge.parse import parse_document
 
 MANIFEST_NAME = "manifest.json"
-SKIPPED_FILES = {MANIFEST_NAME, ".DS_Store"}
-
-
-def _id(kind: str) -> UUID:
-    return uuid5(NAMESPACE_URL, f"defence-gateway:{kind}")
-
-
-def _unit_id(path: str) -> UUID:
-    return _id(f"unit:{path}")
-
-
-def _source_id(name: str) -> UUID:
-    return _id(f"source-system:{name}")
 
 
 def _sha256(path: Path) -> str:
@@ -84,7 +71,7 @@ def ingest_documents(engine: Engine, docs_dir: Path) -> dict[str, int]:
             if not path.exists():
                 raise FileNotFoundError(f"manifest references missing file: {path}")
             content_hash = _sha256(path)
-            doc_id = _id(f"doc:{ref}")
+            doc_id = entity_id(f"doc:{ref}")
             existing = conn.execute(
                 text("SELECT content_hash FROM documents WHERE id = :id"),
                 {"id": doc_id},
@@ -114,11 +101,11 @@ def ingest_documents(engine: Engine, docs_dir: Path) -> dict[str, int]:
                 {
                     "id": doc_id,
                     "title": str(entry["title"]),
-                    "source_system_id": _source_id("documents-ref"),
+                    "source_system_id": source_id("documents-ref"),
                     "source_ref": ref,
                     "classification_code": str(entry["classification"]),
                     "compartments": list(entry["compartments"]),
-                    "unit_id": _unit_id(str(entry["unit_path"])),
+                    "unit_id": unit_id(str(entry["unit_path"])),
                     "content_hash": content_hash,
                     "status": "published",
                     "version": 1,
@@ -131,7 +118,7 @@ def ingest_documents(engine: Engine, docs_dir: Path) -> dict[str, int]:
                     summary["embedded"] += 1
                 chunk_rows.append(
                     {
-                        "id": _id(f"chunk:{ref}:{index}"),
+                        "id": entity_id(f"chunk:{ref}:{index}"),
                         "document_id": doc_id,
                         "text": chunk.text,
                         "embedding": vector,
@@ -139,7 +126,7 @@ def ingest_documents(engine: Engine, docs_dir: Path) -> dict[str, int]:
                         "section": chunk.section,
                         "classification_code": str(entry["classification"]),
                         "compartments": list(entry["compartments"]),
-                        "unit_id": _unit_id(str(entry["unit_path"])),
+                        "unit_id": unit_id(str(entry["unit_path"])),
                     }
                 )
             conn.execute(Chunk.__table__.insert(), chunk_rows)

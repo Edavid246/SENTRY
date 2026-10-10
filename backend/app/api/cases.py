@@ -66,11 +66,7 @@ def case_view(case_ref: str, ctx: CurrentContext, conn: ConnDep) -> CaseView:
         raise HTTPException(status_code=404, detail="not found")
     with guarded(ctx, conn, "read", "dashboard", on_deny="not_found") as scope:
         cases = execute_tool(scope, "forensic_cases", {}).result
-        found = (
-            [(row, rec) for row, rec in zip(cases.rows, cases.records, strict=True)]
-            if cases
-            else []
-        )
+        found = list(zip(cases.rows, cases.records, strict=True)) if cases else []
         match = next(((row, rec) for row, rec in found if row["case_ref"] == case_ref), None)
         if match is None:
             raise HTTPException(status_code=404, detail="not found")

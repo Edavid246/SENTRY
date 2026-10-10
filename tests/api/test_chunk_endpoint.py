@@ -8,7 +8,7 @@ passage exists.
 """
 
 import pytest
-from app.seed import _id
+from app.ids import entity_id as _id
 from test_assistant_endpoints import _audit, _latest
 from test_auth_endpoints import auth_header
 

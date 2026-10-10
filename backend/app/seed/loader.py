@@ -14,7 +14,6 @@ from __future__ import annotations
 import hashlib
 import sys
 from datetime import UTC, datetime, timedelta
-from uuid import NAMESPACE_URL, UUID, uuid5
 
 from argon2 import PasswordHasher
 from sqlalchemy import create_engine, delete
@@ -30,6 +29,7 @@ from app.authz.models import (
 from app.config import get_settings
 from app.connectors.models import CanonicalRecord, SourceSystem
 from app.correlation.models import Finding
+from app.ids import entity_id, source_id, unit_id
 from app.knowledge.models import Chunk, Conversation, Document, Message
 from app.seed.identity import (
     ARCHIVED_USERS,
@@ -42,18 +42,6 @@ from app.seed.identity import (
     USERS,
 )
 from app.seed.records import RECORDS
-
-
-def _id(kind: str) -> UUID:
-    return uuid5(NAMESPACE_URL, f"defence-gateway:{kind}")
-
-
-def _unit_id(path: str) -> UUID:
-    return _id(f"unit:{path}")
-
-
-def _source_id(name: str) -> UUID:
-    return _id(f"source-system:{name}")
 
 
 def _chunk_texts(doc_ref: str, title: str, unit_path: str) -> list[tuple[str, str, int]]:
@@ -74,9 +62,9 @@ def _chunk_texts(doc_ref: str, title: str, unit_path: str) -> list[tuple[str, st
 def _rows(include_archived: bool = False) -> dict[type, list[dict]]:
     unit_rows = [
         {
-            "id": _unit_id(u["path"]),
+            "id": unit_id(u["path"]),
             "name": u["name"],
-            "parent_id": _unit_id(u["parent"]) if u["parent"] else None,
+            "parent_id": unit_id(u["parent"]) if u["parent"] else None,
             "path": u["path"],
             "depth": u["depth"],
         }
@@ -87,14 +75,14 @@ def _rows(include_archived: bool = False) -> dict[type, list[dict]]:
     user_rows = []
     user_compartment_rows = []
     for u in USERS + (ARCHIVED_USERS if include_archived else []):
-        user_id = _id(f"user:{u['username']}")
+        user_id = entity_id(f"user:{u['username']}")
         user_rows.append(
             {
                 "id": user_id,
                 "username": u["username"],
                 "display_name": u["display_name"],
                 "role": u["role"],
-                "unit_id": _unit_id(u["unit"]),
+                "unit_id": unit_id(u["unit"]),
                 "clearance_code": u["clearance"],
                 "keycloak_id": None,
                 "data_scope": u["data_scope"],
@@ -108,7 +96,7 @@ def _rows(include_archived: bool = False) -> dict[type, list[dict]]:
 
     source_rows = [
         {
-            "id": _source_id(s["name"]),
+            "id": source_id(s["name"]),
             "name": s["name"],
             "adapter_type": s["adapter_type"],
             "default_classification": "restricted",
@@ -120,16 +108,16 @@ def _rows(include_archived: bool = False) -> dict[type, list[dict]]:
     document_rows = []
     chunk_rows = []
     for ref, title, classification, compartments, unit_path in DOCUMENTS:
-        doc_id = _id(f"doc:{ref}")
+        doc_id = entity_id(f"doc:{ref}")
         document_rows.append(
             {
                 "id": doc_id,
                 "title": title,
-                "source_system_id": _source_id("documents-ref"),
+                "source_system_id": source_id("documents-ref"),
                 "source_ref": ref,
                 "classification_code": classification,
                 "compartments": compartments,
-                "unit_id": _unit_id(unit_path),
+                "unit_id": unit_id(unit_path),
                 "content_hash": hashlib.sha256(
                     f"{ref}|{title}|{classification}|{unit_path}".encode()
                 ).hexdigest(),
@@ -140,7 +128,7 @@ def _rows(include_archived: bool = False) -> dict[type, list[dict]]:
         for i, (text, section, page) in enumerate(_chunk_texts(ref, title, unit_path), start=1):
             chunk_rows.append(
                 {
-                    "id": _id(f"chunk:{ref}:{i}"),
+                    "id": entity_id(f"chunk:{ref}:{i}"),
                     "document_id": doc_id,
                     "text": text,
                     "embedding": None,
@@ -148,21 +136,21 @@ def _rows(include_archived: bool = False) -> dict[type, list[dict]]:
                     "section": section,
                     "classification_code": classification,
                     "compartments": compartments,
-                    "unit_id": _unit_id(unit_path),
+                    "unit_id": unit_id(unit_path),
                 }
             )
 
     base_time = datetime(2026, 10, 1, 6, 0, tzinfo=UTC)
     record_rows = [
         {
-            "id": _id(f"record:{ref}"),
+            "id": entity_id(f"record:{ref}"),
             "entity_type": entity_type,
-            "source_system_id": _source_id(source),
+            "source_system_id": source_id(source),
             "source_ref": ref,
             "data": data,
             "classification_code": classification,
             "compartments": compartments,
-            "unit_id": _unit_id(unit_path),
+            "unit_id": unit_id(unit_path),
             "retrieved_at": base_time + timedelta(minutes=i),
         }
         for i, (

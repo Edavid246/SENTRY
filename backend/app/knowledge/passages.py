@@ -120,7 +120,7 @@ def visible_passages(scope: Scope, chunk_ids: list[str]) -> dict[str, Passage]:
     rows = (
         scope.conn.execute(
             text(
-                f"{_PASSAGE_SELECT} WHERE chunks.id::text = ANY(CAST(:ids AS text[]))"
+                f"{_PASSAGE_SELECT} WHERE chunks.id = ANY(CAST(:ids AS uuid[]))"
                 f" AND {row_filter.where_sql}"
             ),
             {"ids": format_array(chunk_ids), **row_filter.params},

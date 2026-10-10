@@ -28,11 +28,9 @@ from app.audit.chain import utc_now_iso
 from app.authz.labels import Labels
 from app.correlation.store import list_findings
 from app.data_queries.registry import execute_tool
-from app.units import unit_names
+from app.units import GROUP_ROOT, is_site, unit_names
 
 router = APIRouter(prefix="/api/v1/home", tags=["home"])
-
-_GROUP_ROOT = "/eib-group/"
 
 
 class AlertPart(BaseModel):
@@ -97,14 +95,10 @@ class _Member:
     compartments: tuple[str, ...]
 
 
-def _depth(unit_path: str) -> int:
-    return len(unit_path.strip("/").split("/"))
-
-
 def _division_key(unit_path: str, *, finding: bool = False) -> str | None:
     """Which card a record counts toward. A site team (a unit below a subsidiary) belongs to
     Field Operations; a finding about a site stays with the subsidiary that raised it."""
-    if not unit_path.startswith(_GROUP_ROOT):
+    if not unit_path.startswith(GROUP_ROOT):
         return None
     parts = unit_path.strip("/").split("/")
     if len(parts) < 2:
@@ -139,7 +133,7 @@ def home_summary(ctx: CurrentContext, conn: ConnDep) -> HomeSummary:
             )
 
         # A division is shown when the caller's unit covers it, or when anything in it is visible.
-        site_units = [p for p in names if p.startswith(_GROUP_ROOT) and _depth(p) >= 3]
+        site_units = [p for p in names if is_site(p)]
         divisions: list[HomeDivision] = []
         item_ids: list[str] = []
         for division in DIVISIONS:

@@ -7,7 +7,7 @@ run is a no-op (idempotent)."""
 
 from __future__ import annotations
 
-from app.seed import _id
+from app.ids import entity_id as _id
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 

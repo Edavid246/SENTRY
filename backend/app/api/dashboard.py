@@ -30,7 +30,7 @@ from app.authz.scope import Scope
 from app.connectors.base import SourceRecord
 from app.correlation.store import list_findings
 from app.data_queries.registry import execute_tool
-from app.units import unit_names, unit_slug
+from app.units import is_subsidiary, subsidiary_path, unit_names, unit_slug
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 
@@ -179,15 +179,6 @@ GROUP_STATUS_TOOLS = (
     ("stock_below_threshold", {}, "stock lines short"),
     ("uas_missions", {"status": "cancelled"}, "UAS missions cancelled"),
 )
-_GROUP_ROOT = "/eib-group/"
-
-
-def _subsidiary_path(unit_path: str) -> str:
-    """'/eib-group/stratoc/site-4/' -> '/eib-group/stratoc/'; other units stand for themselves."""
-    parts = unit_path.strip("/").split("/")
-    if len(parts) >= 2 and unit_path.startswith(_GROUP_ROOT):
-        return f"{_GROUP_ROOT}{parts[1]}/"
-    return unit_path
 
 
 def _group_status_tile(scope: Scope, labels: Labels, names: dict[str, str]) -> DashboardTile:
@@ -202,12 +193,11 @@ def _group_status_tile(scope: Scope, labels: Labels, names: dict[str, str]) -> D
     groups: dict[str, dict[str, list[SourceRecord]]] = {}
     for tool, params, what in GROUP_STATUS_TOOLS:
         for record in execute_tool(scope, tool, params).records:
-            by_what = groups.setdefault(_subsidiary_path(record.unit_path), {})
+            by_what = groups.setdefault(subsidiary_path(record.unit_path), {})
             by_what.setdefault(what, []).append(record)
     ctx = scope.ctx
     for path in names:
-        parts = path.strip("/").split("/")
-        if path.startswith(_GROUP_ROOT) and len(parts) == 2 and path.startswith(ctx.unit_path):
+        if is_subsidiary(path) and path.startswith(ctx.unit_path):
             groups.setdefault(path, {})
     items = []
     for path in sorted(groups):

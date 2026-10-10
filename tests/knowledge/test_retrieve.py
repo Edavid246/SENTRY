@@ -10,8 +10,8 @@ from __future__ import annotations
 from app.authz.context import AccessContext, permissions_for_role
 from app.authz.scope import Scope
 from app.db import clear_rls_context
+from app.ids import entity_id as _id
 from app.knowledge.retrieve import retrieve_chunks
-from app.seed import _id
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
