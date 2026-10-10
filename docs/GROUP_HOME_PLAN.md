@@ -30,7 +30,7 @@ and maintenance stay, but as background compliance, not headline tiles.
    Still to do: rename "Demo-day" wording left in docs/PIVOT_PLAN.md/DECISIONS.md if any; update memory
    notes `demo-deadline-and-gaps` and `client-pivot-plan` (drop the deadline); add a dated line to
    docs/DECISIONS.md (no deadline; one account; new landing).
-2. Accounts: `backend/app/seed.py` now has `USERS = [owner]` and `ARCHIVED_USERS`, with
+2. Accounts: `backend/app/seed/identity.py` now has `USERS = [owner]` and `ARCHIVED_USERS`, with
    `run(url, include_archived=False)`. `tests/conftest.py` and `tests/integration/test_seed.py` seed with
    `include_archived=True`, so the authorization matrix (invariant) keeps running. Still to do:
    `scripts/prefill_cache.py` DEFAULT_USERS ("owner","coo"), `web/smoke/smoke.mjs`, README login list,
@@ -63,7 +63,7 @@ missing.
 - Group Compliance page: the old certification/maintenance tiles, full list, group-wide.
 
 ## Phase D - forensic case workspace (Giga)
-- Seed richer fictional case data in `backend/app/seed.py` (cases, evidence items, custody events), all
+- Seed richer fictional case data in `backend/app/seed/identity.py` (cases, evidence items, custody events), all
   `FORENSICS` compartment, `/eib-group/giga/`, labelled demo. Reuse the CASE/UCO-style `EvidenceItem` and
   `CustodyEvent` records (REC-046..062 range today, see seed.py near line 778).
 - Typed tools: cases open/by status, custody gaps, evidence by case. Derived items inherit the highest

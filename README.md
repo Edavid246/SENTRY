@@ -102,7 +102,7 @@ All names, units and documents are fictitious.
 | Group Owner (`owner`) | Commander role | EIB Group | Government-sensitive | UAS-OPS, FORENSICS, CLIENT-A..D |
 
 Only `owner` is seeded and can log in. Five restricted accounts (`logistics.head`, `coo`,
-`briech.lead`, `group.it`, `group.audit`) are archived in `ARCHIVED_USERS` in `backend/app/seed.py`;
+`briech.lead`, `group.it`, `group.audit`) are archived in `ARCHIVED_USERS` in `backend/app/seed/identity.py`;
 only the authorization tests load them (`include_archived=True`). To restore one, move its entry
 back into `USERS` and reseed.
 

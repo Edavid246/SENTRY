@@ -344,7 +344,7 @@ end-of-step report. Never silently log it.
 
 ### 2026-10-07 — Connected-technology demo data is hand-seeded, windowed in Python
 - **Issue:** surveillance, UAS and forensics records (REC-046..062) are a small hand-written
-  set in `app/seed.py`, not output of a generator, and are served by the same
+  set in `app/seed/`, not output of a generator, and are served by the same
   `DemoReferenceAdapter` as logistics data. A mission's track is a short coordinate list
   inside the mission record (no `TrackPoint` rows). `uas_missions`, `detections_near_site`
   and `/connected/map` fetch every authorized row of the entity type and apply the time

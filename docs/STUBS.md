@@ -55,7 +55,7 @@ Swap point: a model-drafted narrative over the same rows, through `LLMProvider`,
 ## Archived accounts
 
 Only `owner` is seeded. `logistics.head`, `coo`, `briech.lead`, `group.it`, `group.audit` are kept in
-`ARCHIVED_USERS` (`backend/app/seed.py`); tests seed them with `include_archived=True`. Restore one by
+`ARCHIVED_USERS` (`backend/app/seed/identity.py`); tests seed them with `include_archived=True`. Restore one by
 moving its entry to `USERS` and reseeding.
 
 ## Pivot data (Tasks 4-6)
