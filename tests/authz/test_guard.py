@@ -127,5 +127,5 @@ def test_permitted_audits_the_decision_alone(written) -> None:
     guard.permitted(access_context("group.audit"), "read_audit", "audit")
     assert [[e["decision"] for e in batch] for batch in written] == [["allow"]]
     with pytest.raises(HTTPException) as raised:
-        guard.permitted(access_context("owner"), "read_audit", "audit")
+        guard.permitted(access_context("briech.lead"), "read_audit", "audit")
     assert raised.value.status_code == 403

@@ -183,6 +183,7 @@ export const api = {
       `/audit?limit=${limit}${eventId ? `&event_id=${encodeURIComponent(eventId)}` : ""}`,
     ),
   runCorrelation: () => request<RunResult>("/correlation/run", { method: "POST" }),
+  findings: () => request<Finding[]>("/correlation/findings"),
   finding: (id: string) => request<Finding>(`/correlation/findings/${encodeURIComponent(id)}`),
   record: (sourceRef: string) =>
     request<RecordDetail>(`/records/${encodeURIComponent(sourceRef)}`),

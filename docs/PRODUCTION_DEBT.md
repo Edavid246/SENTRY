@@ -393,3 +393,8 @@ end-of-step report. Never silently log it.
 - **Production needs:** a release rule per classification and compartment (who may export what, and where
   to), recipient watermarking, a retention rule for exported files, and review of whether secret or
   compartmented reports may be exported at all.
+
+## 2026-10-10 — Owner reads the audit trail (separation of duties relaxed)
+- **Issue:** the `commander` (owner) role holds `read_audit`, so the person whose actions are audited can read the log. SPEC 7.1 separates auditors and administrators from operational roles.
+- **Why acceptable:** single-owner demo; read-only; the hash chain and ledger still expose any tampering.
+- **Production needs:** restore a separate auditor login (and sysadmin) and drop `read_audit` from operational roles, or agree the owner's access with the client in writing.

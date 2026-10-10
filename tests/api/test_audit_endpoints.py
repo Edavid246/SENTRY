@@ -44,8 +44,8 @@ def test_login_success_and_failure_are_both_audited(client) -> None:
     assert allowed["payload"]["user_id"]
 
 
-@pytest.mark.parametrize("username", DATA_USERS)
-def test_operational_roles_may_not_read_the_audit_trail(client, username: str) -> None:
+@pytest.mark.parametrize("username", [u for u in DATA_USERS if u != "owner"])
+def test_other_operational_roles_may_not_read_the_audit_trail(client, username: str) -> None:
     response = client.get("/api/v1/audit", headers=auth_header(client, username))
     assert response.status_code == 403
     verify = client.get("/api/v1/audit/verify", headers=auth_header(client, username))
@@ -53,7 +53,7 @@ def test_operational_roles_may_not_read_the_audit_trail(client, username: str) -
 
 
 def test_auditor_and_sysadmin_may_read_the_audit_trail(client) -> None:
-    for username in (AUDITOR, SYSADMIN):
+    for username in ("owner", AUDITOR, SYSADMIN):
         response = client.get("/api/v1/audit?limit=5", headers=auth_header(client, username))
         assert response.status_code == 200, response.text
         verify = client.get("/api/v1/audit/verify", headers=auth_header(client, username))

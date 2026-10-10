@@ -10,7 +10,10 @@ from dataclasses import dataclass
 from uuid import UUID
 
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
-    "commander": frozenset({"read", "query", "retrieve", "answer", "run_correlation"}),
+    # The single group owner reads the audit trail (read-only; nothing here can edit it).
+    "commander": frozenset(
+        {"read", "query", "retrieve", "answer", "run_correlation", "read_audit"}
+    ),
     "logistics": frozenset({"read", "query", "retrieve", "answer"}),
     "training": frozenset({"read", "query", "retrieve", "answer"}),
     "uas_ops": frozenset({"read", "query", "retrieve", "answer"}),

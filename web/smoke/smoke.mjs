@@ -76,7 +76,8 @@ try {
   await login("owner");
   await page.waitForURL("**/home");
   await page.waitForSelector('[data-testid="user-name"]');
-  check((await page.locator('a[href="/audit"]').count()) === 0, "audit nav hidden without read_audit");
+  check((await page.locator('a[href="/audit"]').count()) > 0, "owner sees the audit log in the nav");
+  check((await page.locator('a[href="/findings"]').count()) > 0, "owner sees Findings in the nav");
 
   // group home: login lands here; five cards, alerts only where something needs attention
   await page.waitForSelector('[data-testid="division-briech"]');

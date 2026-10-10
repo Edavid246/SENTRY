@@ -40,7 +40,7 @@ export default function FindingPage() {
   return (
     <Shell>
       <div className="h-full overflow-y-auto p-6">
-        <BackLink fallback="/dashboard" />
+        <BackLink fallback="/findings" />
         {error && (
           <p role="alert" data-testid="finding-error" className="mt-4 border border-rule p-4">
             {error}
