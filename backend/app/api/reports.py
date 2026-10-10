@@ -22,6 +22,7 @@ from app.api.divisions import Section, build_division
 from app.api.guard import guarded
 from app.audit.chain import utc_now_iso
 from app.audit.events import event
+from app.authz.labels import Labels
 from app.reporting.division import (
     DivisionReport,
     ReportRow,
@@ -74,12 +75,12 @@ class _Part:
     compartments: tuple[str, ...]
 
 
-def _section(section: Section) -> ReportSection:
+def _section(section: Section, labels: Labels) -> ReportSection:
     return ReportSection(
         title=section.title,
         empty_text=section.empty_text,
         flagged=section.flagged,
-        marking=marking(section.classification, section.compartments)
+        marking=marking(labels.display(section.classification), section.compartments)
         if section.classification
         else None,
         rows=tuple(ReportRow(r.label, r.detail, r.ref, r.flagged) for r in section.rows),
@@ -100,8 +101,9 @@ def _build(ctx: CurrentContext, conn: ConnDep, key: str, *, export: str | None) 
             generated_at=utc_now_iso()[:16].replace("T", " ") + " UTC",
             prepared_for=f"{scope.ctx.display_name}, {scope.ctx.unit_path}",
             facts=tuple((f.label, f.value) for f in facts),
-            sections=tuple(_section(s) for s in sections),
+            sections=tuple(_section(s, labels) for s in sections),
             label=label,
+            label_name=labels.display(label.code),
         )
         scope.read("dashboard", len(report.refs), item_ids=list(report.refs))
         if export:

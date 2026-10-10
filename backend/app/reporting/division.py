@@ -55,9 +55,9 @@ class DivisionReport:
     notice: str
 
 
-def marking(code: str, compartments: tuple[str, ...] | list[str]) -> str:
-    """The marking line: CLASSIFICATION (COMPARTMENT, COMPARTMENT)."""
-    return code.upper() + (f" ({', '.join(compartments)})" if compartments else "")
+def marking(name: str, compartments: tuple[str, ...] | list[str]) -> str:
+    """The marking line: CLASSIFICATION (COMPARTMENT, COMPARTMENT), the level as the UI names it."""
+    return name.upper() + (f" ({', '.join(compartments)})" if compartments else "")
 
 
 def _summary(sections: tuple[ReportSection, ...]) -> tuple[str, ...]:
@@ -82,6 +82,7 @@ def build_division_report(
     facts: tuple[tuple[str, str], ...],
     sections: tuple[ReportSection, ...],
     label: Label,
+    label_name: str,
 ) -> DivisionReport:
     refs = tuple(sorted({row.ref for s in sections for row in s.rows}))
     return DivisionReport(
@@ -91,7 +92,7 @@ def build_division_report(
         generated_at=generated_at,
         prepared_for=prepared_for,
         banner=DRAFT_BANNER,
-        marking=marking(label.code, label.compartments),
+        marking=marking(label_name, label.compartments),
         classification=label.code,
         compartments=label.compartments,
         facts=facts,

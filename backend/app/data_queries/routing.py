@@ -68,6 +68,16 @@ _SERIAL_WORD_RE = re.compile(r"\b(serial|trace|traceability|provenance)\b", re.I
 _SERIAL_NO_RE = re.compile(r"\b([A-Z]{2,4}(?:-[A-Z]{2,4})?-\d{3,5})\b", re.IGNORECASE)
 _HOLD_RE = re.compile(r"\bholds?\b", re.IGNORECASE)
 _PRODUCTION_RE = re.compile(r"\b(qc|quality|production|batch(?:es)?|lots?|runs?)\b", re.IGNORECASE)
+_CUSTODY_RE = re.compile(r"\b(custody|chain of custody)\b", re.IGNORECASE)
+_CUSTODY_BREAK_RE = re.compile(
+    r"\b(breaks?|broken|gaps?|discrepanc\w+|unexplained|inconsisten\w+)\b", re.IGNORECASE
+)
+_EVIDENCE_NO_RE = re.compile(r"\bEV-\d{3}-\d{2}\b", re.IGNORECASE)
+_CASE_NO_RE = re.compile(r"\bFR-\d{4}-\d{3}\b", re.IGNORECASE)
+_EVIDENCE_RE = re.compile(r"\bevidence\b", re.IGNORECASE)
+_CASES_RE = re.compile(
+    r"\b(forensic|forensics)\b.*\bcases?\b|\bcases?\b.*\bforensic", re.IGNORECASE
+)
 _PATH_RE = re.compile(r"(?<![\w])(?:\.\.?/|/)[\w./-]+")
 
 
@@ -116,9 +126,28 @@ def route_question(question: str) -> RoutedTool | None:
         return None
     if _FINDING_RE.search(question) or (_FAULT_RE.search(question) and _RISING_RE.search(question)):
         return RoutedTool("correlation_findings", {})
-    if not _REQUEST_RE.search(question) and not _SERIAL_WORD_RE.search(question):
+    if (
+        not _REQUEST_RE.search(question)
+        and not _SERIAL_WORD_RE.search(question)
+        and not _CUSTODY_RE.search(question)
+    ):
         return None
     params = _unit_path_params(question)
+    # Forensic rules come before the serial rule: "EV-014-01" looks like a serial number.
+    evidence_no = _EVIDENCE_NO_RE.search(question)
+    case_no = _CASE_NO_RE.search(question)
+    if evidence_no and _CUSTODY_RE.search(question):
+        return RoutedTool("custody_trail", {**params, "evidence_ref": evidence_no.group(0).upper()})
+    if _CUSTODY_RE.search(question) and _CUSTODY_BREAK_RE.search(question):
+        return RoutedTool("custody_gaps", params)
+    if _EVIDENCE_RE.search(question) and _REQUEST_RE.search(question):
+        if case_no:
+            params["case_ref"] = case_no.group(0).upper()
+        return RoutedTool("evidence_items", params)
+    if _REQUEST_RE.search(question) and (
+        _CASES_RE.search(question) or (case_no and "case" in question.lower())
+    ):
+        return RoutedTool("forensic_cases", params)
     serial = _SERIAL_NO_RE.search(question)
     if serial and _SERIAL_WORD_RE.search(question):
         params["serial"] = serial.group(1).upper()

@@ -152,7 +152,7 @@ try {
 
   // phone width: the shell collapses (menu + bottom tabs) and nothing scrolls sideways
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const route of ["/home", "/d/poctova", "/compliance", "/cases/FR-2026-017", "/dashboard", "/chat", "/map"]) {
+  for (const route of ["/home", "/d/poctova", "/compliance", "/cases/FR-2026-017", "/reports/briech", "/dashboard", "/chat", "/map"]) {
     await page.goto(BASE + route);
     await page.waitForSelector('nav[aria-label="Main"]');
     const [scrollW, innerW] = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);

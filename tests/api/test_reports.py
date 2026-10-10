@@ -62,6 +62,9 @@ def test_report_is_a_derived_item_and_inherits_the_marking(client) -> None:
     assert poctova["marking"] == "CONFIDENTIAL (CLIENT-C)"
     briech = _report(client, "owner", "briech")
     assert briech["classification"] == "secret"  # the airframe rows REC-094..097
+    # the marking names the level as the UI does (Secret is shown as Government-sensitive)
+    assert briech["marking"].startswith("GOVERNMENT-SENSITIVE (")
+    assert "SECRET" not in briech["marking"]
     assert {"CLIENT-A", "UAS-OPS"} <= set(briech["compartments"])
 
 

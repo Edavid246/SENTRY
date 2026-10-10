@@ -25,6 +25,8 @@ cleared for — never `user → LLM → database` with "don't reveal" instructio
 | Citations | Inline citations resolve to the exact passage via `GET /api/v1/documents/{ref}/chunks/{chunk_id}`, through the same authorization path. |
 | Audit trail (SPEC §14) | Every query, retrieval, answer and decision is hash-chained with a checkpoint file and a git ledger; `GET /api/v1/audit/verify` reports `valid`, `checked_count`, `first_bad_event_id` and both external tips. |
 | AI gateway | `LLMProvider`/`EmbeddingProvider` interfaces. Dev uses a hosted model with a response-cache fallback; embeddings are always local. Production swaps in on-prem inference behind the same interface. |
+| Group home | Login lands on a card per business the caller can see; each opens a dashboard of audited typed-tool sections (maintenance, deliveries, QC holds, fleet, detections, forensic cases with chain of custody). A group Compliance page covers certifications and maintenance across all of them. |
+| Reports | Any business can be prepared as a DRAFT FOR HUMAN REVIEW report and exported to PDF or DOCX. Built from the same typed-tool rows (no model), marked with the derived classification on every page, and each export is audited. |
 | Defences | Requests to ignore permissions are refused with access unchanged and flagged as notable events; answers citing outside the evidence set are blocked. |
 
 ## Stack

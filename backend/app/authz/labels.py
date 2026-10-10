@@ -40,15 +40,23 @@ class Label:
 class Labels:
     """The configured classification scheme (levels and their rank order)."""
 
-    def __init__(self, ranks: Mapping[str, int]) -> None:
+    def __init__(self, ranks: Mapping[str, int], names: Mapping[str, str] | None = None) -> None:
         if not ranks:
             raise ValueError("the classification scheme has no levels")
         self._ranks = dict(ranks)
+        self._names = dict(names or {})
 
     @classmethod
     def load(cls, conn: Connection) -> Labels:
-        rows = conn.execute(text("SELECT code, rank FROM classification_levels")).all()
-        return cls({str(row.code): int(row.rank) for row in rows})
+        rows = conn.execute(text("SELECT code, name, rank FROM classification_levels")).all()
+        return cls(
+            {str(row.code): int(row.rank) for row in rows},
+            {str(row.code): str(row.name) for row in rows},
+        )
+
+    def display(self, code: str) -> str:
+        """The level's name as the UI and documents show it, upper case (the code if unnamed)."""
+        return self._names.get(code, code).upper()
 
     def rank(self, code: str) -> int | None:
         """Rank of a level, or None for a code outside the scheme."""
