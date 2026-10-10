@@ -17,7 +17,7 @@ import { BarList, Findings, TileFrame } from "@/components/DashboardTiles";
 import { DivisionGlyph } from "@/components/DivisionGlyph";
 import { SectionCard, SerialLookup } from "@/components/DivisionSections";
 
-// Which business an item belongs to: a site team (a unit below a subsidiary) is Field
+// Which division an item belongs to: a site team (a unit below a subsidiary) is Field
 // Operations; a finding about a site stays with the subsidiary that raised it. Mirrors
 // backend/app/api/home.py.
 function divisionOf(item: DashboardItem, finding: boolean): string | null {
@@ -48,7 +48,7 @@ export default function DivisionPage() {
         setSummary(s);
         setView(v);
       })
-      .catch(() => setError("This business could not be loaded."));
+      .catch(() => setError("This division could not be loaded."));
   }, [me, division]);
 
   async function runCorrelation() {
@@ -77,10 +77,10 @@ export default function DivisionPage() {
           )}
           {!home && !error && <p className="text-sage">Loading…</p>}
           {home && !current && (
-            // A business you cannot see reads exactly like one that does not exist.
+            // A division you cannot see reads exactly like one that does not exist.
             <div data-testid="division-not-found">
               <h1 className="text-[1.6rem] font-medium">Not found</h1>
-              <p className="mt-2 text-sage">There is no such business, or it is not available to you.</p>
+              <p className="mt-2 text-sage">There is no such division, or it is not available to you.</p>
               <Link href="/home" className="btn mt-6 inline-block">
                 Back to the group
               </Link>
@@ -88,7 +88,7 @@ export default function DivisionPage() {
           )}
           {home && current && (
             <>
-              <nav aria-label="Businesses" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[0.9rem]">
+              <nav aria-label="Divisions" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[0.9rem]">
                 <Link href="/home" data-testid="back-to-group" className="text-sage hover:text-ink">
                   ← {me?.unit_breadcrumb[0]?.name ?? "Group"}
                 </Link>

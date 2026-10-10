@@ -87,7 +87,7 @@ try {
   await shot("12-home-owner");
   await page.click('[data-testid="division-poctova"]');
   await page.waitForSelector('[data-testid="division-title"]');
-  check((await page.textContent('[data-testid="division-title"]')) === "Poctova", "a card opens that business");
+  check((await page.textContent('[data-testid="division-title"]')) === "Poctova", "a card opens that division");
   await page.waitForSelector('[data-testid="section-qc-holds"]');
   check((await page.locator('[data-testid="section-runs"] [data-testid="row-link"]').count()) === 2, "poctova lists its two production runs");
   await page.fill('[aria-label="Serial number"]', "PCT-ARM-0007");
@@ -243,11 +243,11 @@ try {
   await login("coo");
   await page.waitForURL("**/d/field-ops");
   await page.waitForSelector('[data-testid="division-title"]');
-  check((await page.locator('[data-testid="division-title"]').count()) === 1, "coo sees one business, so lands in it directly");
+  check((await page.locator('[data-testid="division-title"]').count()) === 1, "coo sees one division, so lands in it directly");
   await shot("14a-division-coo");
   await page.goto(BASE + "/d/briech");
   await page.waitForSelector('[data-testid="division-not-found"]');
-  check(true, "coo gets 'not found' for a business outside their unit");
+  check(true, "coo gets 'not found' for a division outside their unit");
   await page.click('a[href="/dashboard"]');
   await page.waitForSelector('[data-testid="tile-recent_findings"]');
   check((await page.locator('[data-testid="finding-link"]').count()) === 0, "coo does not see the Secret finding");

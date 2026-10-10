@@ -1,4 +1,4 @@
-// One line-drawn mark per business, inline so nothing is fetched at runtime. Drawn on a
+// One line-drawn mark per division, inline so nothing is fetched at runtime. Drawn on a
 // 160-unit square with a shared stroke so the five read as one family.
 type Props = { division: string; className?: string };
 

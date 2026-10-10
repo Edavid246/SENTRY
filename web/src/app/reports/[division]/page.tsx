@@ -23,7 +23,7 @@ export default function ReportPage() {
     api
       .divisionReport(division)
       .then(setReport)
-      // A business you cannot see reads exactly like one that does not exist.
+      // A division you cannot see reads exactly like one that does not exist.
       .catch((err) => setState(err instanceof ApiError && err.status === 404 ? "missing" : "failed"));
   }, [me, division]);
 
@@ -45,13 +45,13 @@ export default function ReportPage() {
       <div className="h-full overflow-y-auto p-6 md:p-10">
         <div className="mx-auto max-w-4xl">
           <Link href={`/d/${division}`} className="text-[0.9rem] text-sage hover:text-ink">
-            ← Back to the business
+            ← Back to the division
           </Link>
           {!report && state === "loading" && <p className="mt-8 text-sage">Loading…</p>}
           {!report && state === "missing" && (
             <div data-testid="report-not-found" className="mt-8">
               <h1 className="text-[1.6rem] font-medium">Not found</h1>
-              <p className="mt-2 text-sage">There is no such business, or it is not available to you.</p>
+              <p className="mt-2 text-sage">There is no such division, or it is not available to you.</p>
             </div>
           )}
           {!report && state === "failed" && (

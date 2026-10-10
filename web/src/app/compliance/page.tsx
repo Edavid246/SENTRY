@@ -47,7 +47,7 @@ export default function CompliancePage() {
             Compliance
           </h1>
           <p className="mt-1 max-w-[60ch] text-[0.95rem] text-sage">
-            Maintenance and certifications across every business you can see. Overdue items come first.
+            Maintenance and certifications across every division you can see. Overdue items come first.
           </p>
           {error && (
             <p role="alert" className="mt-8 border border-rule p-4 text-[0.9rem]">

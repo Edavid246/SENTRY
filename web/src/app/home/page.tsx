@@ -10,7 +10,7 @@ import { ClearanceBadge } from "@/components/ClearanceBadge";
 import { DivisionGlyph } from "@/components/DivisionGlyph";
 
 // The card is the whole link. An alert exists only when something needs attention: a quiet
-// business shows its name and what it does, nothing more.
+// division shows its name and what it does, nothing more.
 function DivisionCard({ division, wide }: { division: HomeDivision; wide?: boolean }) {
   const { alert } = division;
   return (
@@ -87,7 +87,7 @@ export default function HomePage() {
     api
       .home()
       .then((s) => {
-        // Someone who can see a single business goes straight to it.
+        // Someone who can see a single division goes straight to it.
         if (s.divisions.length === 1) router.replace(`/d/${s.divisions[0].key}`);
         else setSummary(s);
       })
@@ -100,7 +100,7 @@ export default function HomePage() {
       );
   }, [me, router]);
 
-  const businesses = summary?.divisions.filter((d) => d.key !== "field-ops") ?? [];
+  const divisions = summary?.divisions.filter((d) => d.key !== "field-ops") ?? [];
   const field = summary?.divisions.find((d) => d.key === "field-ops");
 
   return (
@@ -111,7 +111,7 @@ export default function HomePage() {
             {me?.unit_breadcrumb[0]?.name ?? "Group"}
           </h1>
           <p className="mt-1 text-[0.95rem] text-sage">
-            Open a business to see what is happening there.
+            Open a division to see what is happening there.
           </p>
           {error && (
             <p role="alert" className="mt-8 border border-rule p-4 text-[0.9rem]">
@@ -121,7 +121,7 @@ export default function HomePage() {
           {!summary && !error && <p className="mt-8 text-sage">Loading…</p>}
           {summary && (
             <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2">
-              {businesses.map((d) => (
+              {divisions.map((d) => (
                 <DivisionCard key={d.key} division={d} />
               ))}
               {field && <DivisionCard division={field} wide />}
