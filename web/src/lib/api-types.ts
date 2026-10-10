@@ -343,6 +343,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cases/{case_ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Case View */
+        get: operations["case_view_api_v1_cases__case_ref__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/correlation/run": {
         parameters: {
             query?: never;
@@ -508,6 +525,34 @@ export interface components {
             /** Audit Event Id */
             audit_event_id: string;
         };
+        /** CaseView */
+        CaseView: {
+            /** Generated At */
+            generated_at: string;
+            /**
+             * Ref
+             * @description source record reference of the case
+             */
+            ref: string;
+            /** Case Ref */
+            case_ref: string;
+            /** Title */
+            title: string;
+            /** State */
+            state: string;
+            /** Opened */
+            opened: string;
+            /** Lead Examiner */
+            lead_examiner: string;
+            /** Breaks */
+            breaks: number;
+            /** Classification */
+            classification: string;
+            /** Compartments */
+            compartments: string[];
+            /** Evidence */
+            evidence: components["schemas"]["EvidenceView"][];
+        };
         /** CitationOut */
         CitationOut: {
             /** Chunk Id */
@@ -561,6 +606,27 @@ export interface components {
             created_at: string;
             /** Updated At */
             updated_at: string;
+        };
+        /** CustodyStep */
+        CustodyStep: {
+            /**
+             * Ref
+             * @description source record reference of the custody event
+             */
+            ref: string;
+            /** Action */
+            action: string;
+            /** Event Date */
+            event_date: string;
+            /** From Holder */
+            from_holder: string;
+            /** To Holder */
+            to_holder: string;
+            /**
+             * Expected Holder
+             * @description who the item should have been taken from, when the record says someone else
+             */
+            expected_holder: string | null;
         };
         /** DashboardItem */
         DashboardItem: {
@@ -650,6 +716,26 @@ export interface components {
              * @description empty until this division's dashboard exists
              */
             sections: components["schemas"]["Section"][];
+        };
+        /** EvidenceView */
+        EvidenceView: {
+            /** Ref */
+            ref: string;
+            /** Evidence Ref */
+            evidence_ref: string;
+            /** Item */
+            item: string;
+            /** Kind */
+            kind: string;
+            /** Status */
+            status: string;
+            /**
+             * Sha256
+             * @description synthetic hash prefix, not of any real content
+             */
+            sha256: string;
+            /** Steps */
+            steps: components["schemas"]["CustodyStep"][];
         };
         /** Fact */
         Fact: {
@@ -1440,6 +1526,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ComplianceView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    case_view_api_v1_cases__case_ref__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                case_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseView"];
                 };
             };
             /** @description Validation Error */

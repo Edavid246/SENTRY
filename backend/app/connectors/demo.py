@@ -32,6 +32,7 @@ ENTITY_TYPES: tuple[str, ...] = (
     "Sensor",
     "Detection",
     "Mission",
+    "Case",
     "EvidenceItem",
     "CustodyEvent",
     "Contract",

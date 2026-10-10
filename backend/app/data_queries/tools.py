@@ -36,6 +36,8 @@ _SITE_RE = re.compile(r"^(?:DEP-[A-Z0-9]{1,8}|UAS-HANGAR)$")
 _CLIENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .&-]{0,39}$")
 CONTRACT_STATUSES = frozenset({"active", "at_risk", "completed"})
 _SERIAL_RE = re.compile(r"^[A-Z]{2,4}(?:-[A-Z]{2,4})?-\d{3,5}$")
+_CASE_RE = re.compile(r"^FR-\d{4}-\d{3}$")
+_EVIDENCE_RE = re.compile(r"^EV-\d{3}-\d{2}$")
 _UNIT_PATH_RE = re.compile(r"^/(?:[a-z0-9-]+/)+$")
 
 Column = Callable[[SourceRecord], Any]
@@ -556,6 +558,150 @@ def field_personnel(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
             "id": _source_ref,
             **_fields("name", "rank", "certification", "expires"),
             "status": lambda r: "expired" if r.data["expires"] < today else "valid",
+            "unit_path": _unit_path,
+        },
+    )
+
+
+def _custody_chains(events: list[SourceRecord]) -> dict[str, list[tuple[SourceRecord, str | None]]]:
+    """Each evidence item's visible custody events in date order, each with the holder it should
+    have been taken from (the previous event's `to_holder`) when the record says otherwise.
+
+    A break is a transfer whose `from_holder` is not whoever last received the item. Worked out
+    from the events the caller can see: a trail with a hidden event in the middle would read as
+    broken, so the forensic records of one case share one label (checked by a test).
+    """
+    by_item: dict[str, list[SourceRecord]] = {}
+    for event in events:
+        by_item.setdefault(str(event.data["evidence_ref"]), []).append(event)
+    chains: dict[str, list[tuple[SourceRecord, str | None]]] = {}
+    for evidence_ref, items in by_item.items():
+        items.sort(key=lambda e: (e.data["event_date"], e.source_ref))
+        chain: list[tuple[SourceRecord, str | None]] = []
+        previous: SourceRecord | None = None
+        for event in items:
+            expected = None
+            if previous is not None and event.data["from_holder"] != previous.data["to_holder"]:
+                expected = str(previous.data["to_holder"])
+            chain.append((event, expected))
+            previous = event
+        chains[evidence_ref] = chain
+    return chains
+
+
+Chains = dict[str, list[tuple[SourceRecord, str | None]]]
+
+
+def _forensics(scope: Scope, unit_path: str) -> tuple[list[SourceRecord], Chains]:
+    adapter = get_adapter()
+    evidence = adapter.search(scope, RecordFilter(entity_type="EvidenceItem", unit_path=unit_path))
+    events = adapter.search(scope, RecordFilter(entity_type="CustodyEvent", unit_path=unit_path))
+    return evidence, _custody_chains(events)
+
+
+def forensic_cases(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    """Forensic cases, with how many evidence items and custody breaks the caller can see."""
+    _check_names(params, frozenset({"unit_path"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    cases = get_adapter().search(scope, RecordFilter(entity_type="Case", unit_path=unit_path))
+    evidence, chains = _forensics(scope, unit_path)
+    cases.sort(key=lambda r: (r.data["state"] != "open", r.data["case_ref"]))
+    items = {c.data["case_ref"]: 0 for c in cases}
+    breaks = dict(items)
+    for item in evidence:
+        if item.data["case_ref"] in items:
+            items[item.data["case_ref"]] += 1
+    for chain in chains.values():
+        for event, expected in chain:
+            if expected is not None and event.data["case_ref"] in breaks:
+                breaks[event.data["case_ref"]] += 1
+    return _table(
+        "forensic_cases",
+        {"unit_path": unit_path},
+        cases,
+        {
+            "id": _source_ref,
+            **_fields("case_ref", "title", "state", "opened", "lead_examiner"),
+            "evidence_items": lambda r: items[r.data["case_ref"]],
+            "custody_breaks": lambda r: breaks[r.data["case_ref"]],
+            "unit_path": _unit_path,
+        },
+    )
+
+
+def evidence_items(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    """Evidence items, with how many custody events and breaks each has."""
+    _check_names(params, frozenset({"unit_path", "case_ref"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    case_ref = _pattern(params.get("case_ref"), _CASE_RE, "case_ref must look like FR-2026-014")
+    evidence, chains = _forensics(scope, unit_path)
+    records = [e for e in evidence if case_ref is None or e.data["case_ref"] == case_ref]
+    records.sort(key=lambda r: r.data["evidence_ref"])
+
+    def chain(record: SourceRecord) -> list[tuple[SourceRecord, str | None]]:
+        return chains.get(record.data["evidence_ref"], [])
+
+    return _table(
+        "evidence_items",
+        {"unit_path": unit_path, **_given(case_ref=case_ref)},
+        records,
+        {
+            "id": _source_ref,
+            **_fields("evidence_ref", "case_ref", "item", "kind", "status"),
+            "sha256": lambda r: str(r.data["sha256"])[:16],
+            "custody_events": lambda r: len(chain(r)),
+            "custody_breaks": lambda r: sum(1 for _e, expected in chain(r) if expected),
+            "unit_path": _unit_path,
+        },
+    )
+
+
+def custody_gaps(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    """Custody events whose recorded holder is not whoever last received the item."""
+    _check_names(params, frozenset({"unit_path"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    _evidence, chains = _forensics(scope, unit_path)
+    broken = [
+        (event, expected)
+        for chain in chains.values()
+        for event, expected in chain
+        if expected is not None
+    ]
+    broken.sort(key=lambda pair: (pair[0].data["event_date"], pair[0].source_ref))
+    expected_by_ref = {event.source_ref: expected for event, expected in broken}
+    return _table(
+        "custody_gaps",
+        {"unit_path": unit_path},
+        [event for event, _ in broken],
+        {
+            "id": _source_ref,
+            **_fields("evidence_ref", "case_ref", "action", "event_date"),
+            "recorded_holder": _field("from_holder"),
+            "expected_holder": lambda r: expected_by_ref[r.source_ref],
+            "unit_path": _unit_path,
+        },
+    )
+
+
+def custody_trail(scope: Scope, params: Mapping[str, Any]) -> ToolResult:
+    """One evidence item's chain of custody, oldest first, with any break marked."""
+    _check_names(params, frozenset({"unit_path", "evidence_ref"}))
+    unit_path = _resolve_unit_path(scope.ctx, params.get("unit_path"))
+    evidence_ref = params.get("evidence_ref")
+    if not isinstance(evidence_ref, str) or not _EVIDENCE_RE.match(evidence_ref):
+        raise ToolParamError("evidence_ref must look like EV-014-01")
+    _evidence, chains = _forensics(scope, unit_path)
+    chain = chains.get(evidence_ref, [])
+    expected_by_ref = {event.source_ref: expected for event, expected in chain}
+    return _table(
+        "custody_trail",
+        {"unit_path": unit_path, "evidence_ref": evidence_ref},
+        [event for event, _ in chain],
+        {
+            "id": _source_ref,
+            **_fields("evidence_ref", "action", "event_date", "from_holder", "to_holder"),
+            "break": lambda r: expected_by_ref[r.source_ref] is not None,
+            "expected_holder": lambda r: expected_by_ref[r.source_ref],
             "unit_path": _unit_path,
         },
     )

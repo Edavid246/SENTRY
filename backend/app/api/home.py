@@ -83,6 +83,7 @@ ATTENTION_TOOLS: tuple[tuple[str, Mapping[str, Any], str], ...] = (
     ("production_qc_holds", {}, "production runs on QC hold"),
     ("stock_below_threshold", {}, "stock lines short"),
     ("uas_missions", {"status": "cancelled"}, "UAS missions cancelled"),
+    ("custody_gaps", {}, "custody breaks"),
 )
 FINDINGS_WHAT = "findings open"
 

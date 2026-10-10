@@ -83,6 +83,7 @@ class SectionSpec:
     params: Mapping[str, Any] = field(default_factory=dict)
     meter: Callable[[Row], float | None] = lambda row: None
     href: Callable[[str], str] = lambda ref: f"/records/{ref}"
+    row_href: Callable[[Row], str] | None = None  # when the link needs more than the ref
     scoped: bool = True  # False for tools that take no unit_path (the findings store)
 
 
@@ -114,6 +115,10 @@ _COMPLIANCE = (
 )
 
 
+def _count(n: int, noun: str) -> str:
+    return f"{n} {noun}" + ("" if n == 1 else "s")
+
+
 def _fleet_detail(row: Row) -> str:
     left = row["hours_to_service"]
     text = f"{row['flight_hours']:g} flight hours"
@@ -130,6 +135,51 @@ def _fleet_meter(row: Row) -> float | None:
 
 
 SECTIONS: dict[str, tuple[SectionSpec, ...]] = {
+    "giga": (
+        SectionSpec(
+            "custody-breaks",
+            "Custody breaks",
+            "custody_gaps",
+            "Every chain of custody is unbroken.",
+            lambda r: f"{r['evidence_ref']} · {r['action']} on {r['event_date']}",
+            lambda r: (
+                f"Recorded as taken from {r['recorded_holder']}, "
+                f"but the last holder was {r['expected_holder']}"
+            ),
+            row_href=lambda r: f"/cases/{r['case_ref']}",
+        ),
+        SectionSpec(
+            "cases",
+            "Cases",
+            "forensic_cases",
+            "No cases are visible to you.",
+            lambda r: f"{r['case_ref']} · {r['title']}",
+            lambda r: (
+                f"{r['state']} · opened {r['opened']} · "
+                f"{_count(r['evidence_items'], 'evidence item')}"
+                + (
+                    f" · {_count(r['custody_breaks'], 'custody break')}"
+                    if r["custody_breaks"]
+                    else ""
+                )
+            ),
+            lambda r: r["custody_breaks"] > 0,
+            row_href=lambda r: f"/cases/{r['case_ref']}",
+        ),
+        SectionSpec(
+            "evidence",
+            "Evidence items",
+            "evidence_items",
+            "No evidence items are visible to you.",
+            lambda r: f"{r['evidence_ref']} · {r['item']}",
+            lambda r: (
+                f"{r['case_ref']} · {r['kind']} · {r['status']} · "
+                f"{_count(r['custody_events'], 'custody event')}"
+            ),
+            lambda r: r["custody_breaks"] > 0,
+        ),
+        *_COMPLIANCE,
+    ),
     "field-ops": (
         SectionSpec(
             "personnel",
@@ -317,7 +367,7 @@ def _build(
             rows.append(
                 SectionRow(
                     ref=record.source_ref,
-                    href=spec.href(record.source_ref),
+                    href=spec.row_href(row) if spec.row_href else spec.href(record.source_ref),
                     label=spec.label(row),
                     detail=spec.detail(row),
                     flagged=spec.flagged(row),

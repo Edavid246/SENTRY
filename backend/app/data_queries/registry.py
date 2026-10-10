@@ -23,11 +23,15 @@ from app.data_queries.tools import (
     ToolResult,
     contracts_status,
     correlation_findings,
+    custody_gaps,
+    custody_trail,
     deliveries_overdue,
     detections_near_site,
     equipment_due_for_maintenance,
+    evidence_items,
     expired_certifications,
     field_personnel,
+    forensic_cases,
     production_qc_holds,
     production_runs,
     sensors_status,
@@ -56,6 +60,10 @@ REGISTRY: dict[str, ToolFn] = {
     "serial_trace": serial_trace,
     "production_qc_holds": production_qc_holds,
     "production_runs": production_runs,
+    "forensic_cases": forensic_cases,
+    "evidence_items": evidence_items,
+    "custody_gaps": custody_gaps,
+    "custody_trail": custody_trail,
 }
 
 # The policy decisions a caller needs before a tool runs. Tools read source records;

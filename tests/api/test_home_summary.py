@@ -49,7 +49,7 @@ def test_owner_alert_counts_come_from_the_typed_tools(client) -> None:
         key: {p["what"]: p["count"] for p in card["alert"]["parts"]} for key, card in cards.items()
     }
     assert counts["poctova"] == {"deliveries overdue": 2, "production runs on QC hold": 1}
-    assert counts["giga"] == {"deliveries overdue": 1}
+    assert counts["giga"] == {"deliveries overdue": 1, "custody breaks": 1}
     assert counts["stratoc"]["findings open"] == 1
     assert counts["field-ops"] == {"equipment overdue": 1, "stock lines short": 1}
     assert cards["briech"]["alert"]["count"] == 9

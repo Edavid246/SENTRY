@@ -130,9 +130,20 @@ try {
   await page.waitForSelector('[data-testid="division-briech"]');
   check(true, "back to the group home works");
 
+  // group compliance and the forensic case workspace
+  await page.goto(BASE + "/compliance");
+  await page.waitForSelector('[data-testid="compliance-tally"]');
+  check((await page.locator('[data-testid="section-maintenance"] [data-testid="row-link"]').count()) > 0, "compliance lists maintenance rows");
+  await page.goto(BASE + "/d/giga");
+  await page.waitForSelector('[data-testid="section-custody-breaks"]');
+  await page.click('[data-testid="section-custody-breaks"] [data-testid="row-link"]');
+  await page.waitForSelector('[data-testid="case-title"]');
+  check((await page.locator('[data-testid="custody-break"]').count()) === 1, "the case page marks the one custody break");
+  await shot("12g-case-workspace");
+
   // phone width: the shell collapses (menu + bottom tabs) and nothing scrolls sideways
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const route of ["/home", "/d/poctova", "/dashboard", "/chat", "/map"]) {
+  for (const route of ["/home", "/d/poctova", "/compliance", "/cases/FR-2026-017", "/dashboard", "/chat", "/map"]) {
     await page.goto(BASE + route);
     await page.waitForSelector('nav[aria-label="Main"]');
     const [scrollW, innerW] = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);

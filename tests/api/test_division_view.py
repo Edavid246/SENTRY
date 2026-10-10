@@ -62,10 +62,6 @@ def test_hidden_and_unknown_divisions_read_the_same(client) -> None:
     assert hidden.json() == unknown.json()
 
 
-def test_a_division_without_sections_yet_is_empty_not_missing(client) -> None:
-    assert _get(client, "owner", "giga").json()["sections"] == []
-
-
 def test_serial_trace_returns_one_row_with_delivery(client) -> None:
     body = _get(client, "owner", "poctova/trace?serial=PCT-ARM-0007").json()
     assert _refs(body) == ["REC-091"]

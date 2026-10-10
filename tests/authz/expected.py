@@ -6,9 +6,9 @@ of user compartments AND row unit at or below the user's unit, strictly
 downward). Deliberately NOT derived from app.seed: a seeding bug must not
 be able to rewrite its own expectations.
 
-Verified sets (16 documents, 97 records in the corpus):
+Verified sets (16 documents, 117 records in the corpus):
 
-    owner    14 documents, 96 records
+    owner    14 documents, 116 records
     logistics.head    6 documents, 43 records
     coo   1 document,  24 records
     briech.lead      1 document,  20 records
@@ -60,7 +60,7 @@ GOLD_RECORDS: dict[str, frozenset[str]] = {
             "REC-007",
             "REC-009",
             "REC-010",
-            *(f"REC-0{n}" for n in range(11, 98)),
+            *(f"REC-{n:03d}" for n in range(11, 118)),
         }
     ),
     "logistics.head": frozenset(

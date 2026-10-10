@@ -19,6 +19,7 @@ export type HomeAlert = Schemas["HomeAlert"];
 export type DivisionView = Schemas["DivisionView"];
 export type DivisionSection = Schemas["Section"];
 export type ComplianceView = Schemas["ComplianceView"];
+export type CaseView = Schemas["CaseView"];
 export type SectionRow = Schemas["SectionRow"];
 
 // These endpoints return free-form dicts in OpenAPI, so their shapes are
@@ -189,6 +190,7 @@ export const api = {
   dashboard: () => request<DashboardSummary>("/dashboard/summary"),
   home: () => request<HomeSummary>("/home/summary"),
   division: (key: string) => request<DivisionView>(`/divisions/${encodeURIComponent(key)}`),
+  forensicCase: (caseRef: string) => request<CaseView>(`/cases/${encodeURIComponent(caseRef)}`),
   compliance: () => request<ComplianceView>("/compliance"),
   serialTrace: (key: string, serial: string) =>
     request<DivisionSection>(
