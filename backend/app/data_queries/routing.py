@@ -118,11 +118,7 @@ def route_report(question: str) -> RoutedTool | None:
         return None
     if not (_TRAINING_RE.search(question) and _ACTIVITY_RE.search(question)):
         return None
-    params = _unit_path_params(question)
-    period_days = _period_days(question)
-    if period_days is not None:
-        params["period_days"] = period_days
-    return RoutedTool("training_activity", params)
+    return _training(_Question(question, _unit_path_params(question)))
 
 
 @dataclass(frozen=True, slots=True)

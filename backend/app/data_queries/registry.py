@@ -21,9 +21,6 @@ from app.connectors.base import SourceRecord
 from app.data_queries.errors import ToolParamError
 from app.data_queries.tools import TOOLS, ToolResult
 
-# name -> tool, filled as the domain modules in app.data_queries.tools are imported.
-REGISTRY = TOOLS
-
 # The policy decisions a caller needs before a tool runs. Tools read source records;
 # correlation_findings reads our own findings store, which `query` on records does not cover.
 _RECORD_QUERY: tuple[Requirement, ...] = (("query", "record"),)
@@ -67,7 +64,7 @@ def sanitize_params(params: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def execute_tool(scope: Scope, name: str, params: Mapping[str, Any]) -> ToolOutcome:
-    tool = REGISTRY.get(name)
+    tool = TOOLS.get(name)
     try:
         if tool is None:
             raise ToolParamError("unknown tool")

@@ -147,10 +147,10 @@ def test_bad_params_are_refused_with_a_denied_audit_event(client, app_engine, to
     outcome, _ = run_tool(app_engine, ctx, tool, params)
     assert outcome.refused and outcome.result is None
     with pytest.raises(ToolParamError):
-        from app.data_queries.registry import REGISTRY
+        from app.data_queries.tools import TOOLS
 
         with scoped(app_engine, ctx) as scope:
-            REGISTRY[tool](scope, params)
+            TOOLS[tool](scope, params)
 
 
 # --- routing ----------------------------------------------------------------

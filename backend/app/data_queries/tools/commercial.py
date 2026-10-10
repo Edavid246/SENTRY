@@ -9,10 +9,18 @@ from typing import Any
 
 from app.authz.scope import Scope
 from app.clock import demo_today
-from app.data_queries.errors import ToolParamError
-from app.data_queries.tools.base import Table, column, columns, given, matching, search, tool
+from app.data_queries.tools.base import (
+    Table,
+    choice,
+    column,
+    columns,
+    given,
+    matching,
+    search,
+    tool,
+)
 
-CONTRACT_STATUSES = frozenset({"active", "at_risk", "completed"})
+CONTRACT_STATUSES = ("active", "at_risk", "completed")
 _CLIENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .&-]{0,39}$")
 _CLIENT_MESSAGE = "client is not a valid client name"
 
@@ -51,9 +59,7 @@ def deliveries_overdue(scope: Scope, params: Mapping[str, Any], unit_path: str) 
 def contracts_status(scope: Scope, params: Mapping[str, Any], unit_path: str) -> Table:
     """Contracts the caller may see, optionally for one client and/or one status."""
     client = matching(params.get("client"), _CLIENT_RE, _CLIENT_MESSAGE)
-    status = params.get("status")
-    if status is not None and status not in CONTRACT_STATUSES:
-        raise ToolParamError("status must be 'active', 'at_risk' or 'completed'")
+    status = choice(params.get("status"), "status", CONTRACT_STATUSES)
     records = [
         r
         for r in search(scope, "Contract", unit_path)

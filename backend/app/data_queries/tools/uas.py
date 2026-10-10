@@ -10,12 +10,12 @@ from typing import Any
 from app.authz.scope import Scope
 from app.clock import UTC_TS_FORMAT, demo_now, demo_today
 from app.connectors.base import SourceRecord
-from app.data_queries.errors import ToolParamError
 from app.data_queries.tools.base import (
     MAX_WITHIN_DAYS,
     Table,
     bounded_int,
     checked_state,
+    choice,
     columns,
     given,
     matching,
@@ -27,16 +27,14 @@ from app.data_queries.tools.base import (
 MAX_PERIOD_HOURS = 24 * 30
 DEFAULT_DETECTION_HOURS = 48
 DEFAULT_MISSION_DAYS = 30
-MISSION_STATUSES = frozenset({"completed", "cancelled"})
+MISSION_STATUSES = ("completed", "cancelled")
 _SITE_RE = re.compile(r"^(?:DEP-[A-Z0-9]{1,8}|UAS-HANGAR)$")
 
 
 @tool("status", "period_days", "state")
 def uas_missions(scope: Scope, params: Mapping[str, Any], unit_path: str) -> Table:
     """UAS missions dated in the last `period_days` (default 30), optionally by status."""
-    status = params.get("status")
-    if status is not None and status not in MISSION_STATUSES:
-        raise ToolParamError("status must be 'completed' or 'cancelled'")
+    status = choice(params.get("status"), "status", MISSION_STATUSES)
     state = checked_state(params.get("state"))
     period_days = bounded_int(
         params.get("period_days", DEFAULT_MISSION_DAYS), "period_days", 1, MAX_WITHIN_DAYS

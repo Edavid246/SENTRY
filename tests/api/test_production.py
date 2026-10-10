@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 from app.data_queries.errors import ToolParamError
-from app.data_queries.registry import REGISTRY
 from app.data_queries.routing import route_question
+from app.data_queries.tools import TOOLS
 from scoped import run_tool, scoped
 from test_assistant_endpoints import _ask
 from test_connected_data import _ctx, explain_calls  # noqa: F401
@@ -100,7 +100,7 @@ def test_bad_params_are_refused_with_a_denied_audit_event(client, app_engine, to
     outcome, _ = run_tool(app_engine, ctx, tool, params)
     assert outcome.refused and outcome.result is None
     with pytest.raises(ToolParamError), scoped(app_engine, ctx) as scope:
-        REGISTRY[tool](scope, params)
+        TOOLS[tool](scope, params)
 
 
 @pytest.mark.parametrize(

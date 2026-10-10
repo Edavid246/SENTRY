@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 from app.data_queries.errors import ToolParamError
-from app.data_queries.registry import REGISTRY
+from app.data_queries.tools import TOOLS
 from app.geo.states import STATES, check_state
 from scoped import run_tool, scoped
 from test_auth_endpoints import auth_header
@@ -88,7 +88,7 @@ def test_replay_state_filter(client) -> None:
 
 def _rows(app_engine, ctx, tool, params):
     with scoped(app_engine, ctx) as scope:
-        return {row["id"] for row in REGISTRY[tool](scope, params).rows}
+        return {row["id"] for row in TOOLS[tool](scope, params).rows}
 
 
 def test_tools_filter_by_state_without_widening(client, app_engine) -> None:
@@ -118,4 +118,4 @@ def test_tools_refuse_an_unknown_state_with_a_denied_audit_event(
     outcome, _ = run_tool(app_engine, ctx, tool, {"state": state})
     assert outcome.refused and outcome.result is None
     with pytest.raises(ToolParamError), scoped(app_engine, ctx) as scope:
-        REGISTRY[tool](scope, {"state": state})
+        TOOLS[tool](scope, {"state": state})

@@ -130,6 +130,16 @@ def matching(value: Any, pattern: re.Pattern[str], message: str) -> str | None:
     return value
 
 
+def choice(value: Any, name: str, allowed: tuple[str, ...]) -> str | None:
+    """An optional parameter that must be one of `allowed`; the refusal lists them in order."""
+    if value is None:
+        return None
+    if value not in allowed:
+        quoted = [f"'{item}'" for item in allowed]
+        raise ToolParamError(f"{name} must be {', '.join(quoted[:-1])} or {quoted[-1]}")
+    return value
+
+
 def checked_state(value: Any) -> str | None:
     try:
         return check_state(value)
