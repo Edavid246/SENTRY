@@ -91,8 +91,8 @@ def test_the_owner_gets_the_planted_break_through_the_assistant(client, explain_
     response = _ask(client, "owner", "Which evidence has a custody break?")
     assert response.status_code == 200
     body = response.json()
-    assert [row["id"] for row in body["result_table"]["rows"]] == ["REC-112"]
-    row = body["result_table"]["rows"][0]
+    assert [row["id"] for row in body["result_table"]["rows"]] == ["REC-108", "REC-112"]
+    row = body["result_table"]["rows"][1]
     assert (row["evidence_ref"], row["recorded_holder"], row["expected_holder"]) == (
         "EV-017-01",
         "Courier R. Bala",

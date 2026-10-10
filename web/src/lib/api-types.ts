@@ -744,9 +744,15 @@ export interface components {
             prepared_for: string;
             /** Banner */
             banner: string;
-            /** Marking */
+            /**
+             * Marking
+             * @description banner text: the level as the UI names it, then compartments
+             */
             marking: string;
-            /** Classification */
+            /**
+             * Classification
+             * @description the internal classification code, not the UI name
+             */
             classification: string;
             /** Compartments */
             compartments: string[];
@@ -969,8 +975,8 @@ export interface components {
         };
         /** RunResult */
         RunResult: {
-            /** Analysis */
-            analysis: string;
+            /** Analyses */
+            analyses: string[];
             /** Findings */
             findings: components["schemas"]["FindingOut"][];
         };

@@ -38,9 +38,9 @@ def test_giga_sections_for_the_owner(client) -> None:
         "maintenance",
         "certifications",
     ]
-    # open cases first, then closed; the broken case is the flagged one
+    # open cases first, then closed; the two cases with a custody break are flagged
     assert _refs(sections["cases"]) == ["REC-007", "REC-098", "REC-099"]
-    assert [r["flagged"] for r in sections["cases"]["rows"]] == [False, True, False]
+    assert [r["flagged"] for r in sections["cases"]["rows"]] == [True, True, False]
     assert _refs(sections["evidence"]) == [
         "REC-104",  # EV-009-01
         "REC-061",  # EV-014-01
@@ -49,8 +49,9 @@ def test_giga_sections_for_the_owner(client) -> None:
         "REC-102",  # EV-017-01 carries the break
         "REC-103",
     ]
-    assert _refs(sections["custody-breaks"]) == ["REC-112"]
-    assert sections["custody-breaks"]["rows"][0]["href"] == "/cases/FR-2026-017"
+    assert _refs(sections["custody-breaks"]) == ["REC-108", "REC-112"]  # by date
+    assert sections["custody-breaks"]["rows"][0]["href"] == "/cases/FR-2026-014"
+    assert sections["custody-breaks"]["rows"][1]["href"] == "/cases/FR-2026-017"
     assert sections["cases"]["rows"][1]["href"] == "/cases/FR-2026-017"
 
 
@@ -58,13 +59,15 @@ def test_forensic_sections_inherit_the_highest_label(client) -> None:
     sections = _sections(client, "owner")
     assert sections["cases"]["classification"] == "secret"
     assert sections["cases"]["compartments"] == ["FORENSICS"]
-    assert sections["custody-breaks"]["classification"] == "confidential"
+    # REC-108 sits in the Secret case, so the section as a whole is Secret
+    assert sections["custody-breaks"]["classification"] == "secret"
 
 
 def test_the_giga_card_counts_custody_breaks(client) -> None:
     cards = {c["key"]: c for c in _get(client, "owner", "home/summary").json()["divisions"]}
     parts = {p["what"]: p["count"] for p in cards["giga"]["alert"]["parts"]}
-    assert parts == {"deliveries overdue": 1, "custody breaks": 1}
+    parts.pop("findings open", None)  # present only once some test has run the correlation job
+    assert parts == {"deliveries overdue": 1, "custody breaks": 2}
 
 
 def test_case_view_with_the_planted_break(client) -> None:
@@ -82,7 +85,7 @@ def test_case_view_with_the_planted_break(client) -> None:
 def test_case_view_is_a_derived_item_and_inherits_labels(client) -> None:
     secret = _get(client, "owner", "cases/FR-2026-014").json()
     assert (secret["classification"], secret["compartments"]) == ("secret", ["FORENSICS"])
-    assert secret["breaks"] == 0
+    assert secret["breaks"] == 1  # EV-014-02 reaches the lab from a courier who never held it
     confidential = _get(client, "owner", "cases/FR-2026-009").json()
     assert confidential["classification"] == "confidential"
     # the trail is date-ordered: seized, to the lab, then handed back

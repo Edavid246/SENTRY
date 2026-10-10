@@ -11,7 +11,9 @@ from app.seed.records.common import _GIGA
 # takes its case's classification, so a derived view inherits the highest of them. Dates are fixed
 # (a custody trail is history, not a deadline). The sha256 values are hashes of the item reference,
 # not of any real content. FR-2026-017 has a planted break: EV-017-01 reaches the lab from a
-# courier who never took it from the examiner who last held it.
+# courier who never took it from the examiner who last held it. FR-2026-014 repeats it: EV-014-02
+# also reaches the lab from that courier, who never took it from the examiner (REC-108), so the
+# correlation job can flag the same hand-over breaking custody in two cases.
 _FORENSIC = "forensics-demo"
 
 
@@ -151,7 +153,7 @@ RECORDS = [
         "FR-2026-014",
         "transferred to lab",
         "2026-06-04",
-        "A. Danjuma",
+        "Courier R. Bala",
         _LS1,
         "secret",
     ),

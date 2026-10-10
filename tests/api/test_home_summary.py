@@ -48,11 +48,16 @@ def test_owner_alert_counts_come_from_the_typed_tools(client) -> None:
     counts = {
         key: {p["what"]: p["count"] for p in card["alert"]["parts"]} for key, card in cards.items()
     }
-    assert counts["poctova"] == {"deliveries overdue": 2, "production runs on QC hold": 1}
-    assert counts["giga"] == {"deliveries overdue": 1, "custody breaks": 1}
+    assert counts["poctova"] == {
+        "deliveries overdue": 2,
+        "production runs on QC hold": 1,
+        "findings open": 1,
+    }
+    assert counts["giga"] == {"deliveries overdue": 1, "custody breaks": 2, "findings open": 1}
     assert counts["stratoc"]["findings open"] == 1
     assert counts["field-ops"] == {"equipment overdue": 1, "stock lines short": 1}
-    assert cards["briech"]["alert"]["count"] == 9
+    assert counts["briech"]["findings open"] == 1  # the QC hold behind the overdue airframes
+    assert cards["briech"]["alert"]["count"] == 10
 
 
 def test_alert_is_a_derived_item_and_inherits_the_highest_label(client) -> None:
@@ -79,7 +84,7 @@ def test_a_division_the_caller_cannot_see_is_absent(client) -> None:
 def test_restricted_callers_get_smaller_counts_and_lower_labels(client) -> None:
     owner = _cards(client, "owner")["briech"]["alert"]
     lead = _cards(client, "briech.lead")["briech"]["alert"]
-    assert lead["count"] == 5 < owner["count"]
+    assert lead["count"] == 6 < owner["count"]
     assert lead["classification"] == "confidential"
     assert "FORENSICS" not in lead["compartments"]
 
@@ -107,6 +112,6 @@ def test_read_and_denial_are_audited(client) -> None:
     decide = _latest(events, actor="briech.lead", action="decide", resource="dashboard")
     query = _latest(events, actor="briech.lead", action="query", resource="dashboard")
     assert decide["payload"]["decision"] == "allow"
-    assert query["payload"]["rows"] == 5 and len(query["payload"]["item_ids"]) == 5
+    assert query["payload"]["rows"] == 6 and len(query["payload"]["item_ids"]) == 6
     deny = _latest(events, actor="group.it", action="decide", resource="dashboard")
     assert deny["payload"]["decision"] == "deny"

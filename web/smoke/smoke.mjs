@@ -175,7 +175,7 @@ try {
   check((await page.locator('[data-testid="item-FND-RISING-FAULTS-SITE-4"]').count()) === 1, "owner sees the Secret finding after running correlation");
   const ownerItems = await page.locator('[data-testid^="item-"]').count();
   await shot("13-dashboard-owner");
-  await page.click('[data-testid="finding-link"]');
+  await page.click('[data-testid="item-FND-RISING-FAULTS-SITE-4"] [data-testid="finding-link"]');
   await page.waitForSelector('[data-testid="finding-detail"]');
   const evidence = await page.locator('[data-testid="evidence-link"]').count();
   check(evidence === 10, `finding detail lists its evidence (${evidence} records)`);
@@ -184,6 +184,11 @@ try {
   await page.locator('[data-testid="evidence-link"]').first().click();
   await page.waitForSelector('[data-testid="record-detail"]');
   check(true, "an evidence link opens the record");
+  // the Findings page lists every finding the owner may see, across divisions
+  await page.click('a[href="/findings"]');
+  await page.waitForSelector('[data-testid="findings-list"]');
+  const listed = await page.locator('[data-testid="findings-list"] > li').count();
+  check(listed === 4, `the Findings page lists the four findings (${listed})`);
   await page.click('a[href="/dashboard"]');
   await page.waitForSelector('[data-testid="tile-recent_findings"]');
   await page.click('a[href="/chat"]');
