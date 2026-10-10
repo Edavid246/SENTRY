@@ -382,3 +382,14 @@ end-of-step report. Never silently log it.
   query, backed by RLS) is the real one and is covered by tests/authz.
 - **Production needs:** agreed client-to-compartment mapping, a grant/revoke process with
   approval and audit, and review of cross-client aggregates such as the dashboard tile counts.
+
+## 2026-10-10 — Exported reports leave the system
+
+- **Issue:** a division report can be exported as PDF or DOCX. The file carries its derived marking in the
+  header and footer of every page and a DRAFT banner, and the export is audited (who, division, format,
+  records, marking), but once downloaded the file is outside every control the gateway has: no watermark
+  naming the recipient, no expiry, no copy control, no check that the destination may hold the marking.
+- **Why acceptable:** demo data only; the audit trail and the marking are the real mechanism.
+- **Production needs:** a release rule per classification and compartment (who may export what, and where
+  to), recipient watermarking, a retention rule for exported files, and review of whether secret or
+  compartmented reports may be exported at all.

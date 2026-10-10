@@ -22,7 +22,7 @@ mkdirSync(shots, { recursive: true });
 const saved = [];
 
 const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || "msedge" });
-const page = await (await browser.newContext({ viewport: { width: 1920, height: 1080 } })).newPage();
+const page = await (await browser.newContext({ viewport: { width: 1920, height: 1080 }, acceptDownloads: true })).newPage();
 page.setDefaultTimeout(60000);
 // Air-gap: record every request that leaves this machine (the basemap included).
 const external = [];
@@ -140,6 +140,15 @@ try {
   await page.waitForSelector('[data-testid="case-title"]');
   check((await page.locator('[data-testid="custody-break"]').count()) === 1, "the case page marks the one custody break");
   await shot("12g-case-workspace");
+  await page.goto(BASE + "/d/briech");
+  await page.click('[data-testid="open-report"]');
+  await page.waitForSelector('[data-testid="report-banner"]');
+  check((await page.textContent('[data-testid="report-banner"]')).includes("DRAFT FOR HUMAN REVIEW"), "the division report is marked as a draft");
+  const [pdf] = await Promise.all([page.waitForEvent("download"), page.click('[data-testid="export-pdf"]')]);
+  check(pdf.suggestedFilename() === "briech-status-report-DRAFT.pdf", "the report exports as a PDF");
+  const [docx] = await Promise.all([page.waitForEvent("download"), page.click('[data-testid="export-docx"]')]);
+  check(docx.suggestedFilename().endsWith(".docx"), "the report exports as a Word file");
+  await shot("12h-division-report");
 
   // phone width: the shell collapses (menu + bottom tabs) and nothing scrolls sideways
   await page.setViewportSize({ width: 390, height: 844 });

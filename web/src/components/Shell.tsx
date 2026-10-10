@@ -48,7 +48,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }
 
   const nav = [
-    { href: "/home", label: "Home", icon: <IconOrg />, show: can("read"), also: ["/d/", "/cases/"] },
+    { href: "/home", label: "Home", icon: <IconOrg />, show: can("read"), also: ["/d/", "/cases/", "/reports/"] },
     { href: "/dashboard", label: "Overview", icon: <IconDashboard />, show: can("read") },
     { href: "/compliance", label: "Compliance", icon: <IconShield />, show: can("read") },
     { href: "/chat", label: "Assistant", icon: <IconChat />, show: true },

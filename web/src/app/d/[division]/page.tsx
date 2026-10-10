@@ -116,9 +116,16 @@ export default function DivisionPage() {
                   division={current.key}
                   className="pointer-events-none absolute -bottom-6 right-2 h-40 w-40 text-rule"
                 />
-                <h1 data-testid="division-title" className="relative text-[2rem] font-medium tracking-[0.02em]">
-                  {current.name}
-                </h1>
+                <div className="relative flex flex-wrap items-start justify-between gap-4">
+                  <h1 data-testid="division-title" className="text-[2rem] font-medium tracking-[0.02em]">
+                    {current.name}
+                  </h1>
+                  {view && view.sections.length > 0 && (
+                    <Link href={`/reports/${current.key}`} data-testid="open-report" className="btn">
+                      Prepare report
+                    </Link>
+                  )}
+                </div>
                 <p className="relative mt-1 text-[0.95rem] text-sage">{current.tagline}</p>
                 <p className="relative mt-4 text-[0.9rem]">
                   {current.alert ? (

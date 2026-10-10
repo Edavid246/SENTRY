@@ -20,6 +20,7 @@ export type DivisionView = Schemas["DivisionView"];
 export type DivisionSection = Schemas["Section"];
 export type ComplianceView = Schemas["ComplianceView"];
 export type CaseView = Schemas["CaseView"];
+export type DivisionReport = Schemas["DivisionReportOut"];
 export type SectionRow = Schemas["SectionRow"];
 
 // These endpoints return free-form dicts in OpenAPI, so their shapes are
@@ -191,6 +192,8 @@ export const api = {
   home: () => request<HomeSummary>("/home/summary"),
   division: (key: string) => request<DivisionView>(`/divisions/${encodeURIComponent(key)}`),
   forensicCase: (caseRef: string) => request<CaseView>(`/cases/${encodeURIComponent(caseRef)}`),
+  divisionReport: (key: string) =>
+    request<DivisionReport>(`/reports/${encodeURIComponent(key)}`),
   compliance: () => request<ComplianceView>("/compliance"),
   serialTrace: (key: string, serial: string) =>
     request<DivisionSection>(
@@ -204,3 +207,20 @@ export const api = {
     ),
   verify: () => request<VerifyReport>("/audit/verify"),
 };
+
+// The export is a file, not JSON: fetched with the same bearer token, then handed to the browser
+// as a download. The server writes an audit event for every export.
+export async function downloadReport(key: string, format: "pdf" | "docx"): Promise<void> {
+  const bearer = readToken();
+  const res = await fetch(`/api/v1/reports/${encodeURIComponent(key)}/export?format=${format}`, {
+    headers: bearer ? { Authorization: `Bearer ${bearer}` } : {},
+  });
+  if (!res.ok) throw new ApiError(res.status, res.statusText);
+  const name = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1];
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name ?? `report.${format}`;
+  link.click();
+  URL.revokeObjectURL(url);
+}

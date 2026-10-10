@@ -435,16 +435,26 @@ def _facts(key: str, sections: list[Section], names: Mapping[str, str], caller: 
     ]
 
 
+def build_division(
+    scope: Scope, conn: Any, key: str
+) -> tuple[Any, list[Section], list[Fact], Labels]:
+    """The division and its sections, run as audited typed tools for the caller (404 if hidden).
+
+    Shared by the dashboard and the report, so a report can never show more than the page does.
+    """
+    names = unit_names(conn)
+    division, unit_path, keep = _division(key, scope, names)
+    labels = Labels.load(conn)
+    sections = [
+        _build(labels, s, _run(scope, s, unit_path), keep, names) for s in SECTIONS.get(key, ())
+    ]
+    return division, sections, _facts(key, sections, names, scope.ctx.unit_path), labels
+
+
 @router.get("/{key}", response_model=DivisionView)
 def division_view(key: str, ctx: CurrentContext, conn: ConnDep) -> DivisionView:
     with guarded(ctx, conn, "read", "dashboard", on_deny="not_found") as scope:
-        names = unit_names(conn)
-        division, unit_path, keep = _division(key, scope, names)
-        labels = Labels.load(conn)
-        sections = [
-            _build(labels, s, _run(scope, s, unit_path), keep, names) for s in SECTIONS.get(key, ())
-        ]
-        facts = _facts(key, sections, names, scope.ctx.unit_path)
+        division, sections, facts, _labels = build_division(scope, conn, key)
         scope.read(
             "dashboard",
             sum(len(s.rows) for s in sections),

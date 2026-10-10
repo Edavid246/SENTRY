@@ -40,11 +40,17 @@ extract of the demo area, served by the web app (`web/public/basemap/README.md`)
 
 ## Demo-only tooling
 
-`reportlab` and `python-docx` are used **only** by
-`scripts/generate_demo_documents.py` to write the fictitious DOC-201..204
-corpus (the generated files and manifest are committed). Runtime ingestion
-parses PDF/DOCX with `pypdf`/`python-docx` only; `reportlab` is not needed at
-runtime and should not ship in a production image.
+`reportlab` is also a **runtime** dependency since Phase E: division reports export to PDF with it, and to
+DOCX with `python-docx` (`backend/app/reporting/export.py`). Both run in-process on the standard fonts and
+fetch nothing. `scripts/generate_demo_documents.py` still uses them to write the fictitious DOC-201..204
+corpus (the generated files and manifest are committed).
+
+## Division reports
+
+Reports are deterministic: the rows of the division dashboard, set out as a document, with the DRAFT banner,
+the derived marking and the source list. No model writes any of it, so nothing in it can be invented.
+Swap point: a model-drafted narrative over the same rows, through `LLMProvider`, with the citation checks of
+`app/reporting/training.py`. There is no approval flow; people review and decide.
 
 ## Archived accounts
 

@@ -360,6 +360,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Report View */
+        get: operations["report_view_api_v1_reports__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{key}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Report Export */
+        get: operations["report_export_api_v1_reports__key__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/correlation/run": {
         parameters: {
             query?: never;
@@ -696,6 +730,43 @@ export interface components {
             overdue_deliveries: components["schemas"]["DashboardTile"];
             recent_findings: components["schemas"]["DashboardTile"];
         };
+        /** DivisionReportOut */
+        DivisionReportOut: {
+            /** Division */
+            division: string;
+            /** Title */
+            title: string;
+            /** Tagline */
+            tagline: string;
+            /** Generated At */
+            generated_at: string;
+            /** Prepared For */
+            prepared_for: string;
+            /** Banner */
+            banner: string;
+            /** Marking */
+            marking: string;
+            /** Classification */
+            classification: string;
+            /** Compartments */
+            compartments: string[];
+            /** Facts */
+            facts: [
+                string,
+                string
+            ][];
+            /** Summary */
+            summary: string[];
+            /** Sections */
+            sections: components["schemas"]["ReportSectionOut"][];
+            /**
+             * Refs
+             * @description every record reference the report was built from
+             */
+            refs: string[];
+            /** Notice */
+            notice: string;
+        };
         /** DivisionView */
         DivisionView: {
             /** Key */
@@ -862,6 +933,30 @@ export interface components {
             record_ids: string[];
             /** Document Refs */
             document_refs: string[];
+        };
+        /** ReportRowOut */
+        ReportRowOut: {
+            /** Label */
+            label: string;
+            /** Detail */
+            detail: string;
+            /** Ref */
+            ref: string;
+            /** Flagged */
+            flagged: boolean;
+        };
+        /** ReportSectionOut */
+        ReportSectionOut: {
+            /** Title */
+            title: string;
+            /** Empty Text */
+            empty_text: string;
+            /** Flagged */
+            flagged: number;
+            /** Marking */
+            marking: string | null;
+            /** Rows */
+            rows: components["schemas"]["ReportRowOut"][];
         };
         /** ResultTable */
         ResultTable: {
@@ -1559,6 +1654,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CaseView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_view_api_v1_reports__key__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DivisionReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_export_api_v1_reports__key__export_get: {
+        parameters: {
+            query: {
+                format: "pdf" | "docx";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

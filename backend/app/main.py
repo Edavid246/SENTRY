@@ -11,6 +11,7 @@ from app.api.divisions import compliance_router
 from app.api.divisions import router as divisions_router
 from app.api.endpoints import router as api_router
 from app.api.home import router as home_router
+from app.api.reports import router as reports_router
 from app.config import get_settings
 
 
@@ -28,6 +29,7 @@ def create_app() -> FastAPI:
     application.include_router(divisions_router)
     application.include_router(compliance_router)
     application.include_router(cases_router)
+    application.include_router(reports_router)
     application.include_router(correlation_router)
     application.include_router(connected_router)
 
