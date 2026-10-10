@@ -166,7 +166,7 @@ try {
   await page.waitForSelector('[data-testid="division-briech"]');
 
   // overview: every stub tile is tagged; the Secret finding is shown
-  await page.click('a[href="/dashboard"]');
+  await page.goto(BASE + "/dashboard"); // no menu entry any more
   await page.waitForSelector('[data-testid="tile-recent_findings"]');
   check((await page.locator('[data-testid="placeholder-tag"]').count()) === 0, "no tile is tagged placeholder: every tile is counted from typed tools");
   // the finding exists once a commander runs the correlation job
@@ -189,7 +189,7 @@ try {
   await page.waitForSelector('[data-testid="findings-list"]');
   const listed = await page.locator('[data-testid="findings-list"] > li').count();
   check(listed === 4, `the Findings page lists the four findings (${listed})`);
-  await page.click('a[href="/dashboard"]');
+  await page.goto(BASE + "/dashboard"); // no menu entry any more
   await page.waitForSelector('[data-testid="tile-recent_findings"]');
   await page.click('a[href="/chat"]');
   await page.waitForURL("**/chat");
@@ -254,7 +254,7 @@ try {
   await page.goto(BASE + "/d/briech");
   await page.waitForSelector('[data-testid="division-not-found"]');
   check(true, "coo gets 'not found' for a division outside their unit");
-  await page.click('a[href="/dashboard"]');
+  await page.goto(BASE + "/dashboard"); // no menu entry any more
   await page.waitForSelector('[data-testid="tile-recent_findings"]');
   check((await page.locator('[data-testid="finding-link"]').count()) === 0, "coo does not see the Secret finding");
   check((await page.locator('[data-testid="run-correlation"]').count()) === 0, "coo has no run-correlation button");

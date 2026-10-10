@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "@/lib/session";
 import { Clock } from "./Clock";
 import { Emblem } from "./Emblem";
-import { IconChat, IconDashboard, IconEye, IconLog, IconLogout, IconMap, IconOrg } from "./Icons";
+import { IconChat, IconEye, IconLog, IconLogout, IconMap, IconOrg } from "./Icons";
 
 function Segment({
   icon,
@@ -48,7 +48,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   const nav = [
     { href: "/home", label: "Home", icon: <IconOrg />, show: can("read"), also: ["/d/", "/cases/", "/reports/"] },
-    { href: "/dashboard", label: "Overview", icon: <IconDashboard />, show: can("read") },
     { href: "/findings", label: "Findings", icon: <IconEye />, show: can("read") },
     { href: "/chat", label: "Assistant", icon: <IconChat />, show: true },
     { href: "/map", label: "Map", icon: <IconMap />, show: can("read") },
