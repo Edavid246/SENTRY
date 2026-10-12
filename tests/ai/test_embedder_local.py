@@ -11,10 +11,6 @@ from app.ai_gateway import LocalEmbeddingProvider, ProviderNotConfiguredError
 WEIGHTS = (
     Path(__file__).resolve().parents[2] / "data" / "models" / "models--Xenova--bge-m3" / "snapshots"
 )
-pytestmark = pytest.mark.skipif(
-    not any(WEIGHTS.glob("*/onnx/model_int8.onnx")),
-    reason="embedding weights not present under data/models (download or image bake)",
-)
 
 SENTENCE_A = "Vehicle maintenance requires servicing every 500 operating hours."
 SENTENCE_B = "The vehicle maintenance policy defines scheduled servicing intervals."
@@ -24,6 +20,9 @@ SENTENCE_C = "Runway condition normal, no active restrictions at airfield alpha.
 @pytest.fixture(scope="module")
 def embedder() -> LocalEmbeddingProvider:
     from app.config import get_settings
+
+    if not any(WEIGHTS.glob("*/onnx/model_int8.onnx")):
+        pytest.skip("embedding weights not present under data/models (download or image bake)")
 
     settings = get_settings()
     return LocalEmbeddingProvider(

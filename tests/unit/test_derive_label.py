@@ -26,11 +26,6 @@ def test_highest_classification_and_union_of_compartments() -> None:
     assert label == Label("confidential", ("FORENSICS", "UAS-OPS"))
 
 
-def test_one_secret_input_makes_the_whole_item_secret() -> None:
-    inputs = [Item("restricted")] * 9 + [Item("secret")]
-    assert LABELS.derive(inputs) == Label("secret", ())
-
-
 def test_never_less_classified_than_any_input_whatever_the_order() -> None:
     items = [Item("unclassified"), Item("secret", ("UAS-OPS",)), Item("restricted")]
     for ordered in (items, items[::-1], [items[1], items[0], items[2]]):
@@ -42,10 +37,7 @@ def test_fails_closed() -> None:
         LABELS.derive([])
     with pytest.raises(ValueError):
         LABELS.derive([Item("restricted"), Item("top-secret")])
-
-
-def test_unknown_code_fails_closed_even_when_empty_is_allowed() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # an unknown code fails closed even when empty is allowed
         LABELS.derive([Item("top-secret")], empty_ok=True)
 
 

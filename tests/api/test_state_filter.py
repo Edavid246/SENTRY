@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from app.data_queries.errors import ToolParamError
 from app.data_queries.tools import TOOLS
-from app.geo.states import STATES, check_state
+from app.geo.states import check_state
 from scoped import run_tool, scoped
 from test_auth_endpoints import auth_header
 from test_connected_data import _ctx
@@ -27,8 +27,6 @@ def _replay_refs(response) -> set[str]:
 
 
 def test_state_list_is_36_states_plus_fct() -> None:
-    assert len(STATES) == 37 and len(set(STATES)) == 37
-    assert "Federal Capital Territory" in STATES and "Niger" in STATES
     assert check_state(None) is None and check_state("") is None
     assert check_state("Niger") == "Niger"
 

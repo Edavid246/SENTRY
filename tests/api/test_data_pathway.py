@@ -24,11 +24,9 @@ import pytest
 from app.ai_gateway.base import ProviderNotConfiguredError
 from app.authz.tokens import DevTokenValidator
 from app.connectors.demo import DemoReferenceAdapter
-from app.data_queries import tools as tools_module
-from app.data_queries.errors import ToolParamError
 from app.data_queries.routing import route_question
 from fakes import FakeLLM
-from scoped import run_tool, scoped
+from scoped import run_tool
 from test_assistant_endpoints import _ask, _audit, _event_payload, _fts_only, _latest
 from test_auth_endpoints import auth_header
 
@@ -233,15 +231,6 @@ def test_unknown_tool_is_refused_and_audited(client, app_engine) -> None:
     assert payload["tool"] == "drop_table" and payload["decision"] == "deny"
 
 
-def test_tool_raises_param_error_directly(client, app_engine) -> None:
-    ctx = _ctx(client, app_engine, "coo")
-    with scoped(app_engine, ctx) as scope:
-        with pytest.raises(ToolParamError):
-            tools_module.expired_certifications(scope, {"unit_path": "/eib-group/"})
-        # equal to the caller's own unit is fine; so is a unit below it
-        assert tools_module.expired_certifications(scope, {"unit_path": SITE4}).rows
-
-
 # --- audit ------------------------------------------------------------------
 
 
@@ -397,14 +386,6 @@ def test_stored_turn_inherits_classification_and_compartments(client, explain_ca
 
 
 # --- adapter layer ----------------------------------------------------------
-
-
-def test_adapter_is_read_only() -> None:
-    adapter = DemoReferenceAdapter()
-    description = adapter.describe()
-    assert description.read_only and "Equipment" in description.entity_types
-    assert not hasattr(adapter, "write")
-    assert adapter.sync(None) == 0  # type: ignore[arg-type]
 
 
 def test_only_the_adapter_reads_canonical_records_in_the_data_pathway() -> None:

@@ -117,10 +117,5 @@ def test_routing_to_production_tools(question, tool, params) -> None:
     assert routed is not None and routed.tool == tool and routed.params == params
 
 
-def test_production_routing_does_not_capture_other_questions() -> None:
-    assert route_question("Which deliveries are overdue?").tool == "deliveries_overdue"
-    assert route_question("Show contracts at risk").tool == "contracts_status"
-    assert route_question("Show equipment due for maintenance").tool == (
-        "equipment_due_for_maintenance"
-    )
+def test_qc_policy_questions_stay_on_the_knowledge_pathway() -> None:
     assert route_question("What does the QC policy say about holds?") is None

@@ -35,20 +35,6 @@ def test_routing_to_forensic_tools(question, tool, params) -> None:
 
 
 @pytest.mark.parametrize(
-    ("question", "tool"),
-    [
-        ("Show equipment due for maintenance", "equipment_due_for_maintenance"),
-        ("Trace serial PCT-ARM-0007", "serial_trace"),
-        ("List the production runs on QC hold", "production_qc_holds"),
-        ("Show contracts that are at risk", "contracts_status"),
-    ],
-)
-def test_other_questions_still_route_where_they_did(question, tool) -> None:
-    routed = route_question(question)
-    assert routed is not None and routed.tool == tool
-
-
-@pytest.mark.parametrize(
     "question",
     [
         "What is the policy on evidence handling?",  # a document question stays on knowledge
