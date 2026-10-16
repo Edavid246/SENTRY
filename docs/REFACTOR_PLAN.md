@@ -360,7 +360,9 @@ Tick a step when its commit is pushed; note the commit hash.
 - [x] 2.5 (659ee2a) Correlation rename and finding helper: `analysis.py` is `rising_faults.py`;
   `draft_finding()` in `correlation/types.py`; `FindingRow` extends `FindingDraft`. A run's full
   findings JSON (all four, minus `created_at`) is byte-identical before and after
-- [ ] 2.6 `reporting/marking.py` (+ D6)
+- [x] 2.6 (b444b7e) `reporting/marking.py` (+ D6): `DRAFT_BANNER` and `marking()` in one module, used by
+  both reports; the training draft's marking line prints display names (`tests/unit/test_report_marking.py`
+  fails on the code before this step). Prompt fingerprints unchanged
 - [ ] 3.1 `app/divisions/` package (then D3)
 - [ ] 3.2 Split `api/endpoints.py`
 - [ ] 3.3 Assistant ORM models
