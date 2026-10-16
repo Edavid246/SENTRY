@@ -1,7 +1,12 @@
 // Minimal stroke icons, inline so nothing is fetched at runtime.
-type P = { size?: number; className?: string };
+// The stroke is set in rendered pixels to match the weight of the text beside the icon
+// (regular 1.5px, medium 2px, bold 2.5px), whatever size the icon is drawn at.
+type Weight = "regular" | "medium" | "bold";
+type P = { size?: number; className?: string; weight?: Weight };
 
-function Svg({ size = 18, className, children }: P & { children: React.ReactNode }) {
+const STROKE_PX: Record<Weight, number> = { regular: 1.5, medium: 2, bold: 2.5 };
+
+function Svg({ size = 18, className, weight = "regular", children }: P & { children: React.ReactNode }) {
   return (
     <svg
       width={size}
@@ -9,7 +14,7 @@ function Svg({ size = 18, className, children }: P & { children: React.ReactNode
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth={(STROKE_PX[weight] * 24) / size}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"

@@ -11,6 +11,7 @@ import { ResultTableView } from "@/components/ResultTableView";
 import { PassagePanel, type PanelState } from "@/components/PassagePanel";
 import { IconArrow, IconPlus } from "@/components/Icons";
 import { fmtTs } from "@/lib/format";
+import { stagger } from "@/lib/motion";
 
 interface Meta {
   report?: ReportInfo | null;
@@ -30,6 +31,8 @@ interface Message {
   error?: boolean;
   /** Calm "recorded answers only" panel: model unavailable or no answer within the wait limit. */
   notice?: boolean;
+  /** Asked or answered in this sitting, so it enters; a reopened conversation just appears. */
+  fresh?: boolean;
 }
 
 // The demonstration answers its scripted questions from recorded answers. When the
@@ -121,7 +124,7 @@ function Thread({
           <article
             key={m.id}
             data-testid={`msg-${m.role}`}
-            className={`border ${m.role === "user" ? "border-rule bg-raised" : "border-rule bg-surface"}`}
+            className={`border ${m.role === "user" ? "border-rule bg-raised" : "border-rule bg-surface"} ${m.fresh ? "enter" : ""}`}
           >
             <div className="flex items-center justify-between border-b border-rule px-4 py-1.5">
               <span className="label">{m.role === "user" ? "You" : "Assistant"}</span>
@@ -194,7 +197,7 @@ function Thread({
         ))}
 
         {pending && (
-          <div data-testid="pending" role="status" className="border border-rule bg-surface">
+          <div data-testid="pending" role="status" className="enter border border-rule bg-surface" style={stagger(100)}>
             <div className="border-b border-rule px-4 py-1.5">
               <span className="label">Assistant</span>
             </div>
@@ -203,6 +206,7 @@ function Thread({
               <p className="mt-1 text-[0.8rem] text-mute">
                 Answers are not streamed. Elapsed {elapsed}s.
               </p>
+              <div aria-hidden className="scan mt-3" />
             </div>
           </div>
         )}
@@ -288,7 +292,7 @@ export default function ChatPage() {
     const question = text.trim();
     if (!question || pending || !canAsk) return;
     setInput("");
-    setMessages((m) => [...m, { id: nextId(), role: "user", content: question, citations: [] }]);
+    setMessages((m) => [...m, { id: nextId(), role: "user", content: question, citations: [], fresh: true }]);
     setPending(true);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), ASK_TIMEOUT_MS);
@@ -302,6 +306,7 @@ export default function ChatPage() {
           role: "assistant",
           content: res.answer,
           citations: res.citations,
+          fresh: true,
           meta: {
             found: res.found,
             degraded: res.degraded,
@@ -323,7 +328,7 @@ export default function ChatPage() {
           : "The request could not be completed. Please try again.";
       setMessages((m) => [
         ...m,
-        { id: nextId(), role: "assistant", content, citations: [], error: !calm, notice: calm },
+        { id: nextId(), role: "assistant", content, citations: [], error: !calm, notice: calm, fresh: true },
       ]);
     } finally {
       clearTimeout(timer);
@@ -342,14 +347,14 @@ export default function ChatPage() {
               type="button"
               onClick={newConversation}
               disabled={!canAsk}
-              className="btn flex w-full items-center justify-center gap-2"
+              className="btn flex w-full items-center justify-center gap-2 ps-3.5"
             >
               <IconPlus size={16} />
               New conversation
             </button>
           </div>
           <div className="label px-4 pb-2 pt-3">Conversations</div>
-          <ul data-testid="conversation-list" className="min-h-0 flex-1 overflow-y-auto">
+          <ul data-testid="conversation-list" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {conversations.map((c) => {
               const active = c.id === activeId;
               return (
@@ -421,9 +426,9 @@ export default function ChatPage() {
                 placeholder={canAsk ? "Ask a question. Enter to send, Shift+Enter for a new line." : "Assistant not available for this role"}
                 className="field resize-none"
               />
-              <button type="submit" disabled={!canAsk || pending || !input.trim()} className="btn-amber flex items-center gap-2">
+              <button type="submit" disabled={!canAsk || pending || !input.trim()} className="btn-amber flex items-center gap-2 pe-3.5">
                 Send
-                <IconArrow size={16} />
+                <IconArrow size={16} weight="bold" />
               </button>
             </div>
           </form>

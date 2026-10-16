@@ -51,6 +51,95 @@
   .tag {
     @apply inline-block border border-rule px-2 py-0.5 text-[0.75rem] uppercase tracking-[0.1em] text-ink;
   }
+
+  /* Press feedback. `scale` is its own property, so it never fights a transform utility. */
+  .btn,
+  .btn-amber {
+    transition-property: scale, border-color, background-color, color;
+    transition-duration: 150ms;
+    transition-timing-function: theme("transitionTimingFunction.out"), ease, ease, ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .btn:not(:disabled):active,
+    .btn-amber:not(:disabled):active {
+      scale: 0.96;
+    }
+  }
+
+  /* Entrances. Every one fades; movement, scale and blur join only without reduced motion.
+     The hidden state lives in the `from` keyframe and fills backwards, so it covers a stagger
+     delay, an element whose animation never runs stays visible, and nothing lingers after. */
+  .enter {
+    animation: fade-in 300ms theme("transitionTimingFunction.out") backwards;
+  }
+  .enter-panel,
+  .enter-modal,
+  .enter-backdrop {
+    animation: fade-in 250ms theme("transitionTimingFunction.out") backwards;
+  }
+  .enter-fade {
+    animation: fade-in 150ms theme("transitionTimingFunction.out") backwards;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .enter {
+      animation-name: rise-in;
+    }
+    .enter-panel {
+      animation-name: slide-in;
+    }
+    .enter-modal {
+      animation-name: scale-in;
+    }
+  }
+
+  /* Work in progress with no known length: a segment crossing a hairline at constant speed.
+     Under reduced motion it is gone; the elapsed-seconds text beside it carries the state. */
+  .scan {
+    @apply relative h-0.5 overflow-hidden bg-rule;
+  }
+  .scan::after {
+    @apply absolute inset-y-0 left-0 w-[30%] bg-amber;
+    content: "";
+    translate: -100% 0;
+    animation: scan 1.6s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .scan {
+      display: none;
+    }
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    translate: 0 12px;
+    filter: blur(4px);
+  }
+}
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    translate: 12px 0;
+  }
+}
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+/* The segment is 30% of the track, so 333% of its own width carries it fully off the right. */
+@keyframes scan {
+  to {
+    translate: 333.4% 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

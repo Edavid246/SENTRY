@@ -223,7 +223,7 @@ export default function MapPage() {
             </p>
           )}
         </div>
-        <aside className="min-h-0 flex-1 overflow-y-auto border-t border-rule bg-surface p-4 md:w-80 md:flex-none md:shrink-0 md:border-l md:border-t-0">
+        <aside className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-rule bg-surface p-4 md:w-80 md:flex-none md:shrink-0 md:border-l md:border-t-0">
           <h1 className="label">Connected sensors and UAS</h1>
           <p className="mt-1 text-[0.75rem] text-mute">
             Only what your clearance and compartments allow is returned by the API.

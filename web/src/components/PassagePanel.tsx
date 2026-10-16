@@ -15,7 +15,7 @@ export function PassagePanel({ state, onClose }: { state: PanelState; onClose: (
     <aside
       data-testid="passage-panel"
       aria-label="Cited passage"
-      className="fixed inset-0 z-40 flex shrink-0 flex-col bg-surface md:static md:z-auto md:w-[440px] md:border-l md:border-rule"
+      className="enter-panel fixed inset-0 z-40 flex shrink-0 flex-col bg-surface md:static md:z-auto md:w-[440px] md:border-l md:border-rule"
     >
       <div className="flex items-center justify-between border-b border-rule px-5 py-3">
         <div>
@@ -27,7 +27,7 @@ export function PassagePanel({ state, onClose }: { state: PanelState; onClose: (
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
         {state.status === "loading" && <p className="text-sage">Loading passage…</p>}
         {state.status === "missing" && (
           <p className="text-sage">This passage is not available to your clearance.</p>

@@ -112,7 +112,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <Clock />
             </span>
           </div>
-          <button type="button" onClick={logout} className="btn flex items-center gap-2">
+          <button type="button" onClick={logout} className="btn flex items-center gap-2 ps-3.5">
             <IconLogout size={16} />
             Log out
           </button>

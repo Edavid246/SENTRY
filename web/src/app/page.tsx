@@ -4,10 +4,17 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { homePath } from "@/lib/home";
+import { resetEntrances, stagger } from "@/lib/motion";
 import { useSession } from "@/lib/session";
 import { Clock } from "@/components/Clock";
 import { Emblem } from "@/components/Emblem";
 import { IconArrow, IconEye, IconEyeOff, IconLock, IconUser } from "@/components/Icons";
+
+// Icon cross-fade for an infrequent toggle. Under reduced motion only the opacity changes.
+const SWAP =
+  "[grid-area:1/1] transition-[opacity,filter,transform] duration-300 ease-swap motion-reduce:scale-100 motion-reduce:blur-[0px]";
+const SHOWN = "scale-100 opacity-100 blur-[0px]";
+const HIDDEN = "scale-[0.25] opacity-0 blur-[4px]";
 
 function Crosshair({ className }: { className: string }) {
   return (
@@ -44,6 +51,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       const signedIn = await login(username.trim(), password);
+      resetEntrances();
       router.replace(homePath(signedIn));
     } catch (err) {
       setError(
@@ -80,7 +88,8 @@ export default function LoginPage() {
         <Crosshair className="bottom-[22%] right-[14%]" />
 
         <div className="w-full max-w-[560px]">
-          <div className="border border-rule bg-surface">
+          {/* Sign-in is rare, so it gets the one staged entrance: card and title, form, footer. */}
+          <div className="enter border border-rule bg-surface">
             <div className="flex items-center gap-5 border-b border-rule px-8 py-6">
               <Emblem size={52} />
               <div>
@@ -89,7 +98,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <form onSubmit={submit} className="flex flex-col gap-5 px-8 py-7" noValidate>
+            <form onSubmit={submit} className="enter flex flex-col gap-5 px-8 py-7" style={stagger(100)} noValidate>
               <div>
                 <label htmlFor="username" className="label mb-2 block">
                   Username
@@ -133,13 +142,21 @@ export default function LoginPage() {
                     aria-label={reveal ? "Hide password" : "Show password"}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-sage hover:text-ink"
                   >
-                    {reveal ? <IconEyeOff size={18} /> : <IconEye size={18} />}
+                    {/* Both icons stay mounted in one cell and cross-fade. */}
+                    <span className="grid place-items-center">
+                      <span className={`${SWAP} ${reveal ? SHOWN : HIDDEN}`}>
+                        <IconEyeOff size={18} />
+                      </span>
+                      <span className={`${SWAP} ${reveal ? HIDDEN : SHOWN}`}>
+                        <IconEye size={18} />
+                      </span>
+                    </span>
                   </button>
                 </div>
               </div>
 
               {error && (
-                <p role="alert" className="border border-bad/60 px-3 py-2 text-[0.9rem] text-bad">
+                <p role="alert" className="enter-fade border border-bad/60 px-3 py-2 text-[0.9rem] text-bad">
                   {error}
                 </p>
               )}
@@ -147,14 +164,17 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={busy || !username || !password}
-                className="btn-amber flex items-center justify-center gap-3"
+                className="btn-amber flex items-center justify-center gap-3 pe-3.5"
               >
                 {busy ? "Signing in" : "Log in"}
-                <IconArrow size={18} />
+                <IconArrow size={18} weight="bold" />
               </button>
             </form>
 
-            <div className="border-t border-rule px-8 py-4 text-center text-[0.75rem] tracking-[0.14em] text-sage">
+            <div
+              className="enter border-t border-rule px-8 py-4 text-center text-[0.75rem] tracking-[0.14em] text-sage"
+              style={stagger(200)}
+            >
               ACCESS-CONTROLLED <span className="mx-3 text-mute">/</span> AUDITABLE
             </div>
           </div>

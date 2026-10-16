@@ -45,13 +45,13 @@ function VerifyModal({ report, onClose }: { report: VerifyReport; onClose: () =>
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center bg-ground/85 p-6">
+    <div className="enter-backdrop fixed inset-0 z-20 flex items-center justify-center bg-ground/85 p-6">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="verify-title"
         data-testid="verify-modal"
-        className="w-full max-w-[560px] border border-rule bg-surface"
+        className="enter-modal w-full max-w-[560px] border border-rule bg-surface"
       >
         <div className="flex items-center justify-between border-b border-rule px-6 py-4">
           <h2 id="verify-title" className="text-[1.05rem] font-medium tracking-[0.1em]">
@@ -185,7 +185,7 @@ function AuditView() {
       <section className="flex min-h-[28rem] min-w-0 flex-1 flex-col border border-rule bg-surface">
         <div className="flex items-center justify-between border-b border-rule px-5 py-3">
           <div className="flex items-center gap-4">
-            <IconLog size={28} className="text-sage" />
+            <IconLog size={28} weight="medium" className="text-sage" />
             <div>
               <h1 className="text-[1.05rem] font-medium tracking-[0.1em]">AUDIT LOG</h1>
               <p className="text-[0.8rem] text-sage">System activity and access log, newest first</p>
@@ -270,7 +270,7 @@ function AuditView() {
       <aside className="flex shrink-0 flex-col gap-4 md:w-[360px]">
         <div className="border border-rule bg-surface p-5">
           <div className="flex items-center gap-3">
-            <IconShieldCheck size={30} className="text-sage" />
+            <IconShieldCheck size={30} weight="medium" className="text-sage" />
             <div>
               <h2 className="text-[1rem] font-medium tracking-[0.1em]">VERIFY CHAIN</h2>
               <p className="text-[0.8rem] text-sage">Log integrity and chain of custody</p>

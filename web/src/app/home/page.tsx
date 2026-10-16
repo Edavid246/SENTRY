@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, ApiError, type HomeDivision, type HomeSummary } from "@/lib/api";
+import { stagger, useFirstEntrance } from "@/lib/motion";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { ClearanceBadge } from "@/components/ClearanceBadge";
@@ -11,16 +12,17 @@ import { DivisionGlyph } from "@/components/DivisionGlyph";
 
 // The card is the whole link. An alert exists only when something needs attention: a quiet
 // division shows its name and what it does, nothing more.
-function DivisionCard({ division, wide }: { division: HomeDivision; wide?: boolean }) {
+function DivisionCard({ division, wide, delay }: { division: HomeDivision; wide?: boolean; delay?: number }) {
   const { alert } = division;
   return (
     <Link
       href={`/d/${division.key}`}
       data-testid={`division-${division.key}`}
       data-alert={alert ? alert.count : 0}
+      style={delay != null ? stagger(delay) : undefined}
       className={`group relative flex min-h-[210px] overflow-hidden border border-l-[3px] border-rule bg-surface p-7 transition-colors hover:border-sage hover:bg-raised ${
         alert ? "border-l-amber" : "border-l-transparent"
-      } ${wide ? "md:col-span-2 md:min-h-[150px]" : ""}`}
+      } ${wide ? "md:col-span-2 md:min-h-[150px]" : ""} ${delay != null ? "enter" : ""}`}
     >
       <DivisionGlyph
         division={division.key}
@@ -81,6 +83,9 @@ export default function HomePage() {
   const router = useRouter();
   const [summary, setSummary] = useState<HomeSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The landing after sign-in comes in title first, then the cards in reading order.
+  // Coming back to Home later shows it at once.
+  const entrance = useFirstEntrance("home");
 
   useEffect(() => {
     if (!me) return;
@@ -107,12 +112,14 @@ export default function HomePage() {
     <Shell>
       <div className="h-full overflow-y-auto p-6 md:p-10">
         <div className="mx-auto max-w-5xl">
-          <h1 data-testid="home-title" className="text-[2rem] font-medium tracking-[0.02em]">
-            {me?.unit_breadcrumb[0]?.name ?? "Group"}
-          </h1>
-          <p className="mt-1 text-[0.95rem] text-sage">
-            Open a division to see what is happening there.
-          </p>
+          <div className={entrance ? "enter" : undefined}>
+            <h1 data-testid="home-title" className="text-[2rem] font-medium tracking-[0.02em]">
+              {me?.unit_breadcrumb[0]?.name ?? "Group"}
+            </h1>
+            <p className="mt-1 text-[0.95rem] text-sage">
+              Open a division to see what is happening there.
+            </p>
+          </div>
           {error && (
             <p role="alert" className="mt-8 border border-rule p-4 text-[0.9rem]">
               {error}
@@ -121,10 +128,12 @@ export default function HomePage() {
           {!summary && !error && <p className="mt-8 text-sage">Loading…</p>}
           {summary && (
             <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2">
-              {divisions.map((d) => (
-                <DivisionCard key={d.key} division={d} />
+              {divisions.map((d, i) => (
+                <DivisionCard key={d.key} division={d} delay={entrance ? 100 + i * 60 : undefined} />
               ))}
-              {field && <DivisionCard division={field} wide />}
+              {field && (
+                <DivisionCard division={field} wide delay={entrance ? 100 + divisions.length * 60 : undefined} />
+              )}
             </div>
           )}
         </div>
