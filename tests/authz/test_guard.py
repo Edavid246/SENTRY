@@ -10,8 +10,11 @@ the body raises, and a commit happens only after the audit batch is written.
 import pytest
 from app.api import guard
 from app.authz import scope as scope_module
+from app.data_queries import registry
+from app.data_queries.tools import ToolResult
 from fastapi import HTTPException
 from support.contexts import access_context
+from support.policies import WITHHELD, Withholding
 
 
 class RecordingConn:
@@ -129,3 +132,53 @@ def test_permitted_audits_the_decision_alone(written) -> None:
     with pytest.raises(HTTPException) as raised:
         guard.permitted(access_context("briech.lead"), "read_audit", "audit")
     assert raised.value.status_code == 403
+
+
+@pytest.fixture
+def no_record_queries(monkeypatch) -> None:
+    policy = Withholding(scope_module.get_policy(), ("query", "record"))
+    monkeypatch.setattr(scope_module, "get_policy", lambda: policy)
+
+
+@pytest.fixture
+def fake_tool(monkeypatch) -> list[dict]:
+    """A registered tool that only records that it ran (its requirement: query on records)."""
+    calls: list[dict] = []
+
+    def tool(scope, params):
+        calls.append(dict(params))
+        return ToolResult(tool="fake", params={}, columns=(), rows=[], records=())
+
+    monkeypatch.setitem(registry.TOOLS, "fake", tool)
+    return calls
+
+
+def test_a_tool_never_runs_when_the_policy_denies_its_requirement(
+    written, log, fake_tool, no_record_queries
+) -> None:
+    """The route decided only its own read; the tool's requirement is decided before it runs."""
+    with guard.guarded(access_context("owner"), RecordingConn(log), "read", "dashboard") as scope:
+        outcome = registry.execute_tool(scope, "fake", {})
+    assert outcome.refused and outcome.result is None
+    assert fake_tool == []  # nothing ran
+    (batch,) = written
+    assert [(e["action"], e.get("requested"), e["decision"]) for e in batch] == [
+        ("decide", "read", "allow"),
+        ("decide", "query", "deny"),
+        ("data_query", None, "deny"),
+    ]
+    assert batch[1]["reasons"] == [WITHHELD]
+
+
+def test_a_tool_requirement_is_decided_once_per_request(written, log, fake_tool) -> None:
+    ctx = access_context("owner")
+    with scope_module.authorized(ctx, RecordingConn(log), [("query", "record")]) as scope:
+        registry.execute_tool(scope, "fake", {})  # decided up front: not decided again
+    with guard.guarded(ctx, RecordingConn(log), "read", "dashboard") as scope:
+        registry.execute_tool(scope, "fake", {})
+        registry.execute_tool(scope, "fake", {})  # decided by the first call
+    assert len(fake_tool) == 3
+    assert [[(e["action"], e.get("requested")) for e in batch] for batch in written] == [
+        [("decide", "query"), ("data_query", None)],
+        [("decide", "read"), ("decide", "query"), ("data_query", None), ("data_query", None)],
+    ]

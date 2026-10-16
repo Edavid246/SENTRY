@@ -2,11 +2,13 @@
 
 name -> callable(scope, params). `tool_requirements` names the policy decisions
 a caller must make before a tool runs. `execute_tool` is the only entry point: it
-validates the tool name, runs the tool on the caller's authorized Scope, and
-records exactly one `data_query` audit event per call on that scope (written
-with the rest of the request's events, after the decision that allowed it):
-an allow with the row count, or a deny when the call was refused with a
-ToolParamError (no SQL ran).
+validates the tool name, checks that the policy allows the tool's requirements
+(`Scope.allows`: decided up front by the request, or decided there and then),
+runs the tool on the caller's authorized Scope, and records exactly one
+`data_query` audit event per call on that scope (written with the rest of the
+request's events, after the decision that allowed it): an allow with the row
+count, or a deny when the call was refused, no SQL having run (a ToolParamError,
+or a requirement the policy denied).
 """
 
 from __future__ import annotations
@@ -68,6 +70,9 @@ def execute_tool(scope: Scope, name: str, params: Mapping[str, Any]) -> ToolOutc
     try:
         if tool is None:
             raise ToolParamError("unknown tool")
+        for action, resource in tool_requirements(name):
+            if not scope.allows((action, resource)):
+                raise ToolParamError(f"not authorized to {action} {resource}")
         result = tool(scope, params)
     except ToolParamError as exc:
         scope.record(

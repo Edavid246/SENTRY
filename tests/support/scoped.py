@@ -22,8 +22,13 @@ def scoped(engine: Engine, ctx: AccessContext) -> Iterator[Scope]:
 def run_tool(
     engine: Engine, ctx: AccessContext, name: str, params: Mapping[str, Any]
 ) -> tuple[ToolOutcome, dict[str, Any]]:
-    """Run one tool call; returns its outcome and the audit payload it wrote."""
+    """Run one tool call; returns its outcome and the `data_query` payload it wrote.
+
+    The scope decided nothing up front, so the call decides the tool's requirements itself and
+    their decide events come first in the batch.
+    """
     with scoped(engine, ctx) as scope:
         outcome = execute_tool(scope, name, params)
-    (written,) = scope.written
+    *decided, written = scope.written
+    assert [d["payload"]["action"] for d in decided] == ["decide"] * len(decided)
     return outcome, written["payload"]

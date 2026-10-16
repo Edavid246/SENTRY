@@ -76,6 +76,6 @@ def guarded_or_empty(
 def permitted(ctx: AccessContext, action: str, resource: str) -> None:
     """Decide and audit an action that reads nothing through the request connection; 403 on deny."""
     try:
-        audit_events(authorize(ctx, [(action, resource)]))
+        audit_events(list(authorize(ctx, [(action, resource)]).events))
     except Forbidden:
         raise _denied("forbidden") from None

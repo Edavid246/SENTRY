@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Any
 
@@ -45,21 +46,50 @@ class Forbidden(Exception):
     """A policy decision denied the request (already audited)."""
 
 
+@dataclass(frozen=True, slots=True)
+class Decided:
+    """What `authorize` allowed: the requirements and their decide events (audited by the scope)."""
+
+    requirements: tuple[Requirement, ...] = ()
+    events: tuple[dict[str, Any], ...] = ()
+
+
+NOTHING_DECIDED = Decided()
+
+
 class Scope:
     """A connection scoped to one caller: RLS set, row filters at hand, events recorded."""
 
-    def __init__(self, ctx: AccessContext, conn: Connection) -> None:
+    def __init__(
+        self, ctx: AccessContext, conn: Connection, allowed: Sequence[Requirement] = ()
+    ) -> None:
         set_rls_context_for(conn, ctx)
         self.ctx = ctx
         self.conn = conn
         self.events: list[dict[str, Any]] = []
         self.written: list[dict[str, Any]] = []  # the stored audit rows, once the scope closes
         self._commit = False
+        self._decisions: dict[Requirement, bool] = dict.fromkeys(allowed, True)
 
     @cached_property
     def labels(self) -> Labels:
         """The classification scheme, read once per scope (on first use)."""
         return Labels.load(self.conn)
+
+    def allows(self, requirement: Requirement) -> bool:
+        """Whether the policy allows `requirement` for this caller, decided once per scope.
+
+        A requirement the request did not decide up front is decided here, before anything it
+        covers runs, and its decide event is recorded with the rest of the request's events.
+        """
+        if requirement not in self._decisions:
+            action, resource = requirement
+            decision = get_policy().decide(self.ctx, action, resource)
+            self.events.append(
+                decide_event(self.ctx, decision, resource=resource, requested=action)
+            )
+            self._decisions[requirement] = decision.allowed
+        return self._decisions[requirement]
 
     def filter(self, resource: str) -> RowFilter:
         """The policy row filter for `resource`, to put inside the SQL."""
@@ -80,8 +110,8 @@ class Scope:
 
 def authorize(
     ctx: AccessContext, requirements: Sequence[Requirement], *, audit_resource: str | None = None
-) -> list[dict[str, Any]]:
-    """Decide each requirement in order; return the allow events, or audit and raise Forbidden.
+) -> Decided:
+    """Decide each requirement in order; return what was allowed, or audit and raise Forbidden.
 
     The first deny stops the sequence. `audit_resource` names the decide events'
     resource when it differs from the policy resource (e.g. "connected_map").
@@ -96,19 +126,19 @@ def authorize(
         if not decision.allowed:
             audit_events(decided)
             raise Forbidden
-    return decided
+    return Decided(tuple(requirements), tuple(decided))
 
 
 @contextmanager
 def open_scope(
-    ctx: AccessContext, conn: Connection, decided: Sequence[dict[str, Any]] = ()
+    ctx: AccessContext, conn: Connection, decided: Decided = NOTHING_DECIDED
 ) -> Iterator[Scope]:
     """Scope `conn` to `ctx`; audit `decided` plus everything recorded on the way out."""
-    scope = Scope(ctx, conn)
+    scope = Scope(ctx, conn, decided.requirements)
     try:
         yield scope
     finally:
-        scope.written = audit_events([*decided, *scope.events])
+        scope.written = audit_events([*decided.events, *scope.events])
     if scope._commit:
         conn.commit()
 

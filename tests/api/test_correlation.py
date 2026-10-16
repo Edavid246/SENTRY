@@ -239,8 +239,13 @@ def test_run_audits_the_decision_before_its_tool_queries_and_commits_after(clien
         if e["seq"] > tip and e["payload"]["actor"] == "owner" and e["payload"]["action"] != "login"
     ]
     mine = [e["action"] for e in events]
-    assert mine[0] == "decide" and mine[-2:] == ["query", "correlation_run"]
-    assert set(mine[1:-2]) == {"data_query"}
+    assert mine[:2] == ["decide", "decide"] and mine[-2:] == ["query", "correlation_run"]
+    assert set(mine[2:-2]) == {"data_query"}
+    # run_correlation is decided by the route; the tools' own requirement before the first runs
+    assert [(e["requested"], e["resource"], e["decision"]) for e in events[:2]] == [
+        ("run_correlation", "finding", "allow"),
+        ("query", "record", "allow"),
+    ]
     read = events[-2]
     assert read["resource"] == "finding" and read["item_ids"] == returned
 
