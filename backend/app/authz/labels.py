@@ -25,16 +25,24 @@ from sqlalchemy.engine import Connection
 
 
 class Labelled(Protocol):
-    """Anything that carries a classification and compartments (chunks, records)."""
+    """Anything that carries a classification and compartments (chunks, records, labels)."""
 
-    classification_code: str
-    compartments: Any
+    @property
+    def classification_code(self) -> str: ...
+
+    @property
+    def compartments(self) -> Any: ...
 
 
 @dataclass(frozen=True, slots=True)
 class Label:
     code: str
     compartments: tuple[str, ...]
+
+    @property
+    def classification_code(self) -> str:
+        """So a Label is itself `Labelled`: a derived item can be an input to the next one."""
+        return self.code
 
 
 class Labels:

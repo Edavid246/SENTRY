@@ -18,7 +18,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import text
 
 from app.ai_gateway.base import ChatMessage
-from app.authz.labels import Label, Labels
+from app.authz.labels import Label
 from app.authz.scope import Scope
 
 HISTORY_TURNS = 6
@@ -103,9 +103,13 @@ def open_conversation(scope: Scope, requested: UUID | None) -> tuple[UUID, bool]
     """(conversation id, is_new); an id owned by anyone else raises ConversationNotFound."""
     if requested is None:
         return uuid4(), True
+    row_filter = scope.filter("conversation")
     row = scope.conn.execute(
-        text("SELECT id FROM conversations WHERE id = :id AND user_id = :user_id"),
-        {"id": requested, "user_id": scope.ctx.user_id},
+        text(
+            "SELECT id FROM conversations"
+            f" WHERE id = :id AND user_id = :user_id AND {row_filter.where_sql}"
+        ),
+        {"id": requested, "user_id": scope.ctx.user_id, **row_filter.params},
     ).first()
     if row is None:
         raise ConversationNotFound(str(requested))
@@ -129,13 +133,18 @@ class HistoryMessage:
 
 
 def load_history(scope: Scope, conversation_id: UUID) -> tuple[HistoryMessage, ...]:
-    """The last HISTORY_TURNS messages the caller may see, oldest first."""
+    """The last HISTORY_TURNS messages the caller may see, oldest first.
+
+    A turn's question and answer share one created_at (one transaction), so ties break by
+    role exactly as in `list_messages`: the question before its answer.
+    """
     row_filter = scope.filter("message")
     rows = scope.conn.execute(
         text(
             "SELECT role, content, classification_code, compartments FROM messages"
             f" WHERE conversation_id = :id AND {row_filter.where_sql}"
-            " ORDER BY created_at DESC, id DESC LIMIT :limit"
+            " ORDER BY created_at DESC, CASE role WHEN 'user' THEN 0 ELSE 1 END DESC, id DESC"
+            " LIMIT :limit"
         ),
         {"id": conversation_id, "limit": HISTORY_TURNS, **row_filter.params},
     ).all()
@@ -150,12 +159,6 @@ def load_history(scope: Scope, conversation_id: UUID) -> tuple[HistoryMessage, .
     )
 
 
-@dataclass(frozen=True, slots=True)
-class _Stored:
-    classification_code: str
-    compartments: tuple[str, ...]
-
-
 def _raise_conversation_label(scope: Scope, conversation_id: UUID, turn: Label) -> None:
     """The conversation holds every turn, so it takes the derived label of all of them
     (its current label + this turn's) and moves to the top of the list."""
@@ -166,12 +169,8 @@ def _raise_conversation_label(scope: Scope, conversation_id: UUID, turn: Label) 
         text(f"SELECT classification_code, compartments FROM conversations WHERE {where}"),
         params,
     ).one()  # open_conversation already found it under the same filter + RLS
-    label = Labels.load(scope.conn).derive(
-        [
-            _Stored(str(current.classification_code), tuple(current.compartments or ())),
-            _Stored(turn.code, turn.compartments),
-        ]
-    )
+    stored = Label(str(current.classification_code), tuple(current.compartments or ()))
+    label = scope.labels.derive([stored, turn])
     scope.conn.execute(
         text(
             "UPDATE conversations SET classification_code = :classification,"

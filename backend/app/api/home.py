@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from app.api.deps import ConnDep, CurrentContext
 from app.api.guard import guarded
 from app.audit.chain import utc_now_iso
-from app.authz.labels import Labels
+from app.authz.labels import Label
 from app.correlation.store import list_findings
 from app.data_queries.registry import execute_tool
 from app.units import GROUP_ROOT, is_site, unit_names
@@ -86,15 +86,6 @@ ATTENTION_TOOLS: tuple[tuple[str, Mapping[str, Any], str], ...] = (
 FINDINGS_WHAT = "findings open"
 
 
-@dataclass(frozen=True, slots=True)
-class _Member:
-    """One counted thing, reduced to what labelling needs (satisfies authz.labels.Labelled)."""
-
-    ref: str
-    classification_code: str
-    compartments: tuple[str, ...]
-
-
 def _division_key(unit_path: str, *, finding: bool = False) -> str | None:
     """Which card a record counts toward. A site team (a unit below a subsidiary) belongs to
     Field Operations; a finding about a site stays with the subsidiary that raised it."""
@@ -111,25 +102,27 @@ def _division_key(unit_path: str, *, finding: bool = False) -> str | None:
 @router.get("/summary", response_model=HomeSummary)
 def home_summary(ctx: CurrentContext, conn: ConnDep) -> HomeSummary:
     with guarded(ctx, conn, "read", "dashboard") as scope:
-        labels, names = Labels.load(conn), unit_names(conn)
-        counted: dict[str, dict[str, list[_Member]]] = {}
+        names = unit_names(conn)
+        counted: dict[str, dict[str, list[tuple[str, Label]]]] = {}  # key -> what -> (ref, label)
 
-        def add(key: str | None, what: str, member: _Member) -> None:
+        def add(key: str | None, what: str, ref: str, label: Label) -> None:
             if key is not None:
-                counted.setdefault(key, {}).setdefault(what, []).append(member)
+                counted.setdefault(key, {}).setdefault(what, []).append((ref, label))
 
         for tool, params, what in ATTENTION_TOOLS:
             for record in execute_tool(scope, tool, params).records:
                 add(
                     _division_key(record.unit_path),
                     what,
-                    _Member(record.source_ref, record.classification_code, record.compartments),
+                    record.source_ref,
+                    Label(record.classification_code, tuple(record.compartments)),
                 )
         for row in list_findings(scope):
             add(
                 _division_key(row.unit_path, finding=True),
                 FINDINGS_WHAT,
-                _Member(row.key, row.classification_code, tuple(row.compartments)),
+                row.key,
+                Label(row.classification_code, tuple(row.compartments)),
             )
 
         # A division is shown when the caller's unit covers it, or when anything in it is visible.
@@ -147,14 +140,14 @@ def home_summary(ctx: CurrentContext, conn: ConnDep) -> HomeSummary:
             members = [m for found in by_what.values() for m in found]
             alert = None
             if members:
-                label = labels.derive(members)
+                label = scope.labels.derive(m for _, m in members)
                 alert = HomeAlert(
                     count=len(members),
                     parts=[AlertPart(what=w, count=len(found)) for w, found in by_what.items()],
                     classification=label.code,
                     compartments=list(label.compartments),
                 )
-                item_ids.extend(m.ref for m in members)
+                item_ids.extend(ref for ref, _ in members)
             divisions.append(
                 HomeDivision(
                     key=division.key, name=division.name, tagline=division.tagline, alert=alert

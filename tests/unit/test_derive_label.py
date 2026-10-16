@@ -1,17 +1,14 @@
 """The derived-classification rule (SPEC 7.2): highest classification, union of compartments."""
 
-from dataclasses import dataclass
-
 import pytest
 from app.authz.labels import Label, Labels
 
 LABELS = Labels({"unclassified": 0, "restricted": 1, "confidential": 2, "secret": 3})
 
 
-@dataclass
-class Item:
-    classification_code: str
-    compartments: tuple[str, ...] = ()
+def Item(code: str, compartments: tuple[str, ...] = ()) -> Label:
+    """A Label is itself Labelled, so it stands in for any labelled input."""
+    return Label(code, compartments)
 
 
 def test_highest_classification_and_union_of_compartments() -> None:
@@ -51,3 +48,11 @@ def test_display_uses_the_ui_name_and_never_prints_none() -> None:
     assert labels.display("secret") == "GOVERNMENT-SENSITIVE"
     assert labels.display("open") == "OPEN"  # a missing name falls back to the code
     assert labels.display("unlisted") == "UNLISTED"
+
+
+def test_a_derived_label_is_an_input_to_the_next_derivation() -> None:
+    report = LABELS.derive([Item("restricted", ("UAS-OPS",))])
+    assert report.classification_code == "restricted"
+    assert LABELS.derive([report, Item("confidential", ("FORENSICS",))]) == Label(
+        "confidential", ("FORENSICS", "UAS-OPS")
+    )

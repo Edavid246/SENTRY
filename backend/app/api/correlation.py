@@ -19,7 +19,6 @@ from pydantic import BaseModel, Field
 from app.api.deps import ConnDep, CurrentContext
 from app.api.guard import guarded
 from app.audit.events import event
-from app.authz.labels import Labels
 from app.correlation.registry import ANALYSES, run_all
 from app.correlation.store import FindingRow, list_findings, save_findings
 from app.units import unit_names
@@ -68,7 +67,7 @@ def finding_out(row: FindingRow, names: dict[str, str]) -> FindingOut:
 def run_correlation(ctx: CurrentContext, conn: ConnDep) -> RunResult:
     with guarded(ctx, conn, "run_correlation", "finding") as scope:
         names = unit_names(conn)
-        drafts = run_all(scope, Labels.load(conn), names)
+        drafts = run_all(scope, scope.labels, names)
         stored = set(save_findings(scope, drafts))  # committed once the audit batch is written
         rows = list_findings(scope)  # returned to the caller, so audited as a read
         scope.read("finding", len(rows), item_ids=[r.key for r in rows])

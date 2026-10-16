@@ -27,12 +27,14 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from functools import cached_property
 from typing import Any
 
 from sqlalchemy.engine import Connection
 
 from app.audit.events import audit_events, decide_event, query_event
 from app.authz.context import AccessContext
+from app.authz.labels import Labels
 from app.authz.policy import RowFilter, get_policy
 from app.db import set_rls_context_for
 
@@ -53,6 +55,11 @@ class Scope:
         self.events: list[dict[str, Any]] = []
         self.written: list[dict[str, Any]] = []  # the stored audit rows, once the scope closes
         self._commit = False
+
+    @cached_property
+    def labels(self) -> Labels:
+        """The classification scheme, read once per scope (on first use)."""
+        return Labels.load(self.conn)
 
     def filter(self, resource: str) -> RowFilter:
         """The policy row filter for `resource`, to put inside the SQL."""

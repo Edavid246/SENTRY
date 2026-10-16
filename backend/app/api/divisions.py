@@ -167,7 +167,7 @@ def build_division(scope: Scope, conn: Connection, key: str) -> BuiltDivision:
     """
     names = unit_names(conn)
     division, unit_path, keep = _division(key, scope, names)
-    labels = Labels.load(conn)
+    labels = scope.labels
     sections = [
         _build(labels, s, _run(scope, s, unit_path), keep, names) for s in SECTIONS.get(key, ())
     ]
@@ -210,6 +210,6 @@ def serial_trace(
         outcome = _run(scope, spec, unit_path)
         if outcome.refused:
             raise HTTPException(status_code=422, detail=outcome.refusal)
-        section = _build(Labels.load(conn), spec, outcome, keep, names)
+        section = _build(scope.labels, spec, outcome, keep, names)
         scope.read("dashboard", len(section.rows), item_ids=[r.ref for r in section.rows])
     return section

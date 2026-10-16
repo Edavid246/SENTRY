@@ -48,7 +48,7 @@ from app.assistant.conversations import (
 )
 from app.audit.events import AUDIT_TEXT_LIMIT, event
 from app.authz.context import AccessContext
-from app.authz.labels import Label, Labelled, Labels
+from app.authz.labels import Label, Labelled
 from app.authz.scope import Requirement, Scope, authorized
 from app.data_queries.explain import explain_result
 from app.data_queries.registry import ToolOutcome, execute_tool, tool_requirements
@@ -111,7 +111,7 @@ class _Turn:
 
     def label(self, inputs: Sequence[Labelled]) -> Label:
         """The derived label of everything the answer was built from."""
-        return Labels.load(self.scope.conn).derive(inputs, empty_ok=True)
+        return self.scope.labels.derive(inputs, empty_ok=True)
 
     def retrieve(self, query: str) -> tuple[list[RetrievedChunk], list[float] | None]:
         """Authorized chunks for `query`, recorded on the scope as a retrieve event."""

@@ -17,7 +17,6 @@ from pydantic import BaseModel, Field
 from app.api.deps import ConnDep, CurrentContext
 from app.api.guard import guarded
 from app.audit.chain import utc_now_iso
-from app.authz.labels import Labels
 from app.data_queries.registry import execute_tool
 
 router = APIRouter(prefix="/api/v1/cases", tags=["cases"])
@@ -103,7 +102,7 @@ def case_view(case_ref: str, ctx: CurrentContext, conn: ConnDep) -> CaseView:
                     steps=steps,
                 )
             )
-        label = Labels.load(conn).derive(records)
+        label = scope.labels.derive(records)
         scope.read("dashboard", len(records), item_ids=[r.source_ref for r in records])
     return CaseView(
         generated_at=utc_now_iso(),

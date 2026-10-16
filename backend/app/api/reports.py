@@ -11,7 +11,6 @@ Reports are informational drafts. There is no approval flow: people review and d
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Literal
 
 from fastapi import APIRouter, Query, Response
@@ -22,7 +21,7 @@ from app.api.divisions import Section, build_division
 from app.api.guard import guarded
 from app.audit.chain import utc_now_iso
 from app.audit.events import event
-from app.authz.labels import Labels
+from app.authz.labels import Label, Labels
 from app.reporting.division import (
     DivisionReport,
     ReportRow,
@@ -67,14 +66,6 @@ class DivisionReportOut(BaseModel):
     notice: str
 
 
-@dataclass(frozen=True, slots=True)
-class _Part:
-    """One section's label, in the shape `Labels.derive` reads."""
-
-    classification_code: str
-    compartments: tuple[str, ...]
-
-
 def _section(section: Section, labels: Labels) -> ReportSection:
     return ReportSection(
         title=section.title,
@@ -92,7 +83,7 @@ def _build(ctx: CurrentContext, conn: ConnDep, key: str, *, export: str | None) 
         built = build_division(scope, conn, key)
         division, sections, labels = built.division, built.sections, built.labels
         parts = [
-            _Part(s.classification, tuple(s.compartments)) for s in sections if s.classification
+            Label(s.classification, tuple(s.compartments)) for s in sections if s.classification
         ]
         label = labels.derive(parts, empty_ok=True)
         report = build_division_report(

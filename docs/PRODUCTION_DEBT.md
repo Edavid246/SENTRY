@@ -139,6 +139,10 @@ end-of-step report. Never silently log it.
   multi-turn ordering.
 - **Production needs:** a monotonic per-message sequence column (or a two-column
   sort that cannot tie) so history order is deterministic.
+- **Resolved 2026-10-16:** refactor step 2.1 gave `load_history` the same tie-break as
+  `list_messages` (role, so the question comes before its answer, then id), and
+  `tests/authz/test_conversation_store.py` pins it. A sequence column is still the
+  cleaner production answer if a turn ever stores more than one row per role.
 
 ### 2026-10-07 — Hosted dev model name deviates from the approved name
 - **Issue:** `llm_model` is configured as `gemini-3.5-flash`, which is not the
