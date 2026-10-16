@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.seed.records.common import _BRIECH, _CLIENT, _GIGA, _POCTOVA, _days_from_today
+from app.seed.records.common import BRIECH, CLIENT, GIGA, POCTOVA, STRATOC, days_from_today
 
 # Contracts and deliveries (pivot Task 4). Fictitious, illustrative figures; the agencies are
 # generic labels mapped to the CLIENT-A..D compartments (no real agency names). Due dates are
@@ -14,13 +14,13 @@ _CONTRACTS = "contracts-demo"
 def _contract(ref, cid, client, subject, status, classification, unit_path, end_offset, value):
     data = {
         "contract_ref": cid,
-        "client": _CLIENT[client],
+        "client": CLIENT[client],
         "subject": subject,
         "status": status,
-        "end_date": _days_from_today(end_offset),
+        "end_date": days_from_today(end_offset),
         "value_musd": value,
     }
-    compartments = [f"CLIENT-{client}"] + (["FORENSICS"] if unit_path == _GIGA else [])
+    compartments = [f"CLIENT-{client}"] + (["FORENSICS"] if unit_path == GIGA else [])
     return (ref, "Contract", _CONTRACTS, classification, compartments, unit_path, data)
 
 
@@ -28,13 +28,13 @@ def _delivery(ref, did, cid, client, item, qty, offset, status, classification, 
     data = {
         "delivery_ref": did,
         "contract_ref": cid,
-        "client": _CLIENT[client],
+        "client": CLIENT[client],
         "item": item,
         "quantity": qty,
-        "due_date": _days_from_today(offset),
+        "due_date": days_from_today(offset),
         "status": status,
     }
-    compartments = [f"CLIENT-{client}"] + (["FORENSICS"] if unit_path == _GIGA else [])
+    compartments = [f"CLIENT-{client}"] + (["FORENSICS"] if unit_path == GIGA else [])
     return (ref, "Delivery", _CONTRACTS, classification, compartments, unit_path, data)
 
 
@@ -46,7 +46,7 @@ RECORDS = [
         "Reconnaissance UAS fleet supply",
         "active",
         "confidential",
-        _BRIECH,
+        BRIECH,
         180,
         4.2,
     ),
@@ -57,7 +57,7 @@ RECORDS = [
         "UAS spares and maintenance support",
         "at_risk",
         "confidential",
-        _BRIECH,
+        BRIECH,
         90,
         1.1,
     ),
@@ -68,7 +68,7 @@ RECORDS = [
         "Payload integration trials",
         "active",
         "confidential",
-        _BRIECH,
+        BRIECH,
         120,
         0.8,
     ),
@@ -79,7 +79,7 @@ RECORDS = [
         "Body armour plate supply",
         "active",
         "confidential",
-        _POCTOVA,
+        POCTOVA,
         240,
         2.6,
     ),
@@ -90,7 +90,7 @@ RECORDS = [
         "Uniform and kit lots",
         "completed",
         "restricted",
-        _POCTOVA,
+        POCTOVA,
         -30,
         0.9,
     ),
@@ -101,7 +101,7 @@ RECORDS = [
         "Helmet liner supply",
         "at_risk",
         "confidential",
-        _POCTOVA,
+        POCTOVA,
         60,
         0.5,
     ),
@@ -112,7 +112,7 @@ RECORDS = [
         "Perimeter surveillance service",
         "active",
         "secret",
-        "/eib-group/stratoc/",
+        STRATOC,
         300,
         3.4,
     ),
@@ -123,7 +123,7 @@ RECORDS = [
         "Forensic laboratory analysis retainer",
         "active",
         "secret",
-        _GIGA,
+        GIGA,
         200,
         0.7,
     ),
@@ -137,7 +137,7 @@ RECORDS = [
         -10,
         "pending",
         "confidential",
-        _BRIECH,
+        BRIECH,
     ),
     _delivery(
         "REC-072",
@@ -149,7 +149,7 @@ RECORDS = [
         -25,
         "delivered",
         "confidential",
-        _BRIECH,
+        BRIECH,
     ),
     _delivery(
         "REC-073",
@@ -161,7 +161,7 @@ RECORDS = [
         -3,
         "in_transit",
         "confidential",
-        _BRIECH,
+        BRIECH,
     ),
     _delivery(
         "REC-074",
@@ -173,7 +173,7 @@ RECORDS = [
         14,
         "pending",
         "confidential",
-        _BRIECH,
+        BRIECH,
     ),
     _delivery(
         "REC-075",
@@ -185,7 +185,7 @@ RECORDS = [
         -7,
         "pending",
         "confidential",
-        _BRIECH,
+        BRIECH,
     ),
     _delivery(
         "REC-076",
@@ -197,7 +197,7 @@ RECORDS = [
         -15,
         "pending",
         "confidential",
-        _POCTOVA,
+        POCTOVA,
     ),
     _delivery(
         "REC-077",
@@ -209,7 +209,7 @@ RECORDS = [
         20,
         "pending",
         "confidential",
-        _POCTOVA,
+        POCTOVA,
     ),
     _delivery(
         "REC-078",
@@ -221,7 +221,7 @@ RECORDS = [
         -60,
         "delivered",
         "restricted",
-        _POCTOVA,
+        POCTOVA,
     ),
     _delivery(
         "REC-079",
@@ -233,7 +233,7 @@ RECORDS = [
         -2,
         "pending",
         "confidential",
-        _POCTOVA,
+        POCTOVA,
     ),
     _delivery(
         "REC-080",
@@ -245,7 +245,7 @@ RECORDS = [
         30,
         "pending",
         "confidential",
-        _POCTOVA,
+        POCTOVA,
     ),
     _delivery(
         "REC-081",
@@ -257,7 +257,7 @@ RECORDS = [
         -5,
         "in_transit",
         "secret",
-        "/eib-group/stratoc/",
+        STRATOC,
     ),
     _delivery(
         "REC-082",
@@ -269,6 +269,6 @@ RECORDS = [
         -1,
         "pending",
         "secret",
-        _GIGA,
+        GIGA,
     ),
 ]

@@ -36,7 +36,7 @@ def load_manifest(docs_dir: Path) -> list[dict]:
     manifest_path = docs_dir / MANIFEST_NAME
     if not manifest_path.exists():
         raise FileNotFoundError(f"missing ingestion manifest: {manifest_path}")
-    entries = json.loads(manifest_path.read_text())
+    entries = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(entries, list) or not entries:
         raise ValueError(f"manifest must be a non-empty list: {manifest_path}")
     return entries

@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
-from app.seed.records.common import _SITE4, _STRATOC, _equipment, _fault, _qualification, _training
+from app.seed.records.common import (
+    BRIECH,
+    GROUP,
+    SITE4,
+    STRATOC,
+    equipment_record,
+    fault_record,
+    qualification_record,
+    training_record,
+)
 
 RECORDS = [
-    _equipment(
+    equipment_record(
         "REC-011",
         "logistics-ref",
         "restricted",
         [],
-        _SITE4,
+        SITE4,
         -12,
         equipment_id="EQ-3101",
         name="Armoured Personnel Carrier APC-12",
@@ -18,12 +27,12 @@ RECORDS = [
         status="in_service",
         location="Stratoc Site Team 4 motor pool",
     ),
-    _equipment(
+    equipment_record(
         "REC-012",
         "logistics-ref",
         "restricted",
         [],
-        _SITE4,
+        SITE4,
         15,
         equipment_id="EQ-3102",
         name="Cargo Truck 5T",
@@ -31,12 +40,12 @@ RECORDS = [
         status="in_service",
         location="Stratoc Site Team 4 motor pool",
     ),
-    _equipment(
+    equipment_record(
         "REC-013",
         "logistics-ref",
         "restricted",
         [],
-        _STRATOC,
+        STRATOC,
         10,
         equipment_id="EQ-3103",
         name="Field Radio Set FR-9",
@@ -44,12 +53,12 @@ RECORDS = [
         status="in_service",
         location="EIB Stratoc signals store",
     ),
-    _equipment(
+    equipment_record(
         "REC-014",
         "logistics-ref",
         "confidential",
         [],
-        _STRATOC,
+        STRATOC,
         -3,
         equipment_id="EQ-3104",
         name="Generator 40kW",
@@ -57,12 +66,12 @@ RECORDS = [
         status="degraded",
         location="EIB Stratoc depot",
     ),
-    _equipment(
+    equipment_record(
         "REC-015",
         "logistics-ref",
         "confidential",
         [],
-        _SITE4,
+        SITE4,
         20,
         equipment_id="EQ-3105",
         name="Water Purifier WP-7",
@@ -70,12 +79,12 @@ RECORDS = [
         status="awaiting_parts",
         location="Stratoc Site Team 4 camp",
     ),
-    _equipment(
+    equipment_record(
         "REC-016",
         "logistics-ref",
         "restricted",
         [],
-        "/eib-group/",
+        GROUP,
         15,
         equipment_id="EQ-3106",
         name="Recovery Vehicle RV-2",
@@ -83,12 +92,12 @@ RECORDS = [
         status="in_service",
         location="EIB Group workshop",
     ),
-    _equipment(
+    equipment_record(
         "REC-017",
         "logistics-ref",
         "restricted",
         [],
-        _SITE4,
+        SITE4,
         90,
         equipment_id="EQ-3107",
         name="Field Kitchen FK-3",
@@ -96,12 +105,12 @@ RECORDS = [
         status="in_service",
         location="Stratoc Site Team 4 camp",
     ),
-    _equipment(
+    equipment_record(
         "REC-018",
         "connected-tech-demo",
         "secret",
         ["UAS-OPS"],
-        "/eib-group/briech/",
+        BRIECH,
         5,
         equipment_id="UAS-15",
         name="Raven-II UAS (tail 15)",
@@ -109,71 +118,71 @@ RECORDS = [
         status="in_service",
         location="Briech UAS hangar",
     ),
-    _qualification(
+    qualification_record(
         "REC-019",
         "restricted",
         [],
-        _SITE4,
+        SITE4,
         -30,
         name="Cpl B. Ibrahim",
         rank="Corporal",
         certification="First Aid",
     ),
-    _qualification(
+    qualification_record(
         "REC-020",
         "restricted",
         [],
-        _SITE4,
+        SITE4,
         -10,
         name="Pte C. Nwosu",
         rank="Private",
         certification="Heavy Vehicle Driver",
     ),
-    _qualification(
+    qualification_record(
         "REC-021",
         "restricted",
         [],
-        _STRATOC,
+        STRATOC,
         -45,
         name="Sgt D. Okoye",
         rank="Sergeant",
         certification="Rifle Marksman",
     ),
-    _qualification(
+    qualification_record(
         "REC-022",
         "confidential",
         [],
-        _STRATOC,
+        STRATOC,
         -5,
         name="Capt E. Lawal",
         rank="Captain",
         certification="Signals Operator",
     ),
-    _qualification(
+    qualification_record(
         "REC-023",
         "secret",
         ["UAS-OPS"],
-        "/eib-group/briech/",
+        BRIECH,
         -20,
         name="Lt F. Garba",
         rank="Lieutenant",
         certification="UAS Pilot",
     ),
-    _qualification(
+    qualification_record(
         "REC-024",
         "restricted",
         [],
-        "/eib-group/",
+        GROUP,
         -60,
         name="WO G. Abubakar",
         rank="Warrant Officer",
         certification="Armoured Vehicle Driver",
     ),
-    _qualification(
+    qualification_record(
         "REC-025",
         "restricted",
         [],
-        _SITE4,
+        SITE4,
         200,
         name="Sgt H. Danladi",
         rank="Sergeant",
@@ -186,7 +195,7 @@ RECORDS = [
         "logistics-ref",
         "restricted",
         [],
-        _SITE4,
+        SITE4,
         {"item": "Water purifier filter", "depot": "DEP-B4", "quantity": 8, "threshold": 20},
     ),
     (
@@ -195,7 +204,7 @@ RECORDS = [
         "logistics-ref",
         "restricted",
         [],
-        _SITE4,
+        SITE4,
         {"item": "Ration pack 24h", "depot": "DEP-B4", "quantity": 400, "threshold": 250},
     ),
     # Planted correlation pattern (Part D2): fault reports rise in Stratoc Site Team 4 while
@@ -203,26 +212,28 @@ RECORDS = [
     # short (REC-026). EIB Stratoc's fault rate stays flat as the control. The newest
     # Site 4 report is Secret, so the derived finding inherits Secret (SPEC 7.2).
     # Windows are relative to the seed date: 42..22 days ago vs the last 21 days.
-    _fault("REC-028", "restricted", _SITE4, -40, "APC-12", "Hydraulic leak, rear ramp"),
-    _fault("REC-029", "restricted", _SITE4, -30, "Cargo Truck 5T", "Brake pressure warning"),
-    _fault("REC-030", "restricted", _SITE4, -18, "APC-12", "Transmission slip under load"),
-    _fault("REC-031", "restricted", _SITE4, -14, "Cargo Truck 5T", "Alternator failure"),
-    _fault("REC-032", "restricted", _SITE4, -11, "Water Purifier WP-7", "Filter housing crack"),
-    _fault("REC-033", "restricted", _SITE4, -8, "APC-12", "Coolant loss"),
-    _fault("REC-034", "restricted", _SITE4, -5, "Cargo Truck 5T", "Steering play"),
-    _fault("REC-035", "restricted", _SITE4, -3, "Water Purifier WP-7", "Pump seal failure"),
-    _fault(
-        "REC-036", "secret", _SITE4, -1, "Command vehicle secure radio", "Encryption module fault"
+    fault_record("REC-028", "restricted", SITE4, -40, "APC-12", "Hydraulic leak, rear ramp"),
+    fault_record("REC-029", "restricted", SITE4, -30, "Cargo Truck 5T", "Brake pressure warning"),
+    fault_record("REC-030", "restricted", SITE4, -18, "APC-12", "Transmission slip under load"),
+    fault_record("REC-031", "restricted", SITE4, -14, "Cargo Truck 5T", "Alternator failure"),
+    fault_record(
+        "REC-032", "restricted", SITE4, -11, "Water Purifier WP-7", "Filter housing crack"
     ),
-    _fault("REC-037", "restricted", _STRATOC, -38, "Generator 15kW", "Fuel pump fault"),
-    _fault("REC-038", "restricted", _STRATOC, -28, "Generator 15kW", "Exhaust leak"),
-    _fault("REC-039", "restricted", _STRATOC, -15, "Light Truck 2T", "Tyre wear"),
-    _fault("REC-040", "restricted", _STRATOC, -6, "Light Truck 2T", "Clutch wear"),
-    _qualification(
+    fault_record("REC-033", "restricted", SITE4, -8, "APC-12", "Coolant loss"),
+    fault_record("REC-034", "restricted", SITE4, -5, "Cargo Truck 5T", "Steering play"),
+    fault_record("REC-035", "restricted", SITE4, -3, "Water Purifier WP-7", "Pump seal failure"),
+    fault_record(
+        "REC-036", "secret", SITE4, -1, "Command vehicle secure radio", "Encryption module fault"
+    ),
+    fault_record("REC-037", "restricted", STRATOC, -38, "Generator 15kW", "Fuel pump fault"),
+    fault_record("REC-038", "restricted", STRATOC, -28, "Generator 15kW", "Exhaust leak"),
+    fault_record("REC-039", "restricted", STRATOC, -15, "Light Truck 2T", "Tyre wear"),
+    fault_record("REC-040", "restricted", STRATOC, -6, "Light Truck 2T", "Clutch wear"),
+    qualification_record(
         "REC-041",
         "restricted",
         [],
-        _SITE4,
+        SITE4,
         -18,
         name="Cpl J. Lawal",
         rank="Corporal",
@@ -230,25 +241,27 @@ RECORDS = [
     ),
     # training_activity data: REC-002 (fixed date) is the Site 4 baseline; these add a Stratoc
     # event, a Briech UAS event (Confidential, UAS-OPS) and one old Site 4 event outside a quarter.
-    _training("REC-043", "restricted", [], _STRATOC, -35, "Vehicle Recovery", 18, "EIB Stratoc"),
-    _training(
+    training_record(
+        "REC-043", "restricted", [], STRATOC, -35, "Vehicle Recovery", 18, "EIB Stratoc"
+    ),
+    training_record(
         "REC-044",
         "confidential",
         ["UAS-OPS"],
-        "/eib-group/briech/",
+        BRIECH,
         -20,
         "UAS Flight Qualification",
         6,
         "Briech UAS",
     ),
-    _training(
-        "REC-045", "restricted", [], _SITE4, -200, "Cold Weather Drills", 30, "Stratoc Site Team 4"
+    training_record(
+        "REC-045", "restricted", [], SITE4, -200, "Cold Weather Drills", 30, "Stratoc Site Team 4"
     ),
-    _qualification(
+    qualification_record(
         "REC-042",
         "restricted",
         [],
-        _SITE4,
+        SITE4,
         -9,
         name="Pte S. Ogunleye",
         rank="Private",

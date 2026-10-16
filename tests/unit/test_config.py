@@ -43,3 +43,11 @@ def test_cache_record_is_refused_outside_the_dev_profile(monkeypatch) -> None:
     monkeypatch.setenv("LLM_CACHE_ONLY", "1")
     with pytest.raises(ValidationError):
         Settings()
+
+
+def test_default_embedding_dim_matches_the_chunk_column() -> None:
+    """The vector column's width is fixed by the migrations; the configured default must fit it."""
+    from app.knowledge.models import EMBEDDING_DIM, Chunk
+
+    assert Settings.model_fields["embedding_dim"].default == EMBEDDING_DIM
+    assert Chunk.__table__.c.embedding.type.dim == EMBEDDING_DIM

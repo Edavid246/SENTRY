@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from app.seed.records.common import _BRIECH, _STRATOC, _equipment
+from app.seed.records.common import BRIECH, STRATOC, equipment_record
 
 # Group assets (pivot Task 6): seed-only, answered by the existing equipment and stock tools.
 # The Briech rows (094-097) are Secret, so only the owner sees them.
 RECORDS = [
-    _equipment(
+    equipment_record(
         "REC-093",
         "logistics-ref",
         "restricted",
         [],
-        _STRATOC,
+        STRATOC,
         12,
         equipment_id="EQ-3301",
         name="Command-and-control vehicle",
@@ -20,12 +20,12 @@ RECORDS = [
         location="EIB Stratoc depot",
         status="in_service",
     ),
-    _equipment(
+    equipment_record(
         "REC-094",
         "logistics-ref",
         "secret",
         [],
-        _BRIECH,
+        BRIECH,
         -4,
         equipment_id="EQ-4401",
         name="Helipad lighting and fuel interlock",
@@ -33,12 +33,12 @@ RECORDS = [
         location="Briech UAS airstrip",
         status="in_service",
     ),
-    _equipment(
+    equipment_record(
         "REC-095",
         "logistics-ref",
         "secret",
         [],
-        _BRIECH,
+        BRIECH,
         6,
         equipment_id="EQ-4402",
         name="UAS airframe BRC-0043 (492 of 500 flight hours to service)",
@@ -54,7 +54,7 @@ RECORDS = [
         "logistics-ref",
         "secret",
         [],
-        _BRIECH,
+        BRIECH,
         {"item": "Jet A-1 fuel (litres)", "depot": "DEP-HELI", "quantity": 1800, "threshold": 5000},
     ),
     (
@@ -63,7 +63,7 @@ RECORDS = [
         "logistics-ref",
         "secret",
         [],
-        _BRIECH,
+        BRIECH,
         {"item": "Hydraulic oil (litres)", "depot": "DEP-HELI", "quantity": 200, "threshold": 50},
     ),
 ]

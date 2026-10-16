@@ -1,12 +1,6 @@
-"""Seed the gateway database with the fictitious demo corpus (AGENTS.md).
+"""Turn the identity and record tables into rows and replace the corpus atomically.
 
-Deterministic uuid5 ids plus a full delete-then-insert make the seed
-idempotent: running it twice leaves identical row counts. The audit table is
-never touched (append-only, SPEC 14.2). Demo data only — fictitious people,
-units, documents and records.
-
-Run:  uv run python -m app.seed            (main gateway DB, as owner)
-Tests: app.seed.run(test_owner_database_url)
+See the package docstring (app/seed/__init__.py) for what the seed holds and how to run it.
 """
 
 from __future__ import annotations
@@ -59,7 +53,7 @@ def _chunk_texts(doc_ref: str, title: str, unit_path: str) -> list[tuple[str, st
     return [(summary, "Summary", 1), (body, "Section 1", 2)]
 
 
-def _rows(include_archived: bool = False) -> dict[type, list[dict]]:
+def build_rows(include_archived: bool = False) -> dict[type, list[dict]]:
     unit_rows = [
         {
             "id": unit_id(u["path"]),
@@ -200,7 +194,7 @@ def run(url: str, include_archived: bool = False) -> None:
     """Replace the demo corpus atomically (idempotent; owner role required)."""
     engine = create_engine(url)
     try:
-        rows = _rows(include_archived)
+        rows = build_rows(include_archived)
         with engine.begin() as conn:
             for table in _DELETE_ORDER:
                 conn.execute(delete(table))
@@ -225,7 +219,7 @@ def main() -> None:
     # demos and the web smoke test. The product seed (no flag) has the owner only.
     include_archived = "--include-archived" in sys.argv[1:]
     run(get_settings().owner_database_url, include_archived)
-    counts = {t.__name__: len(r) for t, r in _rows(include_archived).items()}
+    counts = {t.__name__: len(r) for t, r in build_rows(include_archived).items()}
     print(f"seeded demo corpus: {counts}; audit_events untouched ({AuditEvent.__tablename__})")
 
 

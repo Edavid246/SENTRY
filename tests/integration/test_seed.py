@@ -13,7 +13,7 @@ from app.authz.models import (
 )
 from app.connectors.models import CanonicalRecord, SourceSystem
 from app.knowledge.models import Chunk, Document
-from app.seed import DEMO_PASSWORD, _rows
+from app.seed import DEMO_PASSWORD, build_rows
 from argon2 import PasswordHasher
 from sqlalchemy import func, select, text
 from sqlalchemy.engine import Engine
@@ -121,9 +121,17 @@ def test_demo_password_verifies_for_every_user(seeded: None, owner_engine: Engin
 
 def test_content_hashes_are_stable(seeded: None, owner_engine: Engine) -> None:
     """Deterministic uuid5 ids + content hashes: reseeding cannot drift."""
-    doc_rows = _rows()[Document]
+    doc_rows = build_rows()[Document]
     expected = {r["source_ref"]: r["content_hash"] for r in doc_rows}
     with owner_engine.connect() as conn:
         actual = dict(conn.execute(text("SELECT source_ref, content_hash FROM documents")).all())
     assert actual == expected
     assert all(len(value) == 64 for value in expected.values())
+
+
+def test_adapter_describes_every_seeded_entity_type() -> None:
+    from app.connectors.demo import ENTITY_TYPES
+    from app.seed import RECORDS
+
+    seeded = {entity_type for _, entity_type, *_ in RECORDS}
+    assert seeded <= set(ENTITY_TYPES)

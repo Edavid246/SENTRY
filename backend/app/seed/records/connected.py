@@ -1,12 +1,13 @@
-"""Connected technology: surveillance, UAS missions, sensors."""
+"""Connected technology: surveillance, UAS missions, sensors, and the first two forensic items."""
 
 from __future__ import annotations
 
 import hashlib
 
-from app.seed.records.common import _SITE4, _STRATOC, _days_from_today, _hours_from_now
+from app.seed.records.common import BRIECH, GIGA, SITE4, STRATOC, days_from_today, hours_from_now
 
-# Connected-technology demo data (surveillance + UAS + forensics; docs/STUBS.md). Synthetic, shaped
+# Connected-technology demo data (surveillance + UAS; docs/STUBS.md), plus the first forensic items
+# (REC-061/062; the case workspace built on them is forensics.py). Synthetic, shaped
 # like ONVIF analytics events, MAVLink/MISB ST 0601 mission logs and CASE/UCO evidence records;
 # the adapter's translation layer is the only place that shape matters (SPEC 11.2). Detection
 # times are hour offsets from demo_now() (noon on the demo date); mission dates are day offsets.
@@ -21,7 +22,6 @@ _SITES = {
 }
 _CT = "connected-tech-demo"
 _STATE = "Niger"  # every demo site is on fictitious rural land in Niger State
-_UAS_WING = "/eib-group/briech/"
 
 
 def _sensor(ref, classification, compartments, unit_path, sensor_id, site, status="online"):
@@ -42,7 +42,7 @@ def _detection(
         "state": _STATE,
         "object_type": kind,
         "confidence": confidence,
-        "observed_at": _hours_from_now(hours),
+        "observed_at": hours_from_now(hours),
         "lon": round(lon + d[0], 4),
         "lat": round(lat + d[1], 4),
         "format": "ONVIF-style analytics event (synthetic)",
@@ -55,7 +55,7 @@ def _mission(ref, classification, offset, mission, platform, status, area, reaso
         "mission": mission,
         "platform": platform,
         "status": status,
-        "mission_date": _days_from_today(offset),
+        "mission_date": days_from_today(offset),
         "area": area,
         "state": _STATE,
         "reason": reason,
@@ -63,24 +63,24 @@ def _mission(ref, classification, offset, mission, platform, status, area, reaso
         "track": [list(point) for point in route],
         "format": "MAVLink/MISB ST 0601 style (synthetic)",
     }
-    return (ref, "Mission", _CT, classification, ["UAS-OPS"], _UAS_WING, data)
+    return (ref, "Mission", _CT, classification, ["UAS-OPS"], BRIECH, data)
 
 
 _ROUTE_B4 = ((5.490, 9.390, 120), (5.475, 9.370, 150), (5.460, 9.350, 150), (5.450, 9.360, 130))
 _ROUTE_B2 = ((5.490, 9.390, 120), (5.450, 9.350, 140), (5.400, 9.310, 140), (5.420, 9.330, 120))
 RECORDS = [
-    _sensor("REC-046", "restricted", [], _SITE4, "SEN-B4-01", "DEP-B4"),
-    _sensor("REC-047", "restricted", [], _STRATOC, "SEN-B2-01", "DEP-B2"),
-    _detection("REC-048", "restricted", [], _SITE4, -6, "SEN-B4-01", "DEP-B4", "person", 0.91),
-    _detection("REC-049", "restricted", [], _SITE4, -20, "SEN-B4-01", "DEP-B4", "vehicle", 0.88),
-    _detection("REC-050", "restricted", [], _SITE4, -70, "SEN-B4-01", "DEP-B4", "person", 0.79),
-    _detection("REC-051", "restricted", [], _STRATOC, -10, "SEN-B2-01", "DEP-B2", "vehicle", 0.93),
-    _detection("REC-052", "restricted", [], _STRATOC, -30, "SEN-B2-01", "DEP-B2", "person", 0.84),
+    _sensor("REC-046", "restricted", [], SITE4, "SEN-B4-01", "DEP-B4"),
+    _sensor("REC-047", "restricted", [], STRATOC, "SEN-B2-01", "DEP-B2"),
+    _detection("REC-048", "restricted", [], SITE4, -6, "SEN-B4-01", "DEP-B4", "person", 0.91),
+    _detection("REC-049", "restricted", [], SITE4, -20, "SEN-B4-01", "DEP-B4", "vehicle", 0.88),
+    _detection("REC-050", "restricted", [], SITE4, -70, "SEN-B4-01", "DEP-B4", "person", 0.79),
+    _detection("REC-051", "restricted", [], STRATOC, -10, "SEN-B2-01", "DEP-B2", "vehicle", 0.93),
+    _detection("REC-052", "restricted", [], STRATOC, -30, "SEN-B2-01", "DEP-B2", "person", 0.84),
     _detection(
         "REC-053",
         "confidential",
         ["UAS-OPS"],
-        _UAS_WING,
+        BRIECH,
         -5,
         "SEN-UW-01",
         "UAS-HANGAR",
@@ -88,7 +88,7 @@ RECORDS = [
         0.72,
         d=(0.002, 0.001),
     ),  # fmt: skip
-    _detection("REC-054", "confidential", [], _SITE4, -3, "SEN-B4-01", "DEP-B4", "vehicle", 0.95),
+    _detection("REC-054", "confidential", [], SITE4, -3, "SEN-B4-01", "DEP-B4", "vehicle", 0.95),
     _mission(
         "REC-055",
         "confidential",
@@ -161,7 +161,7 @@ RECORDS = [
         "forensics-demo",
         "secret",
         ["FORENSICS"],
-        "/eib-group/giga/",
+        GIGA,
         {
             "evidence_ref": "EV-014-01",
             "case_ref": "FR-2026-014",
@@ -178,7 +178,7 @@ RECORDS = [
         "forensics-demo",
         "secret",
         ["FORENSICS"],
-        "/eib-group/giga/",
+        GIGA,
         {
             "evidence_ref": "EV-014-01",
             "case_ref": "FR-2026-014",

@@ -11,8 +11,8 @@ provider is never called: a hit is replayed, a miss raises
 ProviderUnavailableError.
 
 Every completed call carries provider, model, model version, token counts
-and latency for the audit event (SPEC 8.1); audit attachment happens when
-the knowledge pathway lands.
+and latency for the audit event (SPEC 8.1); the assistant's answer event
+records them (assistant/service.py, _model_use).
 """
 
 import time

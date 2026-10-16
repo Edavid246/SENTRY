@@ -46,7 +46,7 @@ services:
       APP_DATABASE_URL: postgresql+psycopg://gateway_app:${GATEWAY_APP_PASSWORD:-dev-app-password}@db:5432/gateway
       TEST_OWNER_DATABASE_URL: postgresql+psycopg://gateway_owner:${GATEWAY_OWNER_PASSWORD:-dev-owner-password}@db:5432/gateway_test
       TEST_APP_DATABASE_URL: postgresql+psycopg://gateway_app:${GATEWAY_APP_PASSWORD:-dev-app-password}@db:5432/gateway_test
-      DEV_JWT_SECRET: ${DEV_JWT_SECRET:-dev-only-secret-change-me}
+      DEV_JWT_SECRET: ${DEV_JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}
       DEV_JWT_TTL_SECONDS: ${DEV_JWT_TTL_SECONDS:-7200}
       LLM_PROVIDER: ${LLM_PROVIDER:-hosted}
       LLM_MODEL: ${LLM_MODEL:-gemini-3.5-flash}

@@ -13,8 +13,8 @@ Tests: app.seed.run(test_owner_database_url)
 """
 
 from app.seed.identity import DEMO_PASSWORD
-from app.seed.loader import _rows, main, run
+from app.seed.loader import build_rows, main, run
 from app.seed.records import RECORDS
-from app.seed.records.common import _days_from_today
+from app.seed.records.common import days_from_today
 
-__all__ = ["DEMO_PASSWORD", "RECORDS", "_days_from_today", "_rows", "main", "run"]
+__all__ = ["DEMO_PASSWORD", "RECORDS", "days_from_today", "build_rows", "main", "run"]

@@ -51,10 +51,10 @@ def test_pinned_date_ignores_the_live_clock(real_clock, pin) -> None:
 
 def test_seed_offsets_follow_the_one_anchor(real_clock, pin) -> None:
     pin("2026-10-07")
-    assert seed._days_from_today(0) == "2026-10-07"
-    assert seed._days_from_today(-5) == "2026-10-02"
+    assert seed.days_from_today(0) == "2026-10-07"
+    assert seed.days_from_today(-5) == "2026-10-02"
     pin(None)
-    assert seed._days_from_today(10) == "2030-03-11"
+    assert seed.days_from_today(10) == "2030-03-11"
 
 
 def test_demo_date_is_refused_outside_the_dev_profile(monkeypatch) -> None:

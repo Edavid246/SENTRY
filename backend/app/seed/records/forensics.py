@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 
-from app.seed.records.common import _GIGA
+from app.seed.records.common import GIGA
 
 # Forensic case workspace (Phase D). Fictitious cases for Giga Forensics, CASE/UCO style: a case
 # holds evidence items, and each item has a chain of custody. Every record is FORENSICS-only and
@@ -25,7 +25,7 @@ def _case(ref, case_ref, title, opened, state, classification):
         "state": state,
         "lead_examiner": "A. Danjuma",
     }
-    return (ref, "Case", _FORENSIC, classification, ["FORENSICS"], _GIGA, data)
+    return (ref, "Case", _FORENSIC, classification, ["FORENSICS"], GIGA, data)
 
 
 def _evidence(ref, evidence_ref, case_ref, item, kind, status, classification):
@@ -38,7 +38,7 @@ def _evidence(ref, evidence_ref, case_ref, item, kind, status, classification):
         "sha256": hashlib.sha256(evidence_ref.encode()).hexdigest(),
         "format": "CASE/UCO style (synthetic)",
     }
-    return (ref, "EvidenceItem", _FORENSIC, classification, ["FORENSICS"], _GIGA, data)
+    return (ref, "EvidenceItem", _FORENSIC, classification, ["FORENSICS"], GIGA, data)
 
 
 def _custody(ref, evidence_ref, case_ref, action, date, from_holder, to_holder, classification):
@@ -51,7 +51,7 @@ def _custody(ref, evidence_ref, case_ref, action, date, from_holder, to_holder, 
         "event_date": date,
         "format": "CASE/UCO style (synthetic)",
     }
-    return (ref, "CustodyEvent", _FORENSIC, classification, ["FORENSICS"], _GIGA, data)
+    return (ref, "CustodyEvent", _FORENSIC, classification, ["FORENSICS"], GIGA, data)
 
 
 _FIELD_TEAM, _LS1, _LS2 = "Field team", "Lab store LS-1", "Lab store LS-2"

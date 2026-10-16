@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.seed.records.common import BRIECH, GIGA, GROUP, SITE4, STRATOC
+
 # (ref, entity_type, source, classification, compartments, unit path, data)
 RECORDS = [
     (
@@ -10,7 +12,7 @@ RECORDS = [
         "logistics-ref",
         "restricted",
         [],
-        "/eib-group/stratoc/",
+        STRATOC,
         {
             "equipment_id": "EQ-2201",
             "name": "Generator 15kW",
@@ -25,7 +27,7 @@ RECORDS = [
         "training-ref",
         "restricted",
         [],
-        "/eib-group/stratoc/site-4/",
+        SITE4,
         {
             "course": "Rifle Refresher",
             "start_date": "2026-08-11",
@@ -39,7 +41,7 @@ RECORDS = [
         "logistics-ref",
         "confidential",
         [],
-        "/eib-group/stratoc/site-4/",
+        SITE4,
         {
             "wo_ref": "WO-0455",
             "equipment": "Water Purifier WP-7",
@@ -53,7 +55,7 @@ RECORDS = [
         "connected-tech-demo",
         "secret",
         ["UAS-OPS"],
-        "/eib-group/briech/",
+        BRIECH,
         {"tail": "UAS-14", "mission": "MSN-091", "duration_min": 47, "battery_pct_end": 61},
     ),
     (
@@ -62,7 +64,7 @@ RECORDS = [
         "logistics-ref",
         "restricted",
         [],
-        "/eib-group/stratoc/",
+        STRATOC,
         {"item": "Cold weather kit", "depot": "DEP-B2", "quantity": 320, "threshold": 150},
     ),
     (
@@ -71,7 +73,7 @@ RECORDS = [
         "personnel-ref",
         "restricted",
         [],
-        "/eib-group/",
+        GROUP,
         {
             "person": "Sgt N. Yusuf",
             "qualification": "Armoured vehicle driver",
@@ -84,7 +86,7 @@ RECORDS = [
         "forensics-demo",
         "secret",
         ["FORENSICS"],
-        "/eib-group/giga/",
+        GIGA,
         {
             "case_ref": "FR-2026-014",
             "title": "Handset and cloud extraction for Client Agency D",
@@ -113,7 +115,7 @@ RECORDS = [
         "connected-tech-demo",
         "confidential",
         ["UAS-OPS"],
-        "/eib-group/briech/",
+        BRIECH,
         {
             "equipment_id": "UAS-14",
             "name": "Raven-II UAS",
@@ -127,7 +129,7 @@ RECORDS = [
         "logistics-ref",
         "restricted",
         [],
-        "/eib-group/stratoc/",
+        STRATOC,
         {"item": "Generator oil 5L", "depot": "DEP-B2", "quantity": 45, "threshold": 60},
     ),
 ]
