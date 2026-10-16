@@ -7,6 +7,7 @@ import { api, ApiError, downloadReport, type DivisionReport } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { ClearanceBadge } from "@/components/ClearanceBadge";
+import { recordHref } from "@/lib/links";
 
 // The division report as it will print: a draft with its marking, the same rows as the dashboard,
 // and the sources. Nothing here is written by a model; the export carries exactly this.
@@ -151,7 +152,7 @@ export default function ReportPage() {
                                   {row.label}
                                 </span>
                                 <Link
-                                  href={`/records/${row.ref}`}
+                                  href={recordHref(row.ref)}
                                   className="shrink-0 text-[0.75rem] tabular-nums text-mute hover:text-ink hover:underline"
                                 >
                                   {row.ref}

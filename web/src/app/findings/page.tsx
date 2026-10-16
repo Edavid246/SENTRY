@@ -7,6 +7,7 @@ import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { ClearanceBadge } from "@/components/ClearanceBadge";
 import { fmtTs } from "@/lib/format";
+import { recordHref } from "@/lib/links";
 
 export default function FindingsPage() {
   const { me, can } = useSession();
@@ -83,7 +84,7 @@ export default function FindingsPage() {
                   </span>
                 </div>
                 <Link
-                  href={`/findings/${encodeURIComponent(f.id)}`}
+                  href={recordHref(f.id)}
                   data-testid="finding-link"
                   className="mt-2 block text-[1rem] text-amber hover:underline"
                 >

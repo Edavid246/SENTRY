@@ -7,12 +7,7 @@ import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { ClearanceBadge } from "@/components/ClearanceBadge";
 import { BackLink } from "@/components/BackLink";
-
-function show(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
-}
+import { displayValue } from "@/lib/format";
 
 export default function RecordPage() {
   const { me } = useSession();
@@ -67,7 +62,7 @@ export default function RecordPage() {
               {Object.entries(record.data).map(([key, value]) => (
                 <div key={key} className="contents">
                   <dt className="text-mute">{key.replaceAll("_", " ")}</dt>
-                  <dd>{show(value)}</dd>
+                  <dd>{displayValue(value)}</dd>
                 </div>
               ))}
             </dl>

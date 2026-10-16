@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { api, ApiError, type DivisionSection } from "@/lib/api";
 import { ClearanceBadge } from "./ClearanceBadge";
+import { recordHref } from "@/lib/links";
 
 // How much of a service interval has been flown. The tick marks the last tenth, where an
 // aircraft should already be booked in; the fill turns amber once it passes the tick.
@@ -157,7 +158,7 @@ export function SerialLookup({ division }: { division: string }) {
               {result.rows.map((row) => (
                 <li key={row.ref} data-testid="trace-row">
                   <Link
-                    href={`/records/${encodeURIComponent(row.ref)}`}
+                    href={recordHref(row.ref)}
                     className="text-[0.95rem] hover:underline"
                   >
                     {row.label}

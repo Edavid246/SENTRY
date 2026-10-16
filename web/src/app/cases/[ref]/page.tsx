@@ -7,6 +7,7 @@ import { api, ApiError, type CaseView } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { ClearanceBadge } from "@/components/ClearanceBadge";
+import { recordHref } from "@/lib/links";
 
 type Evidence = CaseView["evidence"][number];
 
@@ -19,7 +20,7 @@ function Custody({ item }: { item: Evidence }) {
     <section data-testid={`evidence-${item.evidence_ref}`} className="border border-rule bg-surface">
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-rule px-5 py-3.5">
         <h3 className="text-[1rem] font-medium">
-          <Link href={`/records/${item.ref}`} className="hover:underline">
+          <Link href={recordHref(item.ref)} className="hover:underline">
             {item.evidence_ref} · {item.item}
           </Link>
         </h3>
@@ -40,7 +41,7 @@ function Custody({ item }: { item: Evidence }) {
                 className={`absolute left-0 top-1.5 h-[11px] w-[11px] ${gap ? "bg-amber" : "border border-sage bg-ground"}`}
               />
               <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-                <Link href={`/records/${step.ref}`} className={`text-[0.95rem] hover:underline ${gap ? "text-amber" : ""}`}>
+                <Link href={recordHref(step.ref)} className={`text-[0.95rem] hover:underline ${gap ? "text-amber" : ""}`}>
                   {step.action}
                 </Link>
                 <span className="text-[0.8rem] tabular-nums text-mute">{step.event_date}</span>
@@ -139,7 +140,7 @@ export default function CasePage() {
                       {c}
                     </span>
                   ))}
-                  <Link href={`/records/${view.ref}`} className="ml-3 text-[0.85rem] text-sage hover:text-ink hover:underline">
+                  <Link href={recordHref(view.ref)} className="ml-3 text-[0.85rem] text-sage hover:text-ink hover:underline">
                     Case record {view.ref}
                   </Link>
                   <Link href="/audit" className="ml-3 text-[0.85rem] text-sage hover:text-ink hover:underline">

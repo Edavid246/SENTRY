@@ -7,9 +7,7 @@ import { api, ApiError, type AuditEvent, type ChainTip, type VerifyReport } from
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { IconClose, IconLog, IconShieldCheck } from "@/components/Icons";
-import { fmtTs } from "@/lib/format";
-
-const str = (v: unknown): string => (typeof v === "string" ? v : v == null ? "—" : String(v));
+import { displayValue, fmtTs } from "@/lib/format";
 
 function DecisionBadge({ value }: { value: string }) {
   const cls =
@@ -150,10 +148,10 @@ function AuditView() {
   }, [focusId, loading, events]);
 
   const actors = useMemo(
-    () => Array.from(new Set(events.map((e) => str(e.payload.actor)))).sort(),
+    () => Array.from(new Set(events.map((e) => displayValue(e.payload.actor)))).sort(),
     [events],
   );
-  const shown = actor ? events.filter((e) => str(e.payload.actor) === actor) : events;
+  const shown = actor ? events.filter((e) => displayValue(e.payload.actor) === actor) : events;
 
   async function verify() {
     setVerifying(true);
@@ -317,7 +315,7 @@ function FragmentRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const decision = str(e.payload.decision);
+  const decision = displayValue(e.payload.decision);
   const mark = isBad ? "bg-bad/10 outline outline-1 outline-bad" : isFocus ? "bg-amber/10 outline outline-1 outline-amber" : "";
   return (
     <>
@@ -329,9 +327,9 @@ function FragmentRow({
       >
         <td className="whitespace-nowrap px-4 py-2.5 text-sage">{e.seq}</td>
         <td className="whitespace-nowrap px-4 py-2.5">{fmtTs(e.created_at)}</td>
-        <td className="whitespace-nowrap px-4 py-2.5">{str(e.payload.actor)}</td>
+        <td className="whitespace-nowrap px-4 py-2.5">{displayValue(e.payload.actor)}</td>
         <td className="whitespace-nowrap px-4 py-2.5 uppercase tracking-[0.06em]">
-          {str(e.payload.action)}
+          {displayValue(e.payload.action)}
           {typeof e.payload.source === "string" && e.payload.source && (
             <span
               data-testid="audit-source-tag"
@@ -342,7 +340,7 @@ function FragmentRow({
             </span>
           )}
         </td>
-        <td className="whitespace-nowrap px-4 py-2.5">{str(e.payload.resource)}</td>
+        <td className="whitespace-nowrap px-4 py-2.5">{displayValue(e.payload.resource)}</td>
         <td className="px-4 py-2.5">
           <DecisionBadge value={decision} />
         </td>

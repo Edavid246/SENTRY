@@ -10,6 +10,7 @@ import { Shell } from "@/components/Shell";
 import { ClearanceBadge } from "@/components/ClearanceBadge";
 import { BASEMAP_BOUNDS, basemapStyle, registerBasemap } from "@/lib/basemap";
 import { STATES } from "@/lib/states";
+import { recordHref } from "@/lib/links";
 
 const COLOURS: Record<MapKind, string> = {
   sensor: "#8fa89d",
@@ -314,7 +315,7 @@ export default function MapPage() {
                   ))}
               </dl>
               <Link
-                href={`/records/${encodeURIComponent(picked.properties.ref)}`}
+                href={recordHref(picked.properties.ref)}
                 data-testid="map-record-link"
                 className="btn mt-3 inline-block"
               >

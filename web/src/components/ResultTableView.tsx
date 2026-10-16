@@ -1,12 +1,7 @@
 import Link from "next/link";
 import type { ResultTable } from "@/lib/api";
-
-function cell(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "boolean") return value ? "yes" : "no";
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
-}
+import { displayValue } from "@/lib/format";
+import { recordHref } from "@/lib/links";
 
 export function ResultTableView({ table }: { table: ResultTable }) {
   return (
@@ -28,14 +23,14 @@ export function ResultTableView({ table }: { table: ResultTable }) {
                 <td key={c} className="whitespace-nowrap px-3 py-2">
                   {c === "id" && typeof row[c] === "string" ? (
                     <Link
-                      href={`/${(row[c] as string).startsWith("FND-") ? "findings" : "records"}/${encodeURIComponent(row[c] as string)}`}
+                      href={recordHref(row[c] as string)}
                       data-testid="record-link"
                       className="font-mono text-amber hover:underline"
                     >
                       {row[c] as string}
                     </Link>
                   ) : (
-                    cell(row[c])
+                    displayValue(row[c], { booleans: "yes-no" })
                   )}
                 </td>
               ))}

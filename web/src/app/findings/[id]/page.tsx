@@ -8,13 +8,8 @@ import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { ClearanceBadge } from "@/components/ClearanceBadge";
 import { BackLink } from "@/components/BackLink";
-
-function show(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—";
-  if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
-}
+import { displayValue } from "@/lib/format";
+import { recordHref } from "@/lib/links";
 
 export default function FindingPage() {
   const { me } = useSession();
@@ -76,7 +71,7 @@ export default function FindingPage() {
                 {finding.evidence_ids.map((ref) => (
                   <li key={ref}>
                     <Link
-                      href={`/records/${encodeURIComponent(ref)}`}
+                      href={recordHref(ref)}
                       data-testid="evidence-link"
                       className="tag text-amber hover:underline"
                     >
@@ -94,7 +89,7 @@ export default function FindingPage() {
                 {Object.entries(finding.details).map(([key, value]) => (
                   <div key={key} className="contents">
                     <dt className="text-mute">{key.replaceAll("_", " ")}</dt>
-                    <dd>{show(value)}</dd>
+                    <dd>{displayValue(value, { lists: "comma" })}</dd>
                   </div>
                 ))}
               </dl>
