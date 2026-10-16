@@ -371,7 +371,9 @@ Tick a step when its commit is pushed; note the commit hash.
   dashboard read alone (not a tool, so outside D3)
 - [x] 3.2 (c74ed20) Split `api/endpoints.py` into `api/auth.py`, `api/documents.py`, `api/records.py`,
   `api/audit.py`; OpenAPI snapshot unchanged
-- [ ] 3.3 Assistant ORM models
+- [x] 3.3 (d08ab7b) Assistant ORM models in `app/assistant/models.py`; `StoredMessage`. `alembic check`
+  on the test database: same three differences before and after, all pre-existing
+  (`audit_events.prev_hash` and `chunks.search_vector` nullability, `ix_chunks_search_vector`)
 - [ ] 3.4 `TokenValidator` seam (D2)
 - [ ] 3.5 Response models for the dict routes
 - [ ] 4.1 `displayValue()`, `recordHref()`
