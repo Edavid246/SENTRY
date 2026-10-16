@@ -383,7 +383,8 @@ Tick a step when its commit is pushed; note the commit hash.
 - [x] 4.1 (913803a) `displayValue()` in `lib/format.ts` (options keep the findings comma lists and the
   table's yes/no), `recordHref()` in `lib/links.ts` for all nine record and finding links; old and new
   formatters compared value by value (650 passed; smoke 66 ok)
-- [ ] 4.2 `<Marking>`
+- [x] 4.2 (77e8db2) `<Marking>` in `components/Marking.tsx`, a fragment (same DOM) replacing the ten
+  badge-plus-tags copies; no badge without a classification, as DivisionSections did (650 passed; smoke 66 ok)
 - [ ] 4.3 `useLoad()`, `<NotFound>`, `<Page>`, `<Brand>` (+ D9 a)
 - [ ] 4.4 Palette
 - [ ] 4.5 `DIVISION_EXTRAS`
