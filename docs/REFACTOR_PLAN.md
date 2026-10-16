@@ -376,7 +376,10 @@ Tick a step when its commit is pushed; note the commit hash.
   (`audit_events.prev_hash` and `chunks.search_vector` nullability, `ix_chunks_search_vector`)
 - [x] 3.4 (9e46856) `TokenValidator` seam (D2): protocol and `get_token_validator()` in `authz/tokens.py`;
   `api/deps.py` and `tests/support/contexts.py` go through it; docs/STUBS.md names it
-- [ ] 3.5 Response models for the dict routes
+- [x] 3.5 (989059e) Response models for the ten dict routes; response JSON byte-identical before and
+  after (six users, clock fields masked); map properties are one flat model serialised with
+  `response_model_exclude_unset`; OpenAPI snapshot re-recorded with only the ten 200 responses and
+  15 added schemas changed; `api-types.ts` regenerated and `lib/api.ts` aliases it (650 passed; smoke 66 ok)
 - [ ] 4.1 `displayValue()`, `recordHref()`
 - [ ] 4.2 `<Marking>`
 - [ ] 4.3 `useLoad()`, `<NotFound>`, `<Page>`, `<Brand>` (+ D9 a)
