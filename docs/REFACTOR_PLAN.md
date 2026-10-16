@@ -342,7 +342,7 @@ Tick a step when its commit is pushed; note the commit hash.
 - [x] 1.1 (de32dfa) Remove unused backend and web code (+ D4)
 - [x] 1.2 (0ae2c97) Seed hygiene, stale comments and config, embedding-dim test (+ D9 b-d); seed rows
   byte-identical before and after (SHA-256 of every row but the argon2 hashes, DEMO_DATE pinned)
-- [x] 2.1 `Label` as a `derive` input, `Scope.labels` (+ D1, D8); the D1 and D8 tests in
+- [x] 2.1 (c33eea1) `Label` as a `derive` input, `Scope.labels` (+ D1, D8); the D1 and D8 tests in
   `tests/authz/test_conversation_store.py` fail on the code before this step
 - [ ] 2.2 Unit vocabulary
 - [ ] 2.3 Identifier formats
