@@ -287,7 +287,9 @@ class _Report:
             return _refused(turn, "report", outcome)
         chunks, _ = turn.retrieve(DOCUMENT_QUERY)
         label = turn.label([*result.records, *chunks])
-        report = generate_training_report(turn.question, result, chunks, label, gateway=turn.models)
+        report = generate_training_report(
+            turn.question, result, chunks, label, labels=turn.scope.labels, gateway=turn.models
+        )
         return _Produced(
             answer=report.text,
             label=label,

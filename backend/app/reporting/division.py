@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.authz.labels import Label, Labels
-from app.reporting.training import DRAFT_BANNER
+from app.reporting.marking import DRAFT_BANNER, marking
 
 DEMO_NOTICE = "All data is fictitious demo data. This report informs; people decide."
 
@@ -53,11 +53,6 @@ class DivisionReport:
     sections: tuple[ReportSection, ...]
     refs: tuple[str, ...]
     notice: str
-
-
-def marking(name: str, compartments: tuple[str, ...] | list[str]) -> str:
-    """The marking line: CLASSIFICATION (COMPARTMENT, COMPARTMENT), the level as the UI names it."""
-    return name.upper() + (f" ({', '.join(compartments)})" if compartments else "")
 
 
 def _summary(sections: tuple[ReportSection, ...]) -> tuple[str, ...]:

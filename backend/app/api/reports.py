@@ -27,9 +27,9 @@ from app.reporting.division import (
     ReportRow,
     ReportSection,
     build_division_report,
-    marking,
 )
 from app.reporting.export import DOCX_TYPE, PDF_TYPE, filename, render_docx, render_pdf
+from app.reporting.marking import marking
 
 router = APIRouter(prefix="/api/v1/reports", tags=["reports"])
 

@@ -21,16 +21,16 @@ from dataclasses import dataclass
 
 from app.ai_gateway.base import ChatMessage, LLMRequest, LLMResult
 from app.ai_gateway.port import Completer
-from app.authz.labels import Label
+from app.authz.labels import Label, Labels
 from app.data_queries.formats import RECORD_ID, mention
 from app.data_queries.tools import ToolResult
 from app.knowledge.answer import build_evidence, parse_cited_chunk_ids
 from app.knowledge.retrieve import RetrievedChunk
+from app.reporting.marking import DRAFT_BANNER, marking
 
 # What retrieval looks for: the training directives behind the activity table.
 DOCUMENT_QUERY = "training"
 
-DRAFT_BANNER = "DRAFT FOR HUMAN REVIEW - not an approved document"
 NO_DATA_BODY = (
     "No training activity records or training documents were found within your authorization."
 )
@@ -68,17 +68,14 @@ class DraftReport:
 
 
 def _assemble(
-    body: str, label: Label, record_ids: tuple[str, ...], document_refs: tuple[str, ...]
+    body: str, marked: str, record_ids: tuple[str, ...], document_refs: tuple[str, ...]
 ) -> str:
-    marking = label.code.upper() + (
-        f" ({', '.join(label.compartments)})" if label.compartments else ""
-    )
     sources = [
         f"Records: {', '.join(record_ids) if record_ids else 'none'}",
         f"Documents: {', '.join(document_refs) if document_refs else 'none'}",
     ]
     return (
-        f"{DRAFT_BANNER}\nClassification: {marking}\n\n{body}\n\n"
+        f"{DRAFT_BANNER}\nClassification: {marked}\n\n{body}\n\n"
         "SOURCES (all demo data)\n" + "\n".join(sources)
     )
 
@@ -89,15 +86,17 @@ def generate_training_report(
     chunks: list[RetrievedChunk],
     label: Label,
     *,
+    labels: Labels,
     gateway: Completer,
 ) -> DraftReport:
     """Draft over `result` and `chunks`; `label` is the label derived from both."""
+    marked = marking(labels.display(label.code), label.compartments)
     record_ids = tuple(r.source_ref for r in result.records)
     document_refs = tuple(sorted({c.document_ref for c in chunks if c.document_ref}))
 
     def draft(body: str, *, found: bool, blocked: bool = False, citations=(), llm=None):
         return DraftReport(
-            text=_assemble(body, label, record_ids, document_refs),
+            text=_assemble(body, marked, record_ids, document_refs),
             citations=tuple(citations),
             record_ids=record_ids,
             document_refs=document_refs,

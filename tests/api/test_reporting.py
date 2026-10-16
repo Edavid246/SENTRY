@@ -63,7 +63,13 @@ def test_owner_gets_a_marked_draft_with_the_derived_label(client, gateway) -> No
     assert body["report"]["classification_code"] in {"confidential", "secret"}
     assert "UAS-OPS" in body["report"]["compartments"]  # REC-044 is a UAS-OPS record
     assert body["answer"].startswith("DRAFT FOR HUMAN REVIEW")
-    assert "Classification: " + body["report"]["classification_code"].upper() in body["answer"]
+    # the marking names the level as the UI does (Secret is shown as Government-sensitive)
+    shown = {"confidential": "CONFIDENTIAL", "secret": "GOVERNMENT-SENSITIVE"}
+    marking_line = body["answer"].splitlines()[1]
+    assert marking_line.startswith(
+        "Classification: " + shown[body["report"]["classification_code"]]
+    )
+    assert "SECRET" not in marking_line and "UAS-OPS" in marking_line
     assert "SOURCES (all demo data)" in body["answer"]
     assert body["found"] is True and body["refused"] is False
     assert {c["chunk_id"] for c in body["citations"]}  # a cited document passage
