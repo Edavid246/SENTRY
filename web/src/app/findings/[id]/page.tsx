@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError, type Finding } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
-import { ClearanceBadge } from "@/components/ClearanceBadge";
+import { Marking } from "@/components/Marking";
 import { BackLink } from "@/components/BackLink";
 import { displayValue } from "@/lib/format";
 import { recordHref } from "@/lib/links";
@@ -48,12 +48,7 @@ export default function FindingPage() {
               <span className="border border-bad px-2 py-0.5 text-[0.7rem] uppercase tracking-[0.1em] text-bad">
                 {finding.severity}
               </span>
-              <ClearanceBadge code={finding.classification_code} />
-              {finding.compartments.map((c) => (
-                <span key={c} className="tag">
-                  {c}
-                </span>
-              ))}
+              <Marking code={finding.classification_code} compartments={finding.compartments} />
               <span className="text-[0.75rem] text-mute">{finding.unit_name}</span>
               <span className="ml-auto font-mono text-[0.75rem] text-mute">{finding.id}</span>
             </div>

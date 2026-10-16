@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError, type CaseView } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
-import { ClearanceBadge } from "@/components/ClearanceBadge";
+import { Marking } from "@/components/Marking";
 import { recordHref } from "@/lib/links";
 
 type Evidence = CaseView["evidence"][number];
@@ -134,12 +134,7 @@ export default function CasePage() {
                   ))}
                 </dl>
                 <div className="mt-5 flex flex-wrap items-center gap-1.5">
-                  <ClearanceBadge code={view.classification} />
-                  {view.compartments.map((c) => (
-                    <span key={c} className="tag">
-                      {c}
-                    </span>
-                  ))}
+                  <Marking code={view.classification} compartments={view.compartments} />
                   <Link href={recordHref(view.ref)} className="ml-3 text-[0.85rem] text-sage hover:text-ink hover:underline">
                     Case record {view.ref}
                   </Link>

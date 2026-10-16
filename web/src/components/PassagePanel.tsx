@@ -1,7 +1,7 @@
 "use client";
 
 import type { Chunk, Citation } from "@/lib/api";
-import { ClearanceBadge } from "./ClearanceBadge";
+import { Marking } from "./Marking";
 import { citationLabel } from "./CitedAnswer";
 import { IconClose } from "./Icons";
 
@@ -36,12 +36,7 @@ export function PassagePanel({ state, onClose }: { state: PanelState; onClose: (
           <>
             <h2 className="text-[1rem] font-medium">{state.chunk.document_title}</h2>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <ClearanceBadge code={state.chunk.classification_code} />
-              {state.chunk.compartments.map((c) => (
-                <span key={c} className="tag">
-                  {c}
-                </span>
-              ))}
+              <Marking code={state.chunk.classification_code} compartments={state.chunk.compartments} />
             </div>
             <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[0.85rem]">
               <dt className="text-sage">Document</dt>

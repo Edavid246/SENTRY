@@ -7,7 +7,7 @@ import { api, ApiError, type HomeDivision, type HomeSummary } from "@/lib/api";
 import { stagger, useFirstEntrance } from "@/lib/motion";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
-import { ClearanceBadge } from "@/components/ClearanceBadge";
+import { Marking } from "@/components/Marking";
 import { DivisionGlyph } from "@/components/DivisionGlyph";
 
 // The card is the whole link. An alert exists only when something needs attention: a quiet
@@ -64,12 +64,7 @@ function DivisionCard({ division, wide, delay }: { division: HomeDivision; wide?
               ))}
             </ul>
             <div className="flex flex-wrap items-center gap-1.5">
-              <ClearanceBadge code={alert.classification} />
-              {alert.compartments.map((c) => (
-                <span key={c} className="tag">
-                  {c}
-                </span>
-              ))}
+              <Marking code={alert.classification} compartments={alert.compartments} />
             </div>
           </div>
         )}

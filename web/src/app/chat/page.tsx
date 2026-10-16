@@ -6,7 +6,7 @@ import { api, ApiError, type Citation, type ConversationSummary, type ReportInfo
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
 import { CitedAnswer } from "@/components/CitedAnswer";
-import { ClearanceBadge } from "@/components/ClearanceBadge";
+import { Marking } from "@/components/Marking";
 import { ResultTableView } from "@/components/ResultTableView";
 import { PassagePanel, type PanelState } from "@/components/PassagePanel";
 import { IconArrow, IconPlus } from "@/components/Icons";
@@ -141,12 +141,7 @@ function Thread({
                   className="mb-3 flex flex-wrap items-center gap-2 border border-amber bg-amber/10 px-3 py-2 text-[0.85rem] font-medium uppercase tracking-[0.1em] text-amber"
                 >
                   Draft for human review
-                  <ClearanceBadge code={m.meta.report.classification_code} />
-                  {m.meta.report.compartments.map((c) => (
-                    <span key={c} className="tag">
-                      {c}
-                    </span>
-                  ))}
+                  <Marking code={m.meta.report.classification_code} compartments={m.meta.report.compartments} />
                 </div>
               )}
               {m.meta?.refused && (

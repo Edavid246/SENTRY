@@ -7,7 +7,7 @@ import type { GeoJSONSource, Map as MlMap } from "maplibre-gl";
 import { api, type ConnectedMap, type MapFeature, type MapKind } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
-import { ClearanceBadge } from "@/components/ClearanceBadge";
+import { Marking } from "@/components/Marking";
 import { BASEMAP_BOUNDS, basemapStyle, registerBasemap } from "@/lib/basemap";
 import { STATES } from "@/lib/states";
 import { recordHref } from "@/lib/links";
@@ -285,12 +285,7 @@ export default function MapPage() {
             <div data-testid="map-detail" className="mt-4 border border-rule p-3 text-[0.85rem]">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="label">{picked.properties.kind}</span>
-                <ClearanceBadge code={picked.properties.classification} />
-                {picked.properties.compartments.map((c) => (
-                  <span key={c} className="tag">
-                    {c}
-                  </span>
-                ))}
+                <Marking code={picked.properties.classification} compartments={picked.properties.compartments} />
               </div>
               <div className="mt-2 font-medium">{picked.properties.label}</div>
               <dl className="mt-2 grid grid-cols-[6rem_1fr] gap-y-1 text-[0.8rem]">

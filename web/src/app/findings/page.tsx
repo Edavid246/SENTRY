@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type Finding } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
-import { ClearanceBadge } from "@/components/ClearanceBadge";
+import { Marking } from "@/components/Marking";
 import { fmtTs } from "@/lib/format";
 import { recordHref } from "@/lib/links";
 
@@ -73,12 +73,7 @@ export default function FindingsPage() {
                   <span className="border border-bad px-2 py-0.5 text-[0.7rem] uppercase tracking-[0.1em] text-bad">
                     {f.severity}
                   </span>
-                  <ClearanceBadge code={f.classification_code} />
-                  {f.compartments.map((c) => (
-                    <span key={c} className="tag">
-                      {c}
-                    </span>
-                  ))}
+                  <Marking code={f.classification_code} compartments={f.compartments} />
                   <span className="ml-auto text-[0.75rem] text-mute">
                     {f.unit_name} · {fmtTs(f.created_at)}
                   </span>

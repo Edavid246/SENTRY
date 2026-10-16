@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { api, ApiError, type DivisionSection } from "@/lib/api";
-import { ClearanceBadge } from "./ClearanceBadge";
+import { Marking } from "./Marking";
 import { recordHref } from "@/lib/links";
 
 // How much of a service interval has been flown. The tick marks the last tenth, where an
@@ -89,12 +89,7 @@ export function SectionCard({
       )}
       <footer className="flex flex-wrap items-center gap-2 border-t border-rule px-5 py-2 text-[0.7rem] text-mute">
         <span>Source: {section.tool}</span>
-        {section.classification && <ClearanceBadge code={section.classification} />}
-        {section.compartments.map((c) => (
-          <span key={c} className="tag">
-            {c}
-          </span>
-        ))}
+        <Marking code={section.classification} compartments={section.compartments} />
       </footer>
     </section>
   );

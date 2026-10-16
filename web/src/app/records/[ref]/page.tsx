@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError, type RecordDetail } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
-import { ClearanceBadge } from "@/components/ClearanceBadge";
+import { Marking } from "@/components/Marking";
 import { BackLink } from "@/components/BackLink";
 import { displayValue } from "@/lib/format";
 
@@ -45,12 +45,7 @@ export default function RecordPage() {
           <div data-testid="record-detail" className="mt-4 max-w-3xl border border-rule bg-surface">
             <div className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-3">
               <span className="label">{record.entity_type}</span>
-              <ClearanceBadge code={record.classification_code} />
-              {record.compartments.map((c) => (
-                <span key={c} className="tag">
-                  {c}
-                </span>
-              ))}
+              <Marking code={record.classification_code} compartments={record.compartments} />
             </div>
             <dl className="grid grid-cols-1 gap-x-4 gap-y-1 md:grid-cols-[12rem_1fr] md:gap-y-2 px-4 py-4 text-[0.9rem]">
               <dt className="text-mute">Source system</dt>

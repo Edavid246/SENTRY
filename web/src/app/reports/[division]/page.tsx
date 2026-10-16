@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError, downloadReport, type DivisionReport } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
-import { ClearanceBadge } from "@/components/ClearanceBadge";
+import { Marking } from "@/components/Marking";
 import { recordHref } from "@/lib/links";
 
 // The division report as it will print: a draft with its marking, the same rows as the dashboard,
@@ -101,12 +101,7 @@ export default function ReportPage() {
                 <div className="space-y-6 p-6">
                   <header>
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <ClearanceBadge code={report.classification} />
-                      {report.compartments.map((c) => (
-                        <span key={c} className="tag">
-                          {c}
-                        </span>
-                      ))}
+                      <Marking code={report.classification} compartments={report.compartments} />
                     </div>
                     <p className="mt-3 text-[0.95rem] text-sage">{report.tagline}</p>
                     <p className="mt-1 text-[0.8rem] text-mute">
