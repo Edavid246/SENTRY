@@ -363,7 +363,12 @@ Tick a step when its commit is pushed; note the commit hash.
 - [x] 2.6 (b444b7e) `reporting/marking.py` (+ D6): `DRAFT_BANNER` and `marking()` in one module, used by
   both reports; the training draft's marking line prints display names (`tests/unit/test_report_marking.py`
   fails on the code before this step). Prompt fingerprints unchanged
-- [ ] 3.1 `app/divisions/` package (then D3)
+- [x] 3.1 (9addb2a; D3 db4e7e2) `app/divisions/` package: `catalog`, `specs`, `view`, `attention`;
+  routes keep only HTTP, the domain raises `DivisionNotFound` / `TraceRefused`; OpenAPI and prompt
+  snapshots unchanged. D3 (option b): `execute_tool` checks each tool requirement through
+  `Scope.allows`; dashboard routes gain one decide event. Its five tests fail on the previous
+  registry. Left open: the home "findings open" count reads the findings store under the
+  dashboard read alone (not a tool, so outside D3)
 - [ ] 3.2 Split `api/endpoints.py`
 - [ ] 3.3 Assistant ORM models
 - [ ] 3.4 `TokenValidator` seam (D2)
