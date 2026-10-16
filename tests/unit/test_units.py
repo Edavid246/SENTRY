@@ -1,7 +1,7 @@
 """The unit-tree vocabulary in app.units, and the home grouping rule built on it."""
 
 import pytest
-from app.api.home import FIELD_OPS, _division_key
+from app.divisions.catalog import FIELD_OPS, division_key
 from app.units import covers, is_site, overlaps, subsidiary_key, unit_slug
 
 GROUP = "/eib-group/"
@@ -53,5 +53,5 @@ def test_unit_slug() -> None:
 def test_home_groups_records_and_findings_by_division(
     path: str, record: str | None, finding: str | None
 ) -> None:
-    assert _division_key(path) == record
-    assert _division_key(path, finding=True) == finding
+    assert division_key(path) == record
+    assert division_key(path, finding=True) == finding

@@ -11,17 +11,20 @@ Reports are informational drafts. There is no approval flow: people review and d
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
+from sqlalchemy.engine import Connection
 
 from app.api.deps import ConnDep, CurrentContext
-from app.api.divisions import Section, build_division
 from app.api.guard import guarded
 from app.audit.events import event
+from app.authz.context import AccessContext
 from app.authz.labels import Label, Labels
 from app.clock import utc_now_iso
+from app.divisions.catalog import DivisionNotFound
+from app.divisions.view import Section, build_division
 from app.reporting.division import (
     DivisionReport,
     ReportRow,
@@ -78,9 +81,12 @@ def _section(section: Section, labels: Labels) -> ReportSection:
     )
 
 
-def _build(ctx: CurrentContext, conn: ConnDep, key: str, *, export: str | None) -> DivisionReport:
+def _build(ctx: AccessContext, conn: Connection, key: str, *, export: str | None) -> DivisionReport:
     with guarded(ctx, conn, "read", "dashboard", on_deny="not_found") as scope:
-        built = build_division(scope, conn, key)
+        try:
+            built = build_division(scope, key)
+        except DivisionNotFound:
+            raise HTTPException(status_code=404, detail="not found") from None
         division, sections, labels = built.division, built.sections, built.labels
         parts = [
             Label(s.classification, tuple(s.compartments)) for s in sections if s.classification
@@ -125,7 +131,7 @@ def report_export(
     key: str,
     ctx: CurrentContext,
     conn: ConnDep,
-    format: Literal["pdf", "docx"] = Query(),  # noqa: A002 - the query parameter's public name
+    format: Annotated[Literal["pdf", "docx"], Query()],  # noqa: A002 - the query parameter's public name
 ) -> Response:
     report = _build(ctx, conn, key, export=format)
     data, media = (

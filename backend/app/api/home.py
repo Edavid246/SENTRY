@@ -4,31 +4,19 @@ One card per business the caller can see (Briech UAS, EIB Stratoc, Giga Forensic
 plus Field Operations, the people and sites out in the field. A card carries an alert only
 when something genuinely needs attention; a quiet division has no alert at all.
 
-Same rules as every other data endpoint: a guarded read, so the policy decides first, and the
-numbers come from audited typed tools filtered inside the query. A division the caller cannot
-see is absent from the response, never present-but-locked. An alert is a derived count, so it
-takes the highest classification and the union of compartments of what it counts.
-
-Certifications are deliberately not counted here: they are background compliance, shown on
-the compliance views, not a reason to interrupt the owner on the landing screen.
+Same rules as every other data endpoint: a guarded read, so the policy decides first. The counts
+and which divisions are shown come from `app.divisions.attention`.
 """
 
 from __future__ import annotations
-
-from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.api.deps import ConnDep, CurrentContext
 from app.api.guard import guarded
-from app.authz.labels import Label
 from app.clock import utc_now_iso
-from app.correlation.store import list_findings
-from app.data_queries.registry import execute_tool
-from app.units import covers, is_site, subsidiary_key, unit_names
+from app.divisions.attention import Attention, division_attention
 
 router = APIRouter(prefix="/api/v1/home", tags=["home"])
 
@@ -57,96 +45,23 @@ class HomeSummary(BaseModel):
     divisions: list[HomeDivision]
 
 
-@dataclass(frozen=True, slots=True)
-class Division:
-    key: str
-    name: str
-    tagline: str
-    path: str | None  # the subsidiary's unit path; None for Field Operations
-
-
-DIVISIONS = (
-    Division("briech", "Briech UAS", "Drones and airborne surveillance", "/eib-group/briech/"),
-    Division("stratoc", "EIB Stratoc", "Surveillance and intelligence", "/eib-group/stratoc/"),
-    Division("giga", "Giga Forensics", "Digital forensics and evidence", "/eib-group/giga/"),
-    Division("poctova", "Poctova", "Protective gear, made and traced", "/eib-group/poctova/"),
-    Division("field-ops", "Field Operations", "Personnel and sites in the field", None),
-)
-FIELD_OPS = "field-ops"
-
-# (tool, params, what it counts). Certifications are left out on purpose, see the module doc.
-ATTENTION_TOOLS: tuple[tuple[str, Mapping[str, Any], str], ...] = (
-    ("equipment_due_for_maintenance", {"within_days": 0}, "equipment overdue"),
-    ("deliveries_overdue", {}, "deliveries overdue"),
-    ("production_qc_holds", {}, "production runs on QC hold"),
-    ("stock_below_threshold", {}, "stock lines short"),
-    ("uas_missions", {"status": "cancelled"}, "UAS missions cancelled"),
-    ("custody_gaps", {}, "custody breaks"),
-)
-FINDINGS_WHAT = "findings open"
-
-
-def _division_key(unit_path: str, *, finding: bool = False) -> str | None:
-    """Which card a record counts toward. A site team (a unit below a subsidiary) belongs to
-    Field Operations; a finding about a site stays with the subsidiary that raised it."""
-    if is_site(unit_path) and not finding:
-        return FIELD_OPS
-    return subsidiary_key(unit_path)  # None for a group-level record: no division
+def _card(attention: Attention) -> HomeDivision:
+    division, label = attention.division, attention.label
+    alert = None
+    if label is not None:
+        alert = HomeAlert(
+            count=len(attention.refs),
+            parts=[AlertPart(what=what, count=count) for what, count in attention.parts],
+            classification=label.code,
+            compartments=list(label.compartments),
+        )
+    return HomeDivision(key=division.key, name=division.name, tagline=division.tagline, alert=alert)
 
 
 @router.get("/summary", response_model=HomeSummary)
 def home_summary(ctx: CurrentContext, conn: ConnDep) -> HomeSummary:
     with guarded(ctx, conn, "read", "dashboard") as scope:
-        names = unit_names(conn)
-        counted: dict[str, dict[str, list[tuple[str, Label]]]] = {}  # key -> what -> (ref, label)
-
-        def add(key: str | None, what: str, ref: str, label: Label) -> None:
-            if key is not None:
-                counted.setdefault(key, {}).setdefault(what, []).append((ref, label))
-
-        for tool, params, what in ATTENTION_TOOLS:
-            for record in execute_tool(scope, tool, params).records:
-                add(
-                    _division_key(record.unit_path),
-                    what,
-                    record.source_ref,
-                    Label(record.classification_code, tuple(record.compartments)),
-                )
-        for row in list_findings(scope):
-            add(
-                _division_key(row.unit_path, finding=True),
-                FINDINGS_WHAT,
-                row.key,
-                Label(row.classification_code, tuple(row.compartments)),
-            )
-
-        # A division is shown when the caller's unit covers it, or when anything in it is visible.
-        site_units = [p for p in names if is_site(p)]
-        divisions: list[HomeDivision] = []
-        item_ids: list[str] = []
-        for division in DIVISIONS:
-            by_what = counted.get(division.key, {})
-            if division.path is not None:
-                covered = covers(ctx.unit_path, division.path)
-            else:
-                covered = any(covers(ctx.unit_path, p) for p in site_units)
-            if not covered and not by_what:
-                continue
-            members = [m for found in by_what.values() for m in found]
-            alert = None
-            if members:
-                label = scope.labels.derive(m for _, m in members)
-                alert = HomeAlert(
-                    count=len(members),
-                    parts=[AlertPart(what=w, count=len(found)) for w, found in by_what.items()],
-                    classification=label.code,
-                    compartments=list(label.compartments),
-                )
-                item_ids.extend(ref for ref, _ in members)
-            divisions.append(
-                HomeDivision(
-                    key=division.key, name=division.name, tagline=division.tagline, alert=alert
-                )
-            )
+        shown = division_attention(scope)
+        item_ids = [ref for attention in shown for ref in attention.refs]
         scope.read("dashboard", len(item_ids), item_ids=item_ids)
-    return HomeSummary(generated_at=utc_now_iso(), divisions=divisions)
+    return HomeSummary(generated_at=utc_now_iso(), divisions=[_card(a) for a in shown])

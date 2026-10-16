@@ -2,7 +2,7 @@
 
 Presentation only. A spec names the typed tool that produces the rows and how a row reads
 (label, detail, whether it needs attention); the audit, authorization and labelling all happen
-in `app.api.divisions`, which runs the specs. To add a division's dashboard, add its entry to
+in `app.divisions.view`, which runs the specs. To add a division's dashboard, add its entry to
 SECTIONS. Nothing else changes.
 """
 
