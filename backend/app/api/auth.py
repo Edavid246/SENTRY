@@ -53,6 +53,7 @@ def login(body: LoginRequest, conn: ConnDep) -> dict[str, str]:
             headers={"WWW-Authenticate": "Bearer"},
         )
     audit_events([event(body.username, "login", "auth", "allow", user_id=str(row.id))])
+    # The dev login issues dev tokens explicitly; with Keycloak, login leaves this service.
     return {
         "access_token": DevTokenValidator().issue_token(body.username),
         "token_type": "bearer",

@@ -1,21 +1,25 @@
-"""Dev token validator: JWT in, AccessContext out (SPEC 7.1, 7.4).
+"""The TokenValidator seam and its dev implementation: JWT in, AccessContext out (SPEC 7.1, 7.4).
 
-Keycloak is stubbed for the demo (docs/STUBS.md). The dev profile issues
-HS256 tokens with a config-supplied secret and resolves each token to a
-fully-built AccessContext by reading the user, unit, clearance and
-compartments from the database at validation time — the context is never
-trusted from token claims alone. The real deployment swaps this class for
-the Keycloak-backed TokenValidator behind the same interface.
+`TokenValidator` is the interface every request authenticates through, and
+`get_token_validator()` is the one place the implementation is chosen (as
+`get_policy()` is for the policy). Keycloak is stubbed for the demo
+(docs/STUBS.md): the dev profile issues HS256 tokens with a config-supplied
+secret and resolves each token to a fully-built AccessContext by reading the
+user, unit, clearance and compartments from the database at validation time —
+the context is never trusted from token claims alone. The real deployment
+returns a Keycloak-backed validator from `get_token_validator()`; the dev
+login, which issues the dev tokens, goes away with it.
 """
 
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 import jwt
 from sqlalchemy import text
+from sqlalchemy.engine import Connection
 
 from app.authz.context import AccessContext, permissions_for_role
 from app.config import Settings, get_settings
@@ -40,6 +44,12 @@ _COMPARTMENTS_SQL = """
 
 class TokenError(Exception):
     """Token is missing, malformed, forged, expired, or has no user."""
+
+
+class TokenValidator(Protocol):
+    def validate(self, token: str, *, conn: Connection) -> AccessContext:
+        """The caller's full AccessContext, or TokenError (fail closed on every error path)."""
+        ...
 
 
 class DevTokenValidator:
@@ -105,3 +115,11 @@ class DevTokenValidator:
             token_id=token_id,
             auth_method="dev-jwt",
         )
+
+
+def get_token_validator() -> TokenValidator:
+    """The one place the token validator is chosen (Keycloak replaces it here).
+
+    Built per call, as before the seam existed: it reads the settings when it is made.
+    """
+    return DevTokenValidator()

@@ -143,3 +143,24 @@ def test_me_signed_token_without_jti_401(client, settings) -> None:
     response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 401
     assert response.json() == {"detail": "not authenticated"}
+
+
+def test_requests_authenticate_through_the_token_validator_seam(client, monkeypatch) -> None:
+    """`get_token_validator()` is the one wiring point: swap it and every request follows."""
+    from app.api import deps
+    from app.authz.tokens import TokenValidator
+    from support.contexts import access_context
+
+    seen: list[str] = []
+
+    class Stub:
+        def validate(self, token: str, *, conn) -> object:
+            seen.append(token)
+            return access_context("coo")
+
+    stub: TokenValidator = Stub()
+    monkeypatch.setattr(deps, "get_token_validator", lambda: stub)
+    response = client.get("/api/v1/me", headers={"Authorization": "Bearer not-a-dev-jwt"})
+    assert response.status_code == 200, response.text
+    assert response.json()["username"] == "coo"
+    assert seen == ["not-a-dev-jwt"]

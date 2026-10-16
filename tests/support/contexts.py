@@ -10,7 +10,7 @@ from __future__ import annotations
 from uuid import NAMESPACE_URL, uuid5
 
 from app.authz.context import AccessContext, permissions_for_role
-from app.authz.tokens import DevTokenValidator
+from app.authz.tokens import get_token_validator
 
 from support.http import auth_header
 
@@ -105,4 +105,4 @@ def ctx_for(client, app_engine, username: str) -> AccessContext:
     """Log in through the API and resolve the token the way a request does."""
     token = auth_header(client, username)["Authorization"].split(" ", 1)[1]
     with app_engine.connect() as conn:
-        return DevTokenValidator().validate(token, conn=conn)
+        return get_token_validator().validate(token, conn=conn)

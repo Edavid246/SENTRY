@@ -18,7 +18,7 @@ from sqlalchemy.engine import Connection
 from app.ai_gateway.port import ModelPort
 from app.audit.events import audit_events, event
 from app.authz.context import AccessContext
-from app.authz.tokens import DevTokenValidator, TokenError
+from app.authz.tokens import TokenError, get_token_validator
 from app.db import get_engine
 
 
@@ -66,7 +66,7 @@ def current_context(
     if separator != " " or scheme.lower() != "bearer" or not token.strip():
         raise _unauthenticated()
     try:
-        return DevTokenValidator().validate(token.strip(), conn=conn)
+        return get_token_validator().validate(token.strip(), conn=conn)
     except TokenError as exc:
         audit_events([event("anonymous", "authenticate", "auth", "deny", reasons=[str(exc)])])
         raise _unauthenticated() from exc
