@@ -357,7 +357,7 @@ Tick a step when its commit is pushed; note the commit hash.
   `utc_now_iso` in `app/clock.py`; `_Cited` gone; `embed_or_none` and `vector_literal` in
   `ai_gateway/embeddings.py` (`ingest._embed` stays as the name tests patch); the answer event
   gains `model_version`, token counts and `latency_ms` (`tests/unit/test_model_use.py`)
-- [x] 2.5 Correlation rename and finding helper: `analysis.py` is `rising_faults.py`;
+- [x] 2.5 (659ee2a) Correlation rename and finding helper: `analysis.py` is `rising_faults.py`;
   `draft_finding()` in `correlation/types.py`; `FindingRow` extends `FindingDraft`. A run's full
   findings JSON (all four, minus `created_at`) is byte-identical before and after
 - [ ] 2.6 `reporting/marking.py` (+ D6)
