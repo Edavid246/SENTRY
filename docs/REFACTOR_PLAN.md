@@ -380,7 +380,9 @@ Tick a step when its commit is pushed; note the commit hash.
   after (six users, clock fields masked); map properties are one flat model serialised with
   `response_model_exclude_unset`; OpenAPI snapshot re-recorded with only the ten 200 responses and
   15 added schemas changed; `api-types.ts` regenerated and `lib/api.ts` aliases it (650 passed; smoke 66 ok)
-- [ ] 4.1 `displayValue()`, `recordHref()`
+- [x] 4.1 (913803a) `displayValue()` in `lib/format.ts` (options keep the findings comma lists and the
+  table's yes/no), `recordHref()` in `lib/links.ts` for all nine record and finding links; old and new
+  formatters compared value by value (650 passed; smoke 66 ok)
 - [ ] 4.2 `<Marking>`
 - [ ] 4.3 `useLoad()`, `<NotFound>`, `<Page>`, `<Brand>` (+ D9 a)
 - [ ] 4.4 Palette
