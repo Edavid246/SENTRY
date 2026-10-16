@@ -6,13 +6,13 @@ from collections.abc import Callable
 
 from app.authz.labels import Labels
 from app.authz.scope import Scope
-from app.correlation import analysis, custody, qc_delivery
+from app.correlation import custody, qc_delivery, rising_faults
 from app.correlation.types import FindingDraft
 
 Analysis = Callable[[Scope, Labels, dict[str, str]], list[FindingDraft]]
 
 ANALYSES: dict[str, Analysis] = {
-    analysis.ANALYSIS: analysis.run_rising_faults,
+    rising_faults.ANALYSIS: rising_faults.run_rising_faults,
     custody.ANALYSIS: custody.run_repeated_custody_gaps,
     qc_delivery.ANALYSIS: qc_delivery.run_qc_hold_overdue_delivery,
 }

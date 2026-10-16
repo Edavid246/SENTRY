@@ -17,9 +17,8 @@ import re
 
 from app.authz.labels import Labels
 from app.authz.scope import Scope
-from app.clock import demo_today
 from app.connectors.base import SourceRecord
-from app.correlation.types import FindingDraft
+from app.correlation.types import FindingDraft, draft_finding
 from app.data_queries.registry import execute_tool
 
 ANALYSIS = "repeated_custody_gaps"
@@ -49,11 +48,10 @@ def run_repeated_custody_gaps(
             for r in execute_tool(scope, "evidence_items", {"unit_path": unit_path}).records
             if r.data["evidence_ref"] in items
         ]
-        evidence = [*events, *item_records]
-        label = labels.derive(evidence)
         unit_name = names.get(unit_path, unit_path)
         drafts.append(
-            FindingDraft(
+            draft_finding(
+                labels,
                 key=f"FND-REPEATED-CUSTODY-GAPS-{_slug(holder)}",
                 analysis=ANALYSIS,
                 title=f"Repeated custody gaps at {unit_name} involving {holder}",
@@ -63,23 +61,19 @@ def run_repeated_custody_gaps(
                     "was last received by someone else, so the hand-over is undocumented. "
                     "Review these transfers together rather than case by case."
                 ),
-                severity="high",
-                classification_code=label.code,
-                compartments=list(label.compartments),
                 unit_path=unit_path,
-                evidence_ids=sorted(r.source_ref for r in evidence),
-                details={
-                    "rule": (
-                        "custody breaks with the same recorded holder in at least "
-                        f"{MIN_CASES} different cases"
-                    ),
-                    "as_of": demo_today().isoformat(),
+                evidence=[*events, *item_records],
+                rule=(
+                    "custody breaks with the same recorded holder in at least "
+                    f"{MIN_CASES} different cases"
+                ),
+                facts={
                     "recorded_holder": holder,
                     "cases": cases,
                     "broken_events": sorted(e.source_ref for e in events),
                     "evidence_items": sorted(items),
-                    "tools": ["custody_gaps", "evidence_items"],
                 },
+                tools=["custody_gaps", "evidence_items"],
             )
         )
     return drafts

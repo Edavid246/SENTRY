@@ -20,7 +20,7 @@ from app.authz.scope import Scope
 from app.clock import demo_today
 from app.connectors import get_adapter
 from app.connectors.base import RecordFilter, SourceRecord
-from app.correlation.types import FindingDraft
+from app.correlation.types import FindingDraft, draft_finding
 from app.data_queries.registry import execute_tool
 from app.units import unit_slug
 
@@ -70,11 +70,10 @@ def run_rising_faults(scope: Scope, labels: Labels, names: dict[str, str]) -> li
         if not certs or not stock:
             continue  # a fault rise alone is not the correlation this job looks for
 
-        evidence = [*recent, *certs, *stock]
-        label = labels.derive(evidence)
         unit_name = names.get(unit_path, unit_path)
         drafts.append(
-            FindingDraft(
+            draft_finding(
+                labels,
                 key=f"FND-RISING-FAULTS-{unit_slug(unit_path)}",
                 analysis=ANALYSIS,
                 title=f"Rising faults in {unit_name} linked to lapsed maintainer "
@@ -85,25 +84,22 @@ def run_rising_faults(scope: Scope, labels: Labels, names: dict[str, str]) -> li
                     f"{len(certs)} maintainer certification(s) have lapsed and "
                     f"{len(stock)} stock line(s) are below threshold in the same unit."
                 ),
-                severity="high",
-                classification_code=label.code,
-                compartments=list(label.compartments),
                 unit_path=unit_path,
-                evidence_ids=sorted(r.source_ref for r in evidence),
-                details={
-                    "rule": (
-                        f"faults in last {WINDOW_DAYS} days >= 2 x previous {WINDOW_DAYS} days "
-                        f"and >= {MIN_INCREASE} more; lapsed '{MAINTAINER}' certifications and "
-                        "stock below threshold in the same unit"
-                    ),
-                    "as_of": today.isoformat(),
+                evidence=[*recent, *certs, *stock],
+                rule=(
+                    f"faults in last {WINDOW_DAYS} days >= 2 x previous {WINDOW_DAYS} days "
+                    f"and >= {MIN_INCREASE} more; lapsed '{MAINTAINER}' certifications and "
+                    "stock below threshold in the same unit"
+                ),
+                facts={
                     "window_days": WINDOW_DAYS,
                     "prior_faults": len(prior),
                     "recent_faults": len(recent),
                     "lapsed_maintainer_certifications": sorted(r.source_ref for r in certs),
                     "stock_below_threshold": sorted(r.source_ref for r in stock),
-                    "tools": ["expired_certifications", "stock_below_threshold"],
                 },
+                tools=["expired_certifications", "stock_below_threshold"],
+                as_of=today,  # the day the windows above were measured from
             )
         )
     return drafts

@@ -18,9 +18,8 @@ from __future__ import annotations
 
 from app.authz.labels import Labels
 from app.authz.scope import Scope
-from app.clock import demo_today
 from app.connectors.base import SourceRecord
-from app.correlation.types import FindingDraft
+from app.correlation.types import FindingDraft, draft_finding
 from app.data_queries.registry import execute_tool
 
 ANALYSIS = "qc_hold_overdue_delivery"
@@ -52,13 +51,12 @@ def run_qc_hold_overdue_delivery(
             for ref in sorted({str(d.data["contract_ref"]) for d in deliveries})
             if ref in contracts
         ]
-        evidence = [run, *deliveries, *linked]
-        label = labels.derive(evidence)
         unit_name = names.get(run.unit_path, run.unit_path)
         run_ref = str(run.data["run_ref"])
         refs = [str(d.data["delivery_ref"]) for d in deliveries]
         drafts.append(
-            FindingDraft(
+            draft_finding(
+                labels,
                 key=f"FND-QC-HOLD-OVERDUE-{run_ref}",
                 analysis=ANALYSIS,
                 title=f"{unit_name}: QC hold on {run.data['product']} is holding up an "
@@ -84,17 +82,13 @@ def run_qc_hold_overdue_delivery(
                         else ""
                     )
                 ),
-                severity="high",
-                classification_code=label.code,
-                compartments=list(label.compartments),
                 unit_path=run.unit_path,
-                evidence_ids=sorted(r.source_ref for r in evidence),
-                details={
-                    "rule": (
-                        "a production run on QC hold and an overdue delivery for the same "
-                        "product in the same unit"
-                    ),
-                    "as_of": demo_today().isoformat(),
+                evidence=[run, *deliveries, *linked],
+                rule=(
+                    "a production run on QC hold and an overdue delivery for the same "
+                    "product in the same unit"
+                ),
+                facts={
                     "run_ref": run_ref,
                     "product": run.data["product"],
                     "hold_reason": run.data["hold_reason"],
@@ -102,8 +96,8 @@ def run_qc_hold_overdue_delivery(
                     "contracts": {
                         str(c.data["contract_ref"]): str(c.data["status"]) for c in linked
                     },
-                    "tools": ["production_qc_holds", "deliveries_overdue", "contracts_status"],
                 },
+                tools=["production_qc_holds", "deliveries_overdue", "contracts_status"],
             )
         )
     return drafts

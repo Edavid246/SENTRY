@@ -14,17 +14,9 @@ from app.correlation.types import FindingDraft
 
 
 @dataclass(frozen=True, slots=True)
-class FindingRow:
-    key: str
-    analysis: str
-    title: str
-    summary: str
-    severity: str
-    classification_code: str
-    compartments: list[str]
-    unit_path: str
-    evidence_ids: list[str]
-    details: dict[str, Any]
+class FindingRow(FindingDraft):
+    """A stored finding: the draft as written, plus when it was first stored."""
+
     created_at: datetime
 
 
