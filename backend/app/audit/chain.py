@@ -28,7 +28,6 @@ import json
 import logging
 import os
 import subprocess
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -37,6 +36,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from app.audit.models import AuditEvent
+from app.clock import utc_now_iso
 from app.config import get_settings
 
 logger = logging.getLogger("audit.chain")
@@ -54,10 +54,6 @@ class AuditWriteError(RuntimeError):
 
 class _LedgerError(Exception):
     """Internal: the git ledger could not be updated or read."""
-
-
-def utc_now_iso() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def canonical_json(payload: dict[str, Any]) -> str:

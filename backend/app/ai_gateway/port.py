@@ -31,12 +31,10 @@ def _gateway() -> Completer:
 
 
 def _local_embedding(question: str) -> list[float] | None:
-    try:
-        from app.ai_gateway.embeddings import get_embedder
+    from app.ai_gateway.embeddings import embed_or_none
 
-        return list(get_embedder().embed([question])[0])
-    except Exception:  # noqa: BLE001 - degrade to full-text search
-        return None
+    vectors = embed_or_none([question])
+    return vectors[0] if vectors else None
 
 
 class ModelPort:

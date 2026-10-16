@@ -9,7 +9,8 @@ healthy — plus the blocking behaviour when the audit write itself fails.
 from __future__ import annotations
 
 import pytest
-from app.audit.chain import append_events, utc_now_iso
+from app.audit.chain import append_events
+from app.clock import utc_now_iso
 from app.db import get_engine
 from support.audit import audit_events, latest_event
 from support.http import auth_header, login

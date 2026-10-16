@@ -21,9 +21,9 @@ from sqlalchemy.engine import Connection
 
 from app.api.deps import ConnDep, CurrentContext
 from app.api.guard import guarded
-from app.audit.chain import utc_now_iso
 from app.authz.labels import Labels
 from app.authz.scope import Scope
+from app.clock import utc_now_iso
 from app.connectors.base import SourceRecord
 from app.data_queries.registry import ToolOutcome, execute_tool
 from app.units import covers, is_site, overlaps, subsidiary_key, unit_names

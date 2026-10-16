@@ -1,4 +1,4 @@
-"""The demo date anchor (DEMO_DATE).
+"""The demo date anchor (DEMO_DATE), and the real-clock timestamp helper.
 
 DEMO_DATE pins the *business* date used by exactly two things: the seed's
 date offsets and the data-tool cutoffs ("due within 30 days", "expired").
@@ -6,8 +6,9 @@ Together they decide which records reach a model prompt, so pinning both keeps
 the prefilled LLM cache valid on any day (docs/DEMO_SCOPE.md).
 
 It deliberately does NOT touch the real clock: audit timestamps, token
-issue/expiry, created_at and retrieved_at never read this module. Unset (the
-default) means the live date. Settings refuse DEMO_DATE outside the dev profile.
+issue/expiry, created_at and retrieved_at never read the demo date.
+`utc_now_iso` is the real clock and ignores DEMO_DATE. Unset (the default)
+means the live date. Settings refuse DEMO_DATE outside the dev profile.
 """
 
 from __future__ import annotations
@@ -16,6 +17,11 @@ from datetime import UTC, date, datetime, time
 
 UTC_TS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 """Fixed-width UTC timestamp; such strings order correctly as text."""
+
+
+def utc_now_iso() -> str:
+    """The real time now, ISO 8601 in UTC (audit timestamps, `generated_at`)."""
+    return datetime.now(UTC).isoformat()
 
 
 def real_today() -> date:

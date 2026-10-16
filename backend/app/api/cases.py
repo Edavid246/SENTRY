@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import ConnDep, CurrentContext
 from app.api.guard import guarded
-from app.audit.chain import utc_now_iso
+from app.clock import utc_now_iso
 from app.data_queries.formats import CASE_REF, exact
 from app.data_queries.registry import execute_tool
 

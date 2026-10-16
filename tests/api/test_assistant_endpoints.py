@@ -138,6 +138,10 @@ def test_allowed_query_returns_citations_and_audits_retrieval_and_answer(
     assert answer["payload"]["found"] is True
     assert answer["payload"]["degraded"] is True
     assert answer["payload"]["model"] == "stub-1"
+    # SPEC 8.1 / 14.1: version, token counts and latency travel with the model name.
+    for field in ("model_version", "prompt_tokens", "completion_tokens", "total_tokens"):
+        assert field in answer["payload"]
+    assert answer["payload"]["latency_ms"] >= 0
     assert answer["payload"]["conversation_id"] == body["conversation_id"]
     # The fake cites exactly one passage it was handed; the answer event proves
     # the citation came from the authorized set.

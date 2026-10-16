@@ -22,30 +22,21 @@ from typing import Any
 
 from sqlalchemy import text
 
+from app.ai_gateway.embeddings import vector_literal
 from app.authz.scope import Scope
 from app.config import get_settings
+from app.knowledge.passages import Passage
 
 RRF_K = 60.0
 
 
 @dataclass(frozen=True, slots=True)
-class RetrievedChunk:
-    chunk_id: str
-    document_id: str
-    document_title: str
-    document_ref: str
-    text: str
-    page: int | None
-    section: str | None
-    classification_code: str
-    compartments: tuple[str, ...]
+class RetrievedChunk(Passage):
+    """A passage as retrieval found it, with the scores that ranked it."""
+
     vector_similarity: float | None
     keyword_rank: float | None
     rrf_score: float
-
-
-def _vector_literal(vector: list[float]) -> str:
-    return "[" + ",".join(f"{value:.7f}" for value in vector) + "]"
 
 
 def is_fts_only(query_vector: list[float] | None, chunks: list[RetrievedChunk]) -> bool:
@@ -82,7 +73,7 @@ def retrieve_chunks(
         **row_filter.params,
         "question": question,
         "has_vector": vector is not None,
-        "query_vector": _vector_literal(vector) if vector is not None else None,
+        "query_vector": vector_literal(vector) if vector is not None else None,
         "min_similarity": float(floor),
         "rrf_k": RRF_K,
         "top_k": int(limit),

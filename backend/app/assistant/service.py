@@ -156,10 +156,20 @@ class _Pathway(Protocol):
 
 
 def _model_use(llm: LLMResult | None) -> dict[str, Any]:
-    """The audit fields that say which model call (if any) produced an answer."""
+    """The audit fields that say which model call (if any) produced an answer (SPEC 8.1, 14.1):
+    provider, model and version, token counts and latency. No call: empty and zero."""
     if llm is None:
-        return {"provider": "", "model": "", "cached": False}
-    return {"provider": llm.provider, "model": llm.model, "cached": llm.cached}
+        llm = LLMResult(text="", provider="", model="")
+    return {
+        "provider": llm.provider,
+        "model": llm.model,
+        "model_version": llm.model_version,
+        "cached": llm.cached,
+        "prompt_tokens": llm.usage.prompt_tokens,
+        "completion_tokens": llm.usage.completion_tokens,
+        "total_tokens": llm.usage.total_tokens,
+        "latency_ms": round(llm.latency_ms),
+    }
 
 
 def _refused(turn: _Turn, pathway: str, outcome: ToolOutcome) -> _Produced:

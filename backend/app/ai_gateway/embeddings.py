@@ -116,3 +116,17 @@ def get_embedder() -> LocalEmbeddingProvider:
 
 def reset_embedder() -> None:
     get_embedder.cache_clear()
+
+
+def embed_or_none(texts: Sequence[str]) -> list[list[float]] | None:
+    """Local embeddings, or None when no embedder works here (weights missing, provider not
+    configured). Callers degrade to full-text search instead of failing."""
+    try:
+        return get_embedder().embed(texts)
+    except Exception:  # noqa: BLE001 - degrade to full-text search
+        return None
+
+
+def vector_literal(vector: Sequence[float]) -> str:
+    """pgvector's text form, for binding into CAST(:v AS vector)."""
+    return "[" + ",".join(f"{value:.7f}" for value in vector) + "]"

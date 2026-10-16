@@ -16,9 +16,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.api.deps import ConnDep, CurrentContext
 from app.api.guard import guarded_or_empty
-from app.audit.chain import utc_now_iso
 from app.authz.scope import Scope
-from app.clock import UTC_TS_FORMAT, demo_now, demo_today
+from app.clock import UTC_TS_FORMAT, demo_now, demo_today, utc_now_iso
 from app.connectors import get_adapter
 from app.connectors.base import RecordFilter, SourceRecord
 from app.geo.states import check_state

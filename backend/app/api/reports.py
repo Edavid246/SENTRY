@@ -19,9 +19,9 @@ from pydantic import BaseModel, Field
 from app.api.deps import ConnDep, CurrentContext
 from app.api.divisions import Section, build_division
 from app.api.guard import guarded
-from app.audit.chain import utc_now_iso
 from app.audit.events import event
 from app.authz.labels import Label, Labels
+from app.clock import utc_now_iso
 from app.reporting.division import (
     DivisionReport,
     ReportRow,

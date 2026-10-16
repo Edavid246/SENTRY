@@ -15,7 +15,7 @@ inline citation markers through the chunk row filter
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Protocol
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
@@ -28,7 +28,7 @@ from app.assistant.conversations import Conversation, ConversationNotFound
 from app.assistant.service import ModelUnavailable, answer
 from app.authz.scope import Forbidden
 from app.knowledge.answer import parse_cited_chunk_ids
-from app.knowledge.passages import visible_passages
+from app.knowledge.passages import Passage, visible_passages
 
 router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
 
@@ -142,16 +142,8 @@ def query_assistant(
     )
 
 
-class _Cited(Protocol):
-    chunk_id: str
-    document_title: str
-    document_ref: str
-    page: int | None
-    section: str | None
-    classification_code: str
-
-
-def _citation(chunk: _Cited) -> CitationOut:
+def _citation(chunk: Passage) -> CitationOut:
+    """A stored passage or a freshly retrieved chunk (which is a Passage with scores)."""
     return CitationOut(
         chunk_id=chunk.chunk_id,
         document_title=chunk.document_title,

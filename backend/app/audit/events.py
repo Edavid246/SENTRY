@@ -17,9 +17,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.audit.chain import append_events, utc_now_iso
+from app.audit.chain import append_events
 from app.authz.context import AccessContext
 from app.authz.policy import Decision
+from app.clock import utc_now_iso
 from app.db import get_engine
 
 AUDIT_TEXT_LIMIT = 300

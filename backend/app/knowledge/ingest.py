@@ -21,6 +21,7 @@ from pathlib import Path
 from sqlalchemy import delete, text
 from sqlalchemy.engine import Engine
 
+from app.ai_gateway.embeddings import embed_or_none, vector_literal
 from app.ids import entity_id, source_id, unit_id
 from app.knowledge.models import Chunk, Document
 from app.knowledge.parse import parse_document
@@ -52,12 +53,10 @@ def _embed(texts: list[str]) -> list[list[float] | None]:
     """
     if not texts:
         return []
-    try:
-        from app.ai_gateway.embeddings import get_embedder
-
-        return [list(vector) for vector in get_embedder().embed(texts)]
-    except Exception:  # noqa: BLE001 - degrade to FTS-only rather than fail ingestion
+    vectors = embed_or_none(texts)
+    if vectors is None:
         return [None] * len(texts)
+    return [list(vector) for vector in vectors]
 
 
 def ingest_documents(engine: Engine, docs_dir: Path) -> dict[str, int]:
@@ -155,7 +154,7 @@ def backfill_embeddings(engine: Engine, batch_size: int = 16) -> int:
                     return done
                 conn.execute(
                     text("UPDATE chunks SET embedding = CAST(:v AS vector) WHERE id = :id"),
-                    {"v": "[" + ",".join(f"{x:.7f}" for x in vector) + "]", "id": row.id},
+                    {"v": vector_literal(vector), "id": row.id},
                 )
                 done += 1
     return done
