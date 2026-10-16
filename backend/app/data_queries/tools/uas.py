@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from datetime import timedelta
 from typing import Any
@@ -10,6 +9,7 @@ from typing import Any
 from app.authz.scope import Scope
 from app.clock import UTC_TS_FORMAT, demo_now, demo_today
 from app.connectors.base import SourceRecord
+from app.data_queries.formats import SITE, exact
 from app.data_queries.tools.base import (
     MAX_WITHIN_DAYS,
     Table,
@@ -28,7 +28,7 @@ MAX_PERIOD_HOURS = 24 * 30
 DEFAULT_DETECTION_HOURS = 48
 DEFAULT_MISSION_DAYS = 30
 MISSION_STATUSES = ("completed", "cancelled")
-_SITE_RE = re.compile(r"^(?:DEP-[A-Z0-9]{1,8}|UAS-HANGAR)$")
+_SITE_RE = exact(SITE)
 
 
 @tool("status", "period_days", "state")

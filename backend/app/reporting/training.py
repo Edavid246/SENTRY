@@ -17,12 +17,12 @@ exactly as the knowledge pathway blocks out-of-evidence citations.
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 
 from app.ai_gateway.base import ChatMessage, LLMRequest, LLMResult
 from app.ai_gateway.port import Completer
 from app.authz.labels import Label
+from app.data_queries.formats import RECORD_ID, mention
 from app.data_queries.tools import ToolResult
 from app.knowledge.answer import build_evidence, parse_cited_chunk_ids
 from app.knowledge.retrieve import RetrievedChunk
@@ -36,7 +36,7 @@ NO_DATA_BODY = (
 )
 BLOCKED_BODY = "Draft blocked: it cited sources outside the authorized inputs."
 
-_RECORD_ID_RE = re.compile(r"\bREC-\d{3,6}\b")
+_RECORD_ID_RE = mention(RECORD_ID, ignore_case=False)
 
 _SYSTEM = (
     "You are the Defence Gateway assistant, an informational system for a private"

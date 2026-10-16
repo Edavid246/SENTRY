@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from typing import Any
 
 from app.authz.scope import Scope
 from app.connectors.base import SourceRecord
 from app.data_queries.errors import ToolParamError
+from app.data_queries.formats import CASE_REF, EVIDENCE_REF, exact
 from app.data_queries.tools.base import Table, column, columns, given, matching, search, tool
 
-_CASE_RE = re.compile(r"^FR-\d{4}-\d{3}$")
-_EVIDENCE_RE = re.compile(r"^EV-\d{3}-\d{2}$")
+_CASE_RE = exact(CASE_REF)
+_EVIDENCE_RE = exact(EVIDENCE_REF)
 _CASE_MESSAGE = "case_ref must look like FR-2026-014"
 
 # One custody event, with the holder it should have been taken from when the record says otherwise.

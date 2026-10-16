@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from typing import Any
 
 from app.authz.scope import Scope
 from app.connectors.base import SourceRecord
 from app.data_queries.errors import ToolParamError
+from app.data_queries.formats import SERIAL, exact
 from app.data_queries.tools.base import Table, columns, search, tool
 
-_SERIAL_RE = re.compile(r"^[A-Z]{2,4}(?:-[A-Z]{2,4})?-\d{3,5}$")
+_SERIAL_RE = exact(SERIAL)
 _RUN_COLUMNS = ("run_ref", "product", "quantity", "qc_status", "hold_reason")
 
 

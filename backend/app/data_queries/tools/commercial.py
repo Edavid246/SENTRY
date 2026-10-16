@@ -9,6 +9,7 @@ from typing import Any
 
 from app.authz.scope import Scope
 from app.clock import demo_today
+from app.data_queries.formats import CONTRACT_STATUSES
 from app.data_queries.tools.base import (
     Table,
     choice,
@@ -20,7 +21,6 @@ from app.data_queries.tools.base import (
     tool,
 )
 
-CONTRACT_STATUSES = ("active", "at_risk", "completed")
 _CLIENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .&-]{0,39}$")
 _CLIENT_MESSAGE = "client is not a valid client name"
 

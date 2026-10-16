@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from datetime import date, timedelta
 from typing import Any
@@ -10,6 +9,7 @@ from typing import Any
 from app.authz.scope import Scope
 from app.clock import demo_today
 from app.connectors.base import SourceRecord
+from app.data_queries.formats import DEPOT, exact
 from app.data_queries.tools.base import (
     MAX_WITHIN_DAYS,
     Table,
@@ -24,7 +24,7 @@ from app.data_queries.tools.base import (
 )
 
 DEFAULT_PERIOD_DAYS = 90  # one quarter
-_DEPOT_RE = re.compile(r"^DEP-[A-Z0-9]{1,8}(?:-[A-Z0-9]{1,8})?$")
+_DEPOT_RE = exact(DEPOT)
 
 
 @tool("within_days")

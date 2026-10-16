@@ -19,6 +19,16 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from app.data_queries.formats import (
+    CASE_REF,
+    CONTRACT_STATUS_MENTION,
+    DEPOT_MENTION,
+    EVIDENCE_REF,
+    SERIAL,
+    SITE_MENTION,
+    mention,
+)
+
 _KNOWLEDGE_RE = re.compile(
     r"\b(documents?|policy|policies|directives?|sops?|manuals?|procedures?|"
     r"regulations?|guidelines?)\b",
@@ -35,7 +45,7 @@ _STOCK_RE = re.compile(
     r"\b(stock|inventory|supplies|spares?|spare parts?|shortages?)\b", re.IGNORECASE
 )
 _LOW_RE = re.compile(r"\b(below|low|short|shortages?|under|depleted|running out)\b", re.IGNORECASE)
-_DEPOT_RE = re.compile(r"\bDEP-[A-Za-z0-9-]+\b", re.IGNORECASE)
+_DEPOT_RE = mention(DEPOT_MENTION)
 _FINDING_RE = re.compile(r"\b(findings?|correlations?)\b", re.IGNORECASE)
 _FAULT_RE = re.compile(r"\bfaults?\b", re.IGNORECASE)
 _RISING_RE = re.compile(
@@ -57,16 +67,16 @@ _CANCELLED_RE = re.compile(r"\b(cancell?ed|aborted|scrubbed)\b", re.IGNORECASE)
 _DETECTION_RE = re.compile(
     r"\b(detections?|detected|sightings?|surveillance|sensors?)\b", re.IGNORECASE
 )
-_SITE_RE = re.compile(r"\b(DEP-[A-Za-z0-9-]+|UAS-HANGAR)\b", re.IGNORECASE)
+_SITE_RE = mention(SITE_MENTION)
 _HOURS_RE = re.compile(r"\b(?:last|past)\s+(\d{1,4})\s+hours?\b", re.IGNORECASE)
 _THIS_PERIOD_RE = re.compile(r"\bthis\s+(week|month)\b", re.IGNORECASE)
 _DELIVERY_RE = re.compile(r"\b(deliver\w*|shipments?)\b", re.IGNORECASE)
 _OVERDUE_RE = re.compile(r"\b(overdue|late|delayed|behind schedule|past due)\b", re.IGNORECASE)
 _CONTRACT_RE = re.compile(r"\bcontracts?\b", re.IGNORECASE)
 _CLIENT_NAME_RE = re.compile(r"\bClient Agency ([A-Z])\b", re.IGNORECASE)
-_CONTRACT_STATUS_RE = re.compile(r"\b(at[ -]risk|active|completed)\b", re.IGNORECASE)
+_CONTRACT_STATUS_RE = mention(CONTRACT_STATUS_MENTION)
 _SERIAL_WORD_RE = re.compile(r"\b(serial|trace|traceability|provenance)\b", re.IGNORECASE)
-_SERIAL_NO_RE = re.compile(r"\b([A-Z]{2,4}(?:-[A-Z]{2,4})?-\d{3,5})\b", re.IGNORECASE)
+_SERIAL_NO_RE = mention(SERIAL)
 _HOLD_RE = re.compile(r"\bholds?\b", re.IGNORECASE)
 _PRODUCTION_RE = re.compile(r"\b(qc|quality|production|batch(?:es)?|lots?|runs?)\b", re.IGNORECASE)
 _CUSTODY_RE = re.compile(r"\bcustody\b", re.IGNORECASE)
@@ -77,8 +87,8 @@ _EVIDENCE_PROSE_RE = re.compile(
 _CUSTODY_BREAK_RE = re.compile(
     r"\b(breaks?|broken|gaps?|discrepanc\w+|unexplained|inconsisten\w+)\b", re.IGNORECASE
 )
-_EVIDENCE_NO_RE = re.compile(r"\bEV-\d{3}-\d{2}\b", re.IGNORECASE)
-_CASE_NO_RE = re.compile(r"\bFR-\d{4}-\d{3}\b", re.IGNORECASE)
+_EVIDENCE_NO_RE = mention(EVIDENCE_REF)
+_CASE_NO_RE = mention(CASE_REF)
 _EVIDENCE_RE = re.compile(r"\bevidence\b", re.IGNORECASE)
 _CASES_RE = re.compile(
     r"\b(forensic|forensics)\b.*\bcases?\b|\bcases?\b.*\bforensic", re.IGNORECASE

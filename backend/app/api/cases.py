@@ -9,19 +9,18 @@ every case, evidence and custody record behind it.
 
 from __future__ import annotations
 
-import re
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.api.deps import ConnDep, CurrentContext
 from app.api.guard import guarded
 from app.audit.chain import utc_now_iso
+from app.data_queries.formats import CASE_REF, exact
 from app.data_queries.registry import execute_tool
 
 router = APIRouter(prefix="/api/v1/cases", tags=["cases"])
 
-_CASE_REF = re.compile(r"^FR-\d{4}-\d{3}$")
+_CASE_REF = exact(CASE_REF)
 
 
 class CustodyStep(BaseModel):
