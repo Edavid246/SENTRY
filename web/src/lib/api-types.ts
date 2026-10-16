@@ -63,43 +63,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/records": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Records */
-        get: operations["list_records_api_v1_records_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/records/{source_ref}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Record
-         * @description One record, through the adapter (policy row filter + RLS). 404 when not visible.
-         */
-        get: operations["get_record_api_v1_records__source_ref__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/documents/{source_ref}": {
         parameters: {
             query?: never;
@@ -136,6 +99,43 @@ export interface paths {
          *     internal uuid.
          */
         get: operations["get_document_chunk_api_v1_documents__document_id__chunks__chunk_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Records */
+        get: operations["list_records_api_v1_records_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/records/{source_ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Record
+         * @description One record, through the adapter (policy row filter + RLS). 404 when not visible.
+         */
+        get: operations["get_record_api_v1_records__source_ref__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -471,6 +471,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccessToken */
+        AccessToken: {
+            /** Access Token */
+            access_token: string;
+            /** Token Type */
+            token_type: string;
+        };
         /** AlertPart */
         AlertPart: {
             /**
@@ -518,6 +525,23 @@ export interface components {
             /** Audit Event Id */
             audit_event_id: string;
         };
+        /** AuditEventOut */
+        AuditEventOut: {
+            /** Seq */
+            seq: number;
+            /** Event Id */
+            event_id: string;
+            /** Created At */
+            created_at: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Prev Hash */
+            prev_hash: string;
+            /** Hash */
+            hash: string;
+        };
         /** CaseView */
         CaseView: {
             /** Generated At */
@@ -546,6 +570,13 @@ export interface components {
             /** Evidence */
             evidence: components["schemas"]["EvidenceView"][];
         };
+        /** ChainTip */
+        ChainTip: {
+            /** Seq */
+            seq: number;
+            /** Hash */
+            hash: string;
+        };
         /** CitationOut */
         CitationOut: {
             /** Chunk Id */
@@ -560,6 +591,18 @@ export interface components {
             section: string | null;
             /** Classification Code */
             classification_code: string;
+        };
+        /** ConnectedMap */
+        ConnectedMap: {
+            /**
+             * Type
+             * @constant
+             */
+            type: "FeatureCollection";
+            /** Features */
+            features: components["schemas"]["MapFeature"][];
+            /** Generated At */
+            generated_at: string;
         };
         /** ConversationDetail */
         ConversationDetail: {
@@ -678,6 +721,15 @@ export interface components {
              */
             sections: components["schemas"]["Section"][];
         };
+        /** DocumentOut */
+        DocumentOut: {
+            /** Source Ref */
+            source_ref: string;
+            /** Title */
+            title: string;
+            /** Classification Code */
+            classification_code: string;
+        };
         /** EvidenceView */
         EvidenceView: {
             /** Ref */
@@ -780,12 +832,133 @@ export interface components {
             /** Divisions */
             divisions: components["schemas"]["HomeDivision"][];
         };
+        /** LineStringGeometry */
+        LineStringGeometry: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "LineString";
+            /** Coordinates */
+            coordinates: (number)[][];
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Username */
             username: string;
             /** Password */
             password: string;
+        };
+        /** MapFeature */
+        MapFeature: {
+            /**
+             * Type
+             * @constant
+             */
+            type: "Feature";
+            /** Geometry */
+            geometry: components["schemas"]["PointGeometry"] | components["schemas"]["LineStringGeometry"];
+            properties: components["schemas"]["MapProperties"];
+        };
+        /**
+         * MapProperties
+         * @description One shape for the three kinds; each kind sets only its own extras.
+         *
+         *     Both routes serialise with `response_model_exclude_unset`, so an extra a kind never sets
+         *     is left out (a sensor has no `observed_at` key at all) while one set to None still prints
+         *     as null. Every other field in these models is required, so the exclusion can only ever
+         *     drop these optional extras.
+         */
+        MapProperties: {
+            /** Ref */
+            ref: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "sensor" | "detection" | "mission";
+            /** Label */
+            label: string;
+            /** Classification */
+            classification: string;
+            /** Compartments */
+            compartments: string[];
+            /** Unit Path */
+            unit_path: string;
+            /** Source System */
+            source_system: string;
+            /** Status */
+            status?: string | null;
+            /** Observed At */
+            observed_at?: string | null;
+            /** Object Type */
+            object_type?: string | null;
+            /** Confidence */
+            confidence?: number | null;
+            /** Site */
+            site?: string | null;
+            /** Mission Date */
+            mission_date?: string | null;
+            /** Track Kind */
+            track_kind?: string | null;
+            /** Area */
+            area?: string | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** Me */
+        Me: {
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string;
+            /** Role */
+            role: string;
+            /** Unit Path */
+            unit_path: string;
+            /** Unit Breadcrumb */
+            unit_breadcrumb: components["schemas"]["UnitCrumb"][];
+            /** Clearance Code */
+            clearance_code: string | null;
+            /** Clearance Rank */
+            clearance_rank: number;
+            /** Compartments */
+            compartments: string[];
+            /** Permissions */
+            permissions: string[];
+            /** Data Scope */
+            data_scope: string;
+        };
+        /** PassageOut */
+        PassageOut: {
+            /** Chunk Id */
+            chunk_id: string;
+            /** Document Id */
+            document_id: string;
+            /** Document Ref */
+            document_ref: string;
+            /** Document Title */
+            document_title: string;
+            /** Text */
+            text: string;
+            /** Page */
+            page: number | null;
+            /** Section */
+            section: string | null;
+            /** Classification Code */
+            classification_code: string;
+            /** Compartments */
+            compartments: string[];
+        };
+        /** PointGeometry */
+        PointGeometry: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "Point";
+            /** Coordinates */
+            coordinates: (number)[];
         };
         /** RecordDetail */
         RecordDetail: {
@@ -807,6 +980,24 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+        };
+        /** RecordSummary */
+        RecordSummary: {
+            /** Source Ref */
+            source_ref: string;
+            /** Entity Type */
+            entity_type: string;
+            /** Classification Code */
+            classification_code: string;
+        };
+        /** ReplayBatch */
+        ReplayBatch: {
+            /** Window Start */
+            window_start: string;
+            /** Window End */
+            window_end: string;
+            /** Events */
+            events: components["schemas"]["MapFeature"][];
         };
         /** ReportInfo */
         ReportInfo: {
@@ -932,6 +1123,13 @@ export interface components {
             /** Citations */
             citations?: components["schemas"]["CitationOut"][];
         };
+        /** UnitCrumb */
+        UnitCrumb: {
+            /** Path */
+            path: string;
+            /** Name */
+            name: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -944,6 +1142,21 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VerifyReport */
+        VerifyReport: {
+            /** Valid */
+            valid: boolean;
+            /** Checked Count */
+            checked_count: number;
+            /** First Bad Event Id */
+            first_bad_event_id: string | null;
+            /** Checkpoint Ok */
+            checkpoint_ok: boolean | null;
+            checkpoint_tip: components["schemas"]["ChainTip"] | null;
+            /** Ledger Ok */
+            ledger_ok: boolean | null;
+            ledger_tip: components["schemas"]["ChainTip"] | null;
         };
     };
     responses: never;
@@ -973,9 +1186,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": components["schemas"]["AccessToken"];
                 };
             };
             /** @description Validation Error */
@@ -1006,9 +1217,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Me"];
                 };
             };
             /** @description Validation Error */
@@ -1039,9 +1248,74 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string | null;
-                    }[];
+                    "application/json": components["schemas"]["DocumentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_document_api_v1_documents__source_ref__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                source_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_document_chunk_api_v1_documents__document_id__chunks__chunk_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                document_id: string;
+                chunk_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PassageOut"];
                 };
             };
             /** @description Validation Error */
@@ -1072,9 +1346,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    }[];
+                    "application/json": components["schemas"]["RecordSummary"][];
                 };
             };
             /** @description Validation Error */
@@ -1121,77 +1393,6 @@ export interface operations {
             };
         };
     };
-    get_document_api_v1_documents__source_ref__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                source_ref: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_document_chunk_api_v1_documents__document_id__chunks__chunk_id__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                document_id: string;
-                chunk_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     list_audit_api_v1_audit_get: {
         parameters: {
             query?: {
@@ -1213,9 +1414,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["AuditEventOut"][];
                 };
             };
             /** @description Validation Error */
@@ -1246,9 +1445,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["VerifyReport"];
                 };
             };
             /** @description Validation Error */
@@ -1680,9 +1877,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ReplayBatch"];
                 };
             };
             /** @description Validation Error */
@@ -1717,9 +1912,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ConnectedMap"];
                 };
             };
             /** @description Validation Error */

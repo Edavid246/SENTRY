@@ -1,6 +1,24 @@
 {
   "components": {
     "schemas": {
+      "AccessToken": {
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "token_type": {
+            "title": "Token Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token",
+          "token_type"
+        ],
+        "title": "AccessToken",
+        "type": "object"
+      },
       "AlertPart": {
         "properties": {
           "count": {
@@ -112,6 +130,45 @@
         "title": "AssistantQueryResponse",
         "type": "object"
       },
+      "AuditEventOut": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "hash": {
+            "title": "Hash",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "prev_hash": {
+            "title": "Prev Hash",
+            "type": "string"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq",
+          "event_id",
+          "created_at",
+          "payload",
+          "prev_hash",
+          "hash"
+        ],
+        "title": "AuditEventOut",
+        "type": "object"
+      },
       "CaseView": {
         "properties": {
           "breaks": {
@@ -181,6 +238,24 @@
         "title": "CaseView",
         "type": "object"
       },
+      "ChainTip": {
+        "properties": {
+          "hash": {
+            "title": "Hash",
+            "type": "string"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq",
+          "hash"
+        ],
+        "title": "ChainTip",
+        "type": "object"
+      },
       "CitationOut": {
         "properties": {
           "chunk_id": {
@@ -231,6 +306,33 @@
           "classification_code"
         ],
         "title": "CitationOut",
+        "type": "object"
+      },
+      "ConnectedMap": {
+        "properties": {
+          "features": {
+            "items": {
+              "$ref": "#/components/schemas/MapFeature"
+            },
+            "title": "Features",
+            "type": "array"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "type": {
+            "const": "FeatureCollection",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "features",
+          "generated_at"
+        ],
+        "title": "ConnectedMap",
         "type": "object"
       },
       "ConversationDetail": {
@@ -515,6 +617,29 @@
         "title": "DivisionView",
         "type": "object"
       },
+      "DocumentOut": {
+        "properties": {
+          "classification_code": {
+            "title": "Classification Code",
+            "type": "string"
+          },
+          "source_ref": {
+            "title": "Source Ref",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_ref",
+          "title",
+          "classification_code"
+        ],
+        "title": "DocumentOut",
+        "type": "object"
+      },
       "EvidenceView": {
         "properties": {
           "evidence_ref": {
@@ -756,6 +881,38 @@
         "title": "HomeSummary",
         "type": "object"
       },
+      "LineStringGeometry": {
+        "properties": {
+          "coordinates": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Coordinates",
+            "type": "array"
+          },
+          "type": {
+            "const": "LineString",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "coordinates"
+        ],
+        "title": "LineStringGeometry",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "password": {
@@ -772,6 +929,366 @@
           "password"
         ],
         "title": "LoginRequest",
+        "type": "object"
+      },
+      "MapFeature": {
+        "properties": {
+          "geometry": {
+            "discriminator": {
+              "mapping": {
+                "LineString": "#/components/schemas/LineStringGeometry",
+                "Point": "#/components/schemas/PointGeometry"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PointGeometry"
+              },
+              {
+                "$ref": "#/components/schemas/LineStringGeometry"
+              }
+            ],
+            "title": "Geometry"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/MapProperties"
+          },
+          "type": {
+            "const": "Feature",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "geometry",
+          "properties"
+        ],
+        "title": "MapFeature",
+        "type": "object"
+      },
+      "MapProperties": {
+        "properties": {
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area"
+          },
+          "classification": {
+            "title": "Classification",
+            "type": "string"
+          },
+          "compartments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Compartments",
+            "type": "array"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "kind": {
+            "enum": [
+              "sensor",
+              "detection",
+              "mission"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "mission_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mission Date"
+          },
+          "object_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Type"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "site": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site"
+          },
+          "source_system": {
+            "title": "Source System",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "track_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Track Kind"
+          },
+          "unit_path": {
+            "title": "Unit Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "kind",
+          "label",
+          "classification",
+          "compartments",
+          "unit_path",
+          "source_system"
+        ],
+        "title": "MapProperties",
+        "type": "object"
+      },
+      "Me": {
+        "properties": {
+          "clearance_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clearance Code"
+          },
+          "clearance_rank": {
+            "title": "Clearance Rank",
+            "type": "integer"
+          },
+          "compartments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Compartments",
+            "type": "array"
+          },
+          "data_scope": {
+            "title": "Data Scope",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "unit_breadcrumb": {
+            "items": {
+              "$ref": "#/components/schemas/UnitCrumb"
+            },
+            "title": "Unit Breadcrumb",
+            "type": "array"
+          },
+          "unit_path": {
+            "title": "Unit Path",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "display_name",
+          "role",
+          "unit_path",
+          "unit_breadcrumb",
+          "clearance_code",
+          "clearance_rank",
+          "compartments",
+          "permissions",
+          "data_scope"
+        ],
+        "title": "Me",
+        "type": "object"
+      },
+      "PassageOut": {
+        "properties": {
+          "chunk_id": {
+            "title": "Chunk Id",
+            "type": "string"
+          },
+          "classification_code": {
+            "title": "Classification Code",
+            "type": "string"
+          },
+          "compartments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Compartments",
+            "type": "array"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "document_ref": {
+            "title": "Document Ref",
+            "type": "string"
+          },
+          "document_title": {
+            "title": "Document Title",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "chunk_id",
+          "document_id",
+          "document_ref",
+          "document_title",
+          "text",
+          "page",
+          "section",
+          "classification_code",
+          "compartments"
+        ],
+        "title": "PassageOut",
+        "type": "object"
+      },
+      "PointGeometry": {
+        "properties": {
+          "coordinates": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "title": "Coordinates",
+            "type": "array"
+          },
+          "type": {
+            "const": "Point",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "coordinates"
+        ],
+        "title": "PointGeometry",
         "type": "object"
       },
       "RecordDetail": {
@@ -824,6 +1341,55 @@
           "data"
         ],
         "title": "RecordDetail",
+        "type": "object"
+      },
+      "RecordSummary": {
+        "properties": {
+          "classification_code": {
+            "title": "Classification Code",
+            "type": "string"
+          },
+          "entity_type": {
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "source_ref": {
+            "title": "Source Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_ref",
+          "entity_type",
+          "classification_code"
+        ],
+        "title": "RecordSummary",
+        "type": "object"
+      },
+      "ReplayBatch": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/MapFeature"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "window_end": {
+            "title": "Window End",
+            "type": "string"
+          },
+          "window_start": {
+            "title": "Window Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "window_start",
+          "window_end",
+          "events"
+        ],
+        "title": "ReplayBatch",
         "type": "object"
       },
       "ReportInfo": {
@@ -1129,6 +1695,24 @@
         "title": "TurnOut",
         "type": "object"
       },
+      "UnitCrumb": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "name"
+        ],
+        "title": "UnitCrumb",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -1167,6 +1751,82 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VerifyReport": {
+        "properties": {
+          "checked_count": {
+            "title": "Checked Count",
+            "type": "integer"
+          },
+          "checkpoint_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint Ok"
+          },
+          "checkpoint_tip": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChainTip"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "first_bad_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Bad Event Id"
+          },
+          "ledger_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ledger Ok"
+          },
+          "ledger_tip": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChainTip"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid",
+          "checked_count",
+          "first_bad_event_id",
+          "checkpoint_ok",
+          "checkpoint_tip",
+          "ledger_ok",
+          "ledger_tip"
+        ],
+        "title": "VerifyReport",
         "type": "object"
       }
     }
@@ -1406,8 +2066,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/AuditEventOut"
                   },
                   "title": "Response List Audit Api V1 Audit Get",
                   "type": "array"
@@ -1456,9 +2115,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Audit Verify Api V1 Audit Verify Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/VerifyReport"
                 }
               }
             }
@@ -1496,11 +2153,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Login Api V1 Auth Login Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AccessToken"
                 }
               }
             }
@@ -1641,9 +2294,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Connected Map Api V1 Connected Map Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ConnectedMap"
                 }
               }
             }
@@ -1749,9 +2400,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Connected Replay Api V1 Connected Replay Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ReplayBatch"
                 }
               }
             }
@@ -2069,17 +2718,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "type": "object"
+                    "$ref": "#/components/schemas/DocumentOut"
                   },
                   "title": "Response List Documents Api V1 Documents Get",
                   "type": "array"
@@ -2146,9 +2785,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Document Chunk Api V1 Documents  Document Id  Chunks  Chunk Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PassageOut"
                 }
               }
             }
@@ -2203,11 +2840,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Get Document Api V1 Documents  Source Ref  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/DocumentOut"
                 }
               }
             }
@@ -2299,9 +2932,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Me Api V1 Me Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Me"
                 }
               }
             }
@@ -2348,10 +2979,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": {
-                      "type": "string"
-                    },
-                    "type": "object"
+                    "$ref": "#/components/schemas/RecordSummary"
                   },
                   "title": "Response List Records Api V1 Records Get",
                   "type": "array"

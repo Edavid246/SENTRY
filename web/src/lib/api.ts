@@ -17,97 +17,17 @@ export type DivisionSection = Schemas["Section"];
 export type CaseView = Schemas["CaseView"];
 export type DivisionReport = Schemas["DivisionReportOut"];
 
-// These endpoints return free-form dicts in OpenAPI, so their shapes are
-// declared here (kept in step with backend/app/api/endpoints.py).
-export interface Me {
-  username: string;
-  display_name: string;
-  role: string;
-  unit_path: string;
-  unit_breadcrumb: { path: string; name: string }[];
-  clearance_code: string | null;
-  clearance_rank: number;
-  compartments: string[];
-  permissions: string[];
-  data_scope: string;
-}
-
-export interface Chunk {
-  chunk_id: string;
-  document_id: string;
-  document_ref: string;
-  document_title: string;
-  text: string;
-  page: number | null;
-  section: string | null;
-  classification_code: string;
-  compartments: string[];
-}
-
-export interface AuditEvent {
-  seq: number;
-  event_id: string;
-  created_at: string;
-  payload: Record<string, unknown>;
-  prev_hash: string;
-  hash: string;
-}
-
-export interface ChainTip {
-  seq: number;
-  hash: string;
-}
-
-export interface VerifyReport {
-  valid: boolean;
-  checked_count: number;
-  first_bad_event_id: string | null;
-  checkpoint_ok: boolean | null;
-  checkpoint_tip: ChainTip | null;
-  ledger_ok: boolean | null;
-  ledger_tip: ChainTip | null;
-}
-
-export type MapKind = "sensor" | "detection" | "mission";
-
-export interface MapProperties {
-  ref: string;
-  kind: MapKind;
-  label: string;
-  classification: string;
-  compartments: string[];
-  unit_path: string;
-  source_system: string;
-  status?: string | null;
-  observed_at?: string;
-  object_type?: string;
-  confidence?: number;
-  site?: string;
-  mission_date?: string;
-  track_kind?: string;
-  area?: string;
-  reason?: string | null;
-}
-
-export interface MapFeature {
-  type: "Feature";
-  geometry:
-    | { type: "Point"; coordinates: [number, number] }
-    | { type: "LineString"; coordinates: [number, number][] };
-  properties: MapProperties;
-}
-
-export interface ConnectedMap {
-  type: "FeatureCollection";
-  features: MapFeature[];
-  generated_at: string;
-}
-
-export interface ReplayBatch {
-  window_start: string;
-  window_end: string;
-  events: MapFeature[];
-}
+export type AccessToken = Schemas["AccessToken"];
+export type Me = Schemas["Me"];
+export type Chunk = Schemas["PassageOut"];
+export type AuditEvent = Schemas["AuditEventOut"];
+export type ChainTip = Schemas["ChainTip"];
+export type VerifyReport = Schemas["VerifyReport"];
+export type MapProperties = Schemas["MapProperties"];
+export type MapKind = MapProperties["kind"];
+export type MapFeature = Schemas["MapFeature"];
+export type ConnectedMap = Schemas["ConnectedMap"];
+export type ReplayBatch = Schemas["ReplayBatch"];
 
 export class ApiError extends Error {
   constructor(
@@ -159,7 +79,7 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string |
 
 export const api = {
   login: (username: string, password: string) =>
-    request<{ access_token: string }>("/auth/login", {
+    request<AccessToken>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ username, password }),
     }),

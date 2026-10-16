@@ -5,8 +5,6 @@ Next.js UI can proxy /api/* to this service same-origin. Login attempts are audi
 login events.
 """
 
-from typing import Any
-
 from argon2 import PasswordHasher
 from argon2.exceptions import Argon2Error
 from fastapi import APIRouter, HTTPException
@@ -30,8 +28,31 @@ class LoginRequest(BaseModel):
     password: str
 
 
-@router.post("/auth/login")
-def login(body: LoginRequest, conn: ConnDep) -> dict[str, str]:
+class AccessToken(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class UnitCrumb(BaseModel):
+    path: str
+    name: str
+
+
+class Me(BaseModel):
+    username: str
+    display_name: str
+    role: str
+    unit_path: str
+    unit_breadcrumb: list[UnitCrumb]
+    clearance_code: str | None
+    clearance_rank: int
+    compartments: list[str]
+    permissions: list[str]
+    data_scope: str
+
+
+@router.post("/auth/login", response_model=AccessToken)
+def login(body: LoginRequest, conn: ConnDep) -> AccessToken:
     row = conn.execute(
         text("SELECT id, password_hash, is_active FROM users WHERE username = :username"),
         {"username": body.username},
@@ -54,14 +75,14 @@ def login(body: LoginRequest, conn: ConnDep) -> dict[str, str]:
         )
     audit_events([event(body.username, "login", "auth", "allow", user_id=str(row.id))])
     # The dev login issues dev tokens explicitly; with Keycloak, login leaves this service.
-    return {
-        "access_token": DevTokenValidator().issue_token(body.username),
-        "token_type": "bearer",
-    }
+    return AccessToken(
+        access_token=DevTokenValidator().issue_token(body.username),
+        token_type="bearer",
+    )
 
 
-@router.get("/me")
-def me(ctx: CurrentContext, conn: ConnDep) -> dict[str, Any]:
+@router.get("/me", response_model=Me)
+def me(ctx: CurrentContext, conn: ConnDep) -> Me:
     """UI-facing identity read: exactly the context fields the shell needs.
 
     `unit_breadcrumb` resolves the caller's unit path to readable unit names
@@ -70,7 +91,7 @@ def me(ctx: CurrentContext, conn: ConnDep) -> dict[str, Any]:
     enforces every action itself (SPEC 7.1).
     """
     breadcrumb = [
-        {"path": str(row.path), "name": str(row.name)}
+        UnitCrumb(path=str(row.path), name=str(row.name))
         for row in conn.execute(
             text(
                 "SELECT path, name FROM units"
@@ -79,15 +100,15 @@ def me(ctx: CurrentContext, conn: ConnDep) -> dict[str, Any]:
             {"unit_path": ctx.unit_path},
         ).all()
     ]
-    return {
-        "username": ctx.username,
-        "display_name": ctx.display_name,
-        "role": ctx.role,
-        "unit_path": ctx.unit_path,
-        "unit_breadcrumb": breadcrumb,
-        "clearance_code": ctx.clearance_code,
-        "clearance_rank": ctx.clearance_rank,
-        "compartments": sorted(ctx.compartments),
-        "permissions": sorted(ctx.permissions),
-        "data_scope": ctx.data_scope,
-    }
+    return Me(
+        username=ctx.username,
+        display_name=ctx.display_name,
+        role=ctx.role,
+        unit_path=ctx.unit_path,
+        unit_breadcrumb=breadcrumb,
+        clearance_code=ctx.clearance_code,
+        clearance_rank=ctx.clearance_rank,
+        compartments=sorted(ctx.compartments),
+        permissions=sorted(ctx.permissions),
+        data_scope=ctx.data_scope,
+    )

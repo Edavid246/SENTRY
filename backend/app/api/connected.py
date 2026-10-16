@@ -10,9 +10,10 @@ event and a query event listing the record ids returned.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from app.api.deps import ConnDep, CurrentContext
 from app.api.guard import guarded_or_empty
@@ -24,30 +25,89 @@ from app.geo.states import check_state
 
 router = APIRouter(prefix="/api/v1/connected", tags=["connected"])
 
+# A GeoJSON position: [lon, lat], or [lon, lat, altitude] on mission tracks. `int | float`
+# keeps a whole altitude as stored (a float-only type would print 120 as 120.0).
+Position = list[int | float]
 
-def _properties(record: SourceRecord, kind: str, label: str, **extra: Any) -> dict[str, Any]:
-    return {
-        "ref": record.source_ref,
-        "kind": kind,
-        "label": label,
-        "classification": record.classification_code,
-        "compartments": list(record.compartments),
-        "unit_path": record.unit_path,
-        "source_system": record.source_system,
+
+class PointGeometry(BaseModel):
+    type: Literal["Point"]
+    coordinates: Position
+
+
+class LineStringGeometry(BaseModel):
+    type: Literal["LineString"]
+    coordinates: list[Position]
+
+
+class MapProperties(BaseModel):
+    """One shape for the three kinds; each kind sets only its own extras.
+
+    Both routes serialise with `response_model_exclude_unset`, so an extra a kind never sets
+    is left out (a sensor has no `observed_at` key at all) while one set to None still prints
+    as null. Every other field in these models is required, so the exclusion can only ever
+    drop these optional extras.
+    """
+
+    ref: str
+    kind: Literal["sensor", "detection", "mission"]
+    label: str
+    classification: str
+    compartments: list[str]
+    unit_path: str
+    source_system: str
+    status: str | None = None
+    observed_at: str | None = None
+    object_type: str | None = None
+    confidence: float | None = None
+    site: str | None = None
+    mission_date: str | None = None
+    track_kind: str | None = None
+    area: str | None = None
+    reason: str | None = None
+
+
+class MapFeature(BaseModel):
+    type: Literal["Feature"]
+    geometry: Annotated[PointGeometry | LineStringGeometry, Field(discriminator="type")]
+    properties: MapProperties
+
+
+class ConnectedMap(BaseModel):
+    type: Literal["FeatureCollection"]
+    features: list[MapFeature]
+    generated_at: str
+
+
+class ReplayBatch(BaseModel):
+    window_start: str
+    window_end: str
+    events: list[MapFeature]
+
+
+def _properties(record: SourceRecord, kind: str, label: str, **extra: Any) -> MapProperties:
+    return MapProperties(
+        ref=record.source_ref,
+        kind=kind,
+        label=label,
+        classification=record.classification_code,
+        compartments=list(record.compartments),
+        unit_path=record.unit_path,
+        source_system=record.source_system,
         **extra,
-    }
+    )
 
 
-def _point(record: SourceRecord, kind: str, label: str, **extra: Any) -> dict[str, Any]:
+def _point(record: SourceRecord, kind: str, label: str, **extra: Any) -> MapFeature:
     data = record.data
-    return {
-        "type": "Feature",
-        "geometry": {"type": "Point", "coordinates": [data["lon"], data["lat"]]},
-        "properties": _properties(record, kind, label, **extra),
-    }
+    return MapFeature(
+        type="Feature",
+        geometry=PointGeometry(type="Point", coordinates=[data["lon"], data["lat"]]),
+        properties=_properties(record, kind, label, **extra),
+    )
 
 
-def _detection_feature(det: SourceRecord) -> dict[str, Any]:
+def _detection_feature(det: SourceRecord) -> MapFeature:
     return _point(
         det,
         "detection",
@@ -79,7 +139,7 @@ def _in_state(record: SourceRecord, state: str | None) -> bool:
     return state is None or record.data.get("state") == state
 
 
-@router.get("/replay")
+@router.get("/replay", response_model=ReplayBatch, response_model_exclude_unset=True)
 def connected_replay(
     ctx: CurrentContext,
     conn: ConnDep,
@@ -87,7 +147,7 @@ def connected_replay(
     upto: Annotated[str | None, Query()] = None,
     hours: Annotated[int, Query(ge=1, le=720)] = 48,
     state: Annotated[str | None, Query()] = None,
-) -> dict[str, Any]:
+) -> ReplayBatch:
     """STUB live feed: detections the caller may see, replayed in time order.
 
     The synthetic detections are the "stream"; the client drives a replay clock and polls
@@ -101,11 +161,11 @@ def connected_replay(
     window_start = now - timedelta(hours=hours)
     since = _parse_ts(after, "after") if after else window_start - timedelta(seconds=1)
     limit = min(_parse_ts(upto, "upto"), now) if upto else now
-    out: dict[str, Any] = {
-        "window_start": window_start.strftime(UTC_TS_FORMAT),
-        "window_end": now.strftime(UTC_TS_FORMAT),
-        "events": [],
-    }
+    out = ReplayBatch(
+        window_start=window_start.strftime(UTC_TS_FORMAT),
+        window_end=now.strftime(UTC_TS_FORMAT),
+        events=[],
+    )
     with guarded_or_empty(
         ctx, conn, "retrieve", "record", audit_resource="connected_replay"
     ) as scope:
@@ -118,39 +178,39 @@ def connected_replay(
             if r.data["observed_at"] <= limit_ts and _in_state(r, state)
         ]
         scope.read("connected_replay", len(events), record_ids=[r.source_ref for r in events])
-    out["events"] = [_detection_feature(r) for r in events]
+    out.events = [_detection_feature(r) for r in events]
     return out
 
 
-@router.get("/map")
+@router.get("/map", response_model=ConnectedMap, response_model_exclude_unset=True)
 def connected_map(
     ctx: CurrentContext,
     conn: ConnDep,
     hours: Annotated[int, Query(ge=1, le=720)] = 48,
     mission_days: Annotated[int, Query(ge=1, le=365)] = 30,
     state: Annotated[str | None, Query()] = None,
-) -> dict[str, Any]:
+) -> ConnectedMap:
     """Sensors, recent detections and mission tracks the caller may see (never more)."""
     state = _state_param(state)
     with guarded_or_empty(ctx, conn, "retrieve", "record", audit_resource="connected_map") as scope:
         if scope is None:
             # Roles without data access get an empty map, not a hint about what exists.
-            return {"type": "FeatureCollection", "features": [], "generated_at": utc_now_iso()}
+            return ConnectedMap(type="FeatureCollection", features=[], generated_at=utc_now_iso())
         features, refs = _map_features(scope, hours, mission_days, state)
         scope.read("connected_map", len(refs), record_ids=refs)
-    return {"type": "FeatureCollection", "features": features, "generated_at": utc_now_iso()}
+    return ConnectedMap(type="FeatureCollection", features=features, generated_at=utc_now_iso())
 
 
 def _map_features(
     scope: Scope, hours: int, mission_days: int, state: str | None = None
-) -> tuple[list[dict[str, Any]], list[str]]:
+) -> tuple[list[MapFeature], list[str]]:
     now = demo_now()
     start = (now - timedelta(hours=hours)).strftime(UTC_TS_FORMAT)
     end = now.strftime(UTC_TS_FORMAT)
     mission_start = (demo_today() - timedelta(days=mission_days)).isoformat()
 
     adapter = get_adapter()
-    features: list[dict[str, Any]] = []
+    features: list[MapFeature] = []
     refs: list[str] = []
     for sensor in adapter.search(scope, RecordFilter(entity_type="Sensor")):
         if not _in_state(sensor, state):
@@ -182,10 +242,10 @@ def _map_features(
         if msn.data["mission_date"] < mission_start or not _in_state(msn, state):
             continue
         features.append(
-            {
-                "type": "Feature",
-                "geometry": {"type": "LineString", "coordinates": msn.data["track"]},
-                "properties": _properties(
+            MapFeature(
+                type="Feature",
+                geometry=LineStringGeometry(type="LineString", coordinates=msn.data["track"]),
+                properties=_properties(
                     msn,
                     "mission",
                     f"{msn.data['mission']} ({msn.data['status']})",
@@ -195,7 +255,7 @@ def _map_features(
                     area=msn.data["area"],
                     reason=msn.data["reason"],
                 ),
-            }
+            )
         )
         refs.append(msn.source_ref)
     return features, refs

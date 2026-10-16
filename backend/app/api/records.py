@@ -18,6 +18,12 @@ from app.connectors.base import RecordFilter
 router = APIRouter(prefix="/api/v1/records", tags=["data"])
 
 
+class RecordSummary(BaseModel):
+    source_ref: str
+    entity_type: str
+    classification_code: str
+
+
 class RecordDetail(BaseModel):
     source_ref: str
     entity_type: str
@@ -29,17 +35,17 @@ class RecordDetail(BaseModel):
     data: dict[str, Any]
 
 
-@router.get("")
-def list_records(ctx: CurrentContext, conn: ConnDep) -> list[dict[str, str]]:
+@router.get("", response_model=list[RecordSummary])
+def list_records(ctx: CurrentContext, conn: ConnDep) -> list[RecordSummary]:
     with guarded(ctx, conn, "retrieve", "record") as scope:
         records = get_adapter().search(scope, RecordFilter())
         scope.read("record", len(records))
     return [
-        {
-            "source_ref": record.source_ref,
-            "entity_type": record.entity_type,
-            "classification_code": record.classification_code,
-        }
+        RecordSummary(
+            source_ref=record.source_ref,
+            entity_type=record.entity_type,
+            classification_code=record.classification_code,
+        )
         for record in records
     ]
 

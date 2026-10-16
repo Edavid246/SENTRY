@@ -8,9 +8,9 @@ restricted document from a non-existent one.
 """
 
 from dataclasses import asdict
-from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from app.api.deps import ConnDep, CurrentContext
 from app.api.guard import guarded
@@ -19,16 +19,34 @@ from app.knowledge import passages
 router = APIRouter(prefix="/api/v1/documents", tags=["data"])
 
 
-@router.get("")
-def list_documents(ctx: CurrentContext, conn: ConnDep) -> list[dict[str, str | None]]:
+class DocumentOut(BaseModel):
+    source_ref: str
+    title: str
+    classification_code: str
+
+
+class PassageOut(BaseModel):
+    chunk_id: str
+    document_id: str
+    document_ref: str
+    document_title: str
+    text: str
+    page: int | None
+    section: str | None
+    classification_code: str
+    compartments: list[str]
+
+
+@router.get("", response_model=list[DocumentOut])
+def list_documents(ctx: CurrentContext, conn: ConnDep) -> list[DocumentOut]:
     with guarded(ctx, conn, "read", "document") as scope:
         documents = passages.list_documents(scope)
         scope.read("document", len(documents))
-    return [asdict(document) for document in documents]
+    return [DocumentOut(**asdict(document)) for document in documents]
 
 
-@router.get("/{source_ref}")
-def get_document(source_ref: str, ctx: CurrentContext, conn: ConnDep) -> dict[str, str]:
+@router.get("/{source_ref}", response_model=DocumentOut)
+def get_document(source_ref: str, ctx: CurrentContext, conn: ConnDep) -> DocumentOut:
     # 404 — not 403 — whenever the row is not visible, including a denied
     # action: never confirm that a restricted document exists.
     with guarded(ctx, conn, "read", "document", on_deny="not_found") as scope:
@@ -36,13 +54,13 @@ def get_document(source_ref: str, ctx: CurrentContext, conn: ConnDep) -> dict[st
         scope.read("document", len(found))
     if not found:
         raise HTTPException(status_code=404, detail="not found")
-    return asdict(found[0])
+    return DocumentOut(**asdict(found[0]))
 
 
-@router.get("/{document_id}/chunks/{chunk_id}")
+@router.get("/{document_id}/chunks/{chunk_id}", response_model=PassageOut)
 def get_document_chunk(
     document_id: str, chunk_id: str, ctx: CurrentContext, conn: ConnDep
-) -> dict[str, Any]:
+) -> PassageOut:
     """Cited-passage viewer: open the exact page/section a citation points at.
 
     Same authorization order and the same policy row filter + RLS as every
@@ -57,4 +75,4 @@ def get_document_chunk(
         scope.read("chunk", 0 if passage is None else 1)
     if passage is None:
         raise HTTPException(status_code=404, detail="not found")
-    return {**asdict(passage), "compartments": list(passage.compartments)}
+    return PassageOut(**asdict(passage))
