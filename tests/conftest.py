@@ -7,10 +7,13 @@ fixture skips with a visible message when the infra stack is not running.
 
 from __future__ import annotations
 
+import difflib
+import json
 import os
 import subprocess
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from alembic import command
@@ -20,6 +23,38 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SNAPSHOT_DIR = REPO_ROOT / "tests" / "snapshots"
+
+
+@pytest.fixture
+def snapshot() -> Callable[[str, Any], None]:
+    """Compare a value with tests/snapshots/<name>.json; UPDATE_SNAPSHOTS=1 records it instead.
+
+    Snapshots are pretty-printed with sorted keys, so a change reads as a line diff. Recording
+    skips the test, so a re-recording run can never pass by accident: run it again to check.
+    """
+
+    def check(name: str, value: Any) -> None:
+        path = SNAPSHOT_DIR / f"{name}.json"
+        actual = json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+        if os.environ.get("UPDATE_SNAPSHOTS") == "1":
+            SNAPSHOT_DIR.mkdir(exist_ok=True)
+            path.write_bytes(actual.encode("utf-8"))
+            pytest.skip(f"recorded {path.name}; run again without UPDATE_SNAPSHOTS to check it")
+        if not path.exists():
+            pytest.fail(f"no snapshot {path.name}: record it with UPDATE_SNAPSHOTS=1")
+        expected = path.read_text(encoding="utf-8").replace("\r\n", "\n")
+        if expected != actual:
+            diff = difflib.unified_diff(
+                expected.splitlines(),
+                actual.splitlines(),
+                f"recorded {path.name}",
+                "now",
+                lineterm="",
+            )
+            pytest.fail(f"{path.name} changed:\n" + "\n".join(list(diff)[:120]), pytrace=False)
+
+    return check
 
 
 def _engine(url: str) -> Engine:

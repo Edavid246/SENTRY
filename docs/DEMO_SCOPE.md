@@ -87,6 +87,7 @@ What to know (facts, not rules):
 - Cache keys hash the exact model request (prompt + retrieved evidence + question). Changing
   prompts, the corpus, chunking, retrieval, tools or seed data changes the keys, so re-run
   the prefill after such a change. Cosmetic and UI changes do not matter.
+  `tests/api/test_prompt_fingerprints.py` fails when a change moves a scripted question's request.
 - Record mode reuses answers already cached, so a re-run only pays for what is missing. The
   Gemini free tier allows about 20 requests a day (a full run needs about 19); a 429 means
   wait for the 00:00 UTC reset. To start afresh, delete `data/demo_llm_cache.json`.
