@@ -348,7 +348,7 @@ Tick a step when its commit is pushed; note the commit hash.
   used by home, divisions and the tools' `unit_path` check; `is_subsidiary` and `subsidiary_path`
   deleted (unused; restore with `git show 860b101:backend/app/units.py`); `tests/unit/test_units.py`
   pins the home grouping rule and passes on the code before this step too
-- [x] 2.3 Identifier formats: `app/data_queries/formats.py` (case, evidence, serial, depot, site,
+- [x] 2.3 (ad23f8e) Identifier formats: `app/data_queries/formats.py` (case, evidence, serial, depot, site,
   record id, contract statuses; `exact()` for tools, `mention()` for the router). The router's
   looser depot and site forms stay as they were. Old and new patterns compared on 300,000 random
   strings: same matches, spans and groups. The `REC-` copies in the test fakes and the smoke stub
