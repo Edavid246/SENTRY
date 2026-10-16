@@ -26,7 +26,7 @@ from app.authz.labels import Labels
 from app.authz.scope import Scope
 from app.connectors.base import SourceRecord
 from app.data_queries.registry import ToolOutcome, execute_tool
-from app.units import is_site, unit_names
+from app.units import covers, is_site, overlaps, subsidiary_key, unit_names
 
 from .division_specs import SECTIONS, SectionSpec, trace_spec
 from .home import DIVISIONS, FIELD_OPS, Division
@@ -113,10 +113,6 @@ def _build(
     )
 
 
-def _reach(path: str, caller: str) -> bool:
-    return path.startswith(caller) or caller.startswith(path)
-
-
 def _division(
     key: str, scope: Scope, names: Mapping[str, str]
 ) -> tuple[Division, str, Callable[[str], bool]]:
@@ -131,18 +127,18 @@ def _division(
     if division is None:
         raise HTTPException(status_code=404, detail="not found")
     if division.path is None:
-        if not any(is_site(p) and _reach(p, caller) for p in names):
+        if not any(is_site(p) and overlaps(p, caller) for p in names):
             raise HTTPException(status_code=404, detail="not found")
         return division, caller, is_site
-    if not _reach(division.path, caller):
+    if not overlaps(division.path, caller):
         raise HTTPException(status_code=404, detail="not found")
-    unit_path = division.path if division.path.startswith(caller) else caller
-    return division, unit_path, lambda path: path.startswith(unit_path)
+    unit_path = division.path if covers(caller, division.path) else caller
+    return division, unit_path, lambda path: covers(unit_path, path)
 
 
 def _field_ops_facts(sections: list[Section], names: Mapping[str, str], caller: str) -> list[Fact]:
-    sites = sorted(p for p in names if is_site(p) and _reach(p, caller))
-    owners = {next(d.name for d in DIVISIONS if d.key == p.split("/")[2]) for p in sites}
+    sites = sorted(p for p in names if is_site(p) and overlaps(p, caller))
+    owners = {next(d.name for d in DIVISIONS if d.key == subsidiary_key(p)) for p in sites}
     by_key = {s.key: s for s in sections}
     people = {r.label for r in by_key["personnel"].rows} if "personnel" in by_key else set()
     return [

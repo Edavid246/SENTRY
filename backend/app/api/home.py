@@ -28,7 +28,7 @@ from app.audit.chain import utc_now_iso
 from app.authz.labels import Label
 from app.correlation.store import list_findings
 from app.data_queries.registry import execute_tool
-from app.units import GROUP_ROOT, is_site, unit_names
+from app.units import covers, is_site, subsidiary_key, unit_names
 
 router = APIRouter(prefix="/api/v1/home", tags=["home"])
 
@@ -89,14 +89,9 @@ FINDINGS_WHAT = "findings open"
 def _division_key(unit_path: str, *, finding: bool = False) -> str | None:
     """Which card a record counts toward. A site team (a unit below a subsidiary) belongs to
     Field Operations; a finding about a site stays with the subsidiary that raised it."""
-    if not unit_path.startswith(GROUP_ROOT):
-        return None
-    parts = unit_path.strip("/").split("/")
-    if len(parts) < 2:
-        return None  # group-level record: no division
-    if len(parts) >= 3 and not finding:
+    if is_site(unit_path) and not finding:
         return FIELD_OPS
-    return parts[1]
+    return subsidiary_key(unit_path)  # None for a group-level record: no division
 
 
 @router.get("/summary", response_model=HomeSummary)
@@ -132,9 +127,9 @@ def home_summary(ctx: CurrentContext, conn: ConnDep) -> HomeSummary:
         for division in DIVISIONS:
             by_what = counted.get(division.key, {})
             if division.path is not None:
-                covered = division.path.startswith(ctx.unit_path)
+                covered = covers(ctx.unit_path, division.path)
             else:
-                covered = any(p.startswith(ctx.unit_path) for p in site_units)
+                covered = any(covers(ctx.unit_path, p) for p in site_units)
             if not covered and not by_what:
                 continue
             members = [m for found in by_what.values() for m in found]

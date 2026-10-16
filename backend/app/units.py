@@ -23,21 +23,28 @@ def unit_slug(unit_path: str) -> str:
 GROUP_ROOT = "/eib-group/"
 
 
-def depth(unit_path: str) -> int:
-    return len(unit_path.strip("/").split("/"))
-
-
-def is_subsidiary(unit_path: str) -> bool:
-    return unit_path.startswith(GROUP_ROOT) and depth(unit_path) == 2
+def _segments(unit_path: str) -> list[str]:
+    return unit_path.strip("/").split("/")
 
 
 def is_site(unit_path: str) -> bool:
     """A field site is a unit below a subsidiary: /eib-group/<subsidiary>/<site>/."""
-    return unit_path.startswith(GROUP_ROOT) and depth(unit_path) >= 3
+    return unit_path.startswith(GROUP_ROOT) and len(_segments(unit_path)) >= 3
 
 
-def subsidiary_path(unit_path: str) -> str:
-    """'/eib-group/stratoc/site-4/' -> '/eib-group/stratoc/'; other units stand for themselves."""
-    if unit_path.startswith(GROUP_ROOT) and depth(unit_path) >= 2:
-        return f"{GROUP_ROOT}{unit_path.strip('/').split('/')[1]}/"
-    return unit_path
+def subsidiary_key(unit_path: str) -> str | None:
+    """'/eib-group/stratoc/site-4/' -> 'stratoc'; None for the group itself and outside units."""
+    if not unit_path.startswith(GROUP_ROOT):
+        return None
+    segments = _segments(unit_path)
+    return segments[1] if len(segments) >= 2 else None
+
+
+def covers(outer: str, inner: str) -> bool:
+    """`inner` is `outer` or below it. Paths end in '/', so a prefix is a whole subtree."""
+    return inner.startswith(outer)
+
+
+def overlaps(a: str, b: str) -> bool:
+    """One unit is at or below the other (a caller and a division share some records)."""
+    return covers(a, b) or covers(b, a)

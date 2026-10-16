@@ -23,6 +23,7 @@ from app.connectors import get_adapter
 from app.connectors.base import RecordFilter, SourceRecord
 from app.data_queries.errors import ToolParamError
 from app.geo.states import check_state
+from app.units import covers
 
 MAX_WITHIN_DAYS = 365
 _UNIT_PATH_RE = re.compile(r"^/(?:[a-z0-9-]+/)+$")
@@ -108,7 +109,7 @@ def resolve_unit_path(ctx: AccessContext, value: Any) -> str:
     candidate = value if value.endswith("/") else value + "/"
     if len(candidate) > 200 or not _UNIT_PATH_RE.match(candidate):
         raise ToolParamError("unit_path is not a valid unit path")
-    if not candidate.startswith(ctx.unit_path):
+    if not covers(ctx.unit_path, candidate):
         raise ToolParamError("unit_path is outside your unit scope")
     return candidate
 
