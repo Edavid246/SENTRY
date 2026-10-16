@@ -353,7 +353,7 @@ Tick a step when its commit is pushed; note the commit hash.
   looser depot and site forms stay as they were. Old and new patterns compared on 300,000 random
   strings: same matches, spans and groups. The `REC-` copies in the test fakes and the smoke stub
   are left for 5.1
-- [x] 2.4 Clock helper, `RetrievedChunk` extends `Passage`, vector and embed helpers (+ D7):
+- [x] 2.4 (0ac30be) Clock helper, `RetrievedChunk` extends `Passage`, vector and embed helpers (+ D7):
   `utc_now_iso` in `app/clock.py`; `_Cited` gone; `embed_or_none` and `vector_literal` in
   `ai_gateway/embeddings.py` (`ingest._embed` stays as the name tests patch); the answer event
   gains `model_version`, token counts and `latency_ms` (`tests/unit/test_model_use.py`)
