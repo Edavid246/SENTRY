@@ -344,7 +344,7 @@ Tick a step when its commit is pushed; note the commit hash.
   byte-identical before and after (SHA-256 of every row but the argon2 hashes, DEMO_DATE pinned)
 - [x] 2.1 (c33eea1) `Label` as a `derive` input, `Scope.labels` (+ D1, D8); the D1 and D8 tests in
   `tests/authz/test_conversation_store.py` fail on the code before this step
-- [x] 2.2 Unit vocabulary: `is_site`, `subsidiary_key`, `covers`, `overlaps` in `app/units.py`,
+- [x] 2.2 (5f2ece0) Unit vocabulary: `is_site`, `subsidiary_key`, `covers`, `overlaps` in `app/units.py`,
   used by home, divisions and the tools' `unit_path` check; `is_subsidiary` and `subsidiary_path`
   deleted (unused; restore with `git show 860b101:backend/app/units.py`); `tests/unit/test_units.py`
   pins the home grouping rule and passes on the code before this step too
