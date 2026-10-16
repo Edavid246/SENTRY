@@ -374,7 +374,8 @@ Tick a step when its commit is pushed; note the commit hash.
 - [x] 3.3 (d08ab7b) Assistant ORM models in `app/assistant/models.py`; `StoredMessage`. `alembic check`
   on the test database: same three differences before and after, all pre-existing
   (`audit_events.prev_hash` and `chunks.search_vector` nullability, `ix_chunks_search_vector`)
-- [ ] 3.4 `TokenValidator` seam (D2)
+- [x] 3.4 (9e46856) `TokenValidator` seam (D2): protocol and `get_token_validator()` in `authz/tokens.py`;
+  `api/deps.py` and `tests/support/contexts.py` go through it; docs/STUBS.md names it
 - [ ] 3.5 Response models for the dict routes
 - [ ] 4.1 `displayValue()`, `recordHref()`
 - [ ] 4.2 `<Marking>`
