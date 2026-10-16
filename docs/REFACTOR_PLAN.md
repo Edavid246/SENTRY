@@ -369,7 +369,8 @@ Tick a step when its commit is pushed; note the commit hash.
   `Scope.allows`; dashboard routes gain one decide event. Its five tests fail on the previous
   registry. Left open: the home "findings open" count reads the findings store under the
   dashboard read alone (not a tool, so outside D3)
-- [ ] 3.2 Split `api/endpoints.py`
+- [x] 3.2 (c74ed20) Split `api/endpoints.py` into `api/auth.py`, `api/documents.py`, `api/records.py`,
+  `api/audit.py`; OpenAPI snapshot unchanged
 - [ ] 3.3 Assistant ORM models
 - [ ] 3.4 `TokenValidator` seam (D2)
 - [ ] 3.5 Response models for the dict routes
