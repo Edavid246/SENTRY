@@ -11,32 +11,20 @@ from __future__ import annotations
 import pytest
 from app.audit.chain import append_events, utc_now_iso
 from app.db import get_engine
-from test_auth_endpoints import auth_header, login
+from support.audit import audit_events, latest_event
+from support.http import auth_header, login
 
 AUDITOR = "group.audit"
 SYSADMIN = "group.it"
 DATA_USERS = ["owner", "logistics.head", "coo", "briech.lead"]
 
 
-def _audit(client, username: str = AUDITOR, limit: int = 200) -> list[dict]:
-    response = client.get(f"/api/v1/audit?limit={limit}", headers=auth_header(client, username))
-    assert response.status_code == 200, response.text
-    return response.json()
-
-
-def _latest(events: list[dict], **match) -> dict | None:
-    for event in sorted(events, key=lambda item: item["seq"], reverse=True):
-        if all(event["payload"].get(key) == value for key, value in match.items()):
-            return event
-    return None
-
-
 def test_login_success_and_failure_are_both_audited(client) -> None:
     assert login(client, "owner", password="wrong-password").status_code == 401
     assert login(client, "owner").status_code == 200
-    events = _audit(client)
-    denied = _latest(events, actor="owner", action="login", decision="deny")
-    allowed = _latest(events, actor="owner", action="login", decision="allow")
+    events = audit_events(client)
+    denied = latest_event(events, actor="owner", action="login", decision="deny")
+    allowed = latest_event(events, actor="owner", action="login", decision="allow")
     assert denied is not None
     assert denied["payload"]["reasons"] == ["invalid credentials"]
     assert allowed is not None
@@ -68,7 +56,7 @@ def test_audit_requires_authentication(client) -> None:
 def test_rejected_token_is_audited(client) -> None:
     response = client.get("/api/v1/audit", headers={"Authorization": "Bearer not-a-real-token"})
     assert response.status_code == 401
-    rejected = _latest(_audit(client), action="authenticate", decision="deny")
+    rejected = latest_event(audit_events(client), action="authenticate", decision="deny")
     assert rejected is not None
     assert rejected["payload"]["actor"] == "anonymous"
 
@@ -77,9 +65,11 @@ def test_allowed_data_request_records_decide_then_query(client) -> None:
     headers = auth_header(client, "owner")
     response = client.get("/api/v1/documents", headers=headers)
     assert response.status_code == 200
-    events = _audit(client)
-    decide = _latest(events, actor="owner", action="decide", resource="document", decision="allow")
-    query = _latest(events, actor="owner", action="query", resource="document")
+    events = audit_events(client)
+    decide = latest_event(
+        events, actor="owner", action="decide", resource="document", decision="allow"
+    )
+    query = latest_event(events, actor="owner", action="query", resource="document")
     assert decide is not None and query is not None
     assert decide["payload"]["requested"] == "read"
     assert query["payload"]["rows"] == len(response.json())
@@ -90,12 +80,12 @@ def test_allowed_data_request_records_decide_then_query(client) -> None:
 def test_denied_data_request_records_a_single_denied_decide(client) -> None:
     headers = auth_header(client, SYSADMIN)
     assert client.get("/api/v1/documents", headers=headers).status_code == 403
-    events = _audit(client)
-    decide = _latest(events, actor=SYSADMIN, action="decide", resource="document")
+    events = audit_events(client)
+    decide = latest_event(events, actor=SYSADMIN, action="decide", resource="document")
     assert decide is not None
     assert decide["payload"]["decision"] == "deny"
     assert any("not granted" in reason for reason in decide["payload"]["reasons"])
-    assert _latest(events, actor=SYSADMIN, action="query") is None
+    assert latest_event(events, actor=SYSADMIN, action="query") is None
 
 
 def test_verify_reports_healthy_chain_and_both_layers(client) -> None:
@@ -138,7 +128,7 @@ def test_verify_reports_healthy_chain_and_both_layers(client) -> None:
 
 
 def test_audit_items_have_the_viewer_shape(client) -> None:
-    events = _audit(client, limit=5)
+    events = audit_events(client, limit=5)
     assert events
     seqs = [event["seq"] for event in events]
     assert seqs == sorted(seqs, reverse=True)
@@ -153,7 +143,7 @@ def test_audit_items_have_the_viewer_shape(client) -> None:
 
 def test_login_timestamps_are_utc(client) -> None:
     assert login(client, "coo").status_code == 200
-    event = _latest(_audit(client), actor="coo", action="login", decision="allow")
+    event = latest_event(audit_events(client), actor="coo", action="login", decision="allow")
     assert event is not None
     assert event["payload"]["timestamp"].endswith("+00:00")
 

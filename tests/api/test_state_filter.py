@@ -10,16 +10,13 @@ import pytest
 from app.data_queries.errors import ToolParamError
 from app.data_queries.tools import TOOLS
 from app.geo.states import check_state
-from scoped import run_tool, scoped
-from test_auth_endpoints import auth_header
-from test_connected_data import _ctx
+from support.contexts import ctx_for
+from support.http import auth_header
+from support.responses import feature_refs
+from support.scoped import run_tool, scoped
 
 MAP_PATH = "/api/v1/connected/map"
 REPLAY_PATH = "/api/v1/connected/replay"
-
-
-def _refs(response) -> set[str]:
-    return {f["properties"]["ref"] for f in response.json()["features"]}
 
 
 def _replay_refs(response) -> set[str]:
@@ -42,8 +39,8 @@ def test_check_state_rejects_everything_off_the_list(bad) -> None:
 
 def test_map_state_filter_narrows_and_never_widens(client) -> None:
     for user in ("owner", "logistics.head", "coo", "briech.lead"):
-        everything = _refs(client.get(MAP_PATH, headers=auth_header(client, user)))
-        niger = _refs(
+        everything = feature_refs(client.get(MAP_PATH, headers=auth_header(client, user)))
+        niger = feature_refs(
             client.get(MAP_PATH, params={"state": "Niger"}, headers=auth_header(client, user))
         )
         assert niger == everything  # all demo sites are in Niger State
@@ -52,7 +49,7 @@ def test_map_state_filter_narrows_and_never_widens(client) -> None:
 
 
 def test_map_state_filter_keeps_hidden_records_hidden(client) -> None:
-    refs = _refs(
+    refs = feature_refs(
         client.get(MAP_PATH, params={"state": "Niger"}, headers=auth_header(client, "coo"))
     )
     assert refs == {"REC-046", "REC-048", "REC-049"}
@@ -90,8 +87,8 @@ def _rows(app_engine, ctx, tool, params):
 
 
 def test_tools_filter_by_state_without_widening(client, app_engine) -> None:
-    owner = _ctx(client, app_engine, "owner")
-    coo = _ctx(client, app_engine, "coo")
+    owner = ctx_for(client, app_engine, "owner")
+    coo = ctx_for(client, app_engine, "coo")
     all_missions = _rows(app_engine, owner, "uas_missions", {"period_days": 60})
     assert all_missions
     assert (
@@ -112,7 +109,7 @@ def test_tools_filter_by_state_without_widening(client, app_engine) -> None:
 def test_tools_refuse_an_unknown_state_with_a_denied_audit_event(
     client, app_engine, tool, state
 ) -> None:
-    ctx = _ctx(client, app_engine, "owner")
+    ctx = ctx_for(client, app_engine, "owner")
     outcome, _ = run_tool(app_engine, ctx, tool, {"state": state})
     assert outcome.refused and outcome.result is None
     with pytest.raises(ToolParamError), scoped(app_engine, ctx) as scope:

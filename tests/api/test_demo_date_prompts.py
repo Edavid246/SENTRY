@@ -14,24 +14,15 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 from app import clock
 from app.ai_gateway import LLMResponseCache
-from app.ai_gateway.base import LLMResult
 from app.config import get_settings
 from sqlalchemy import text
-from test_assistant_endpoints import _ask
+from support.fakes import Capture
+from support.http import ask
 
 QUESTION = "Show me the equipment currently awaiting maintenance"
 REC_011_OFFSET = -12  # app.seed: REC-011 is due 12 days before the seed day
 REC_017_OFFSET = 90  # due in 90 days: outside the 30-day window on the seed day
 WINDOW_DAYS = 30
-
-
-class Capture:
-    def __init__(self) -> None:
-        self.requests: list = []
-
-    def complete(self, request):
-        self.requests.append(request)
-        return LLMResult(text="explained", provider="p", model="m")
 
 
 @pytest.fixture
@@ -67,7 +58,7 @@ def setup(monkeypatch, models, seed_day):
 
 def _key(capture: Capture, client, user: str = "owner") -> str:
     before = len(capture.requests)
-    assert _ask(client, user, QUESTION).status_code == 200
+    assert ask(client, user, QUESTION).status_code == 200
     assert len(capture.requests) == before + 1
     return LLMResponseCache.key(capture.requests[-1])
 

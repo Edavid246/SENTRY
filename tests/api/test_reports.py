@@ -13,19 +13,15 @@ import zipfile
 
 from docx import Document
 from pypdf import PdfReader
-from test_assistant_endpoints import _audit
-from test_auth_endpoints import auth_header
+from support.audit import audit_events, audit_tip
+from support.http import auth_header, get
 
 BASE = "/api/v1/reports"
 BANNER = "DRAFT FOR HUMAN REVIEW - not an approved document"
 
 
-def _get(client, username: str, path: str):
-    return client.get(f"{BASE}/{path}", headers=auth_header(client, username))
-
-
 def _report(client, username: str, key: str) -> dict:
-    response = _get(client, username, key)
+    response = get(client, username, f"{BASE}/{key}")
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -48,7 +44,7 @@ def test_report_is_a_draft_with_summary_and_sections(client) -> None:
 
 
 def test_report_holds_exactly_what_the_dashboard_holds(client) -> None:
-    division = _get(client, "owner", "poctova")
+    division = get(client, "owner", f"{BASE}/poctova")
     page = client.get("/api/v1/divisions/poctova", headers=auth_header(client, "owner")).json()
     refs = {r["ref"] for s in page["sections"] for r in s["rows"]}
     assert division.status_code == 200
@@ -80,21 +76,21 @@ def test_a_lower_cleared_caller_gets_a_lower_marked_report(client) -> None:
 
 
 def test_a_hidden_division_report_reads_like_a_missing_one(client) -> None:
-    hidden = _get(client, "briech.lead", "poctova")
-    unknown = _get(client, "briech.lead", "nonesuch")
+    hidden = get(client, "briech.lead", f"{BASE}/poctova")
+    unknown = get(client, "briech.lead", f"{BASE}/nonesuch")
     assert hidden.status_code == unknown.status_code == 404
     assert hidden.json() == unknown.json()
     for path in ("poctova/export?format=pdf", "nonesuch/export?format=pdf"):
-        assert _get(client, "briech.lead", path).status_code == 404
+        assert get(client, "briech.lead", f"{BASE}/{path}").status_code == 404
 
 
 def test_unsupported_export_format_is_rejected(client) -> None:
-    assert _get(client, "owner", "poctova/export?format=exe").status_code == 422
-    assert _get(client, "owner", "poctova/export").status_code == 422
+    assert get(client, "owner", f"{BASE}/poctova/export?format=exe").status_code == 422
+    assert get(client, "owner", f"{BASE}/poctova/export").status_code == 422
 
 
 def test_pdf_export_carries_banner_and_marking_on_every_page(client) -> None:
-    response = _get(client, "owner", "briech/export?format=pdf")
+    response = get(client, "owner", f"{BASE}/briech/export?format=pdf")
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
     assert "briech-status-report-DRAFT.pdf" in response.headers["content-disposition"]
@@ -108,7 +104,7 @@ def test_pdf_export_carries_banner_and_marking_on_every_page(client) -> None:
 
 
 def test_docx_export_carries_banner_and_marking(client) -> None:
-    response = _get(client, "owner", "poctova/export?format=docx")
+    response = get(client, "owner", f"{BASE}/poctova/export?format=docx")
     assert response.status_code == 200
     assert zipfile.is_zipfile(io.BytesIO(response.content))
     document = Document(io.BytesIO(response.content))
@@ -122,14 +118,16 @@ def test_docx_export_carries_banner_and_marking(client) -> None:
 
 
 def _exports_after(client, seq: int) -> list[dict]:
-    return [e for e in _audit(client) if e["seq"] > seq and e["payload"].get("action") == "export"]
+    return [
+        e for e in audit_events(client) if e["seq"] > seq and e["payload"].get("action") == "export"
+    ]
 
 
 def test_an_export_is_audited_and_a_preview_is_not_an_export(client) -> None:
-    tip = max(e["seq"] for e in _audit(client, limit=1))
-    _get(client, "owner", "poctova")
+    tip = audit_tip(client)
+    get(client, "owner", f"{BASE}/poctova")
     assert _exports_after(client, tip) == []
-    _get(client, "owner", "poctova/export?format=pdf")
+    get(client, "owner", f"{BASE}/poctova/export?format=pdf")
     (exported,) = _exports_after(client, tip)
     payload = exported["payload"]
     assert (payload["actor"], payload["resource"], payload["decision"]) == (

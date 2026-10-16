@@ -9,8 +9,8 @@ passage exists.
 
 import pytest
 from app.ids import entity_id as _id
-from test_assistant_endpoints import _audit, _latest
-from test_auth_endpoints import auth_header
+from support.audit import audit_events, latest_event
+from support.http import auth_header
 
 # Confidential, own unit of coo: visible to owner, above coo's
 # restricted clearance, and unreachable without the right unit path.
@@ -67,11 +67,11 @@ def test_passage_above_the_callers_clearance_is_404_not_403(client) -> None:
     assert response.status_code == 404
     assert response.json() == {"detail": "not found"}
 
-    events = _audit(client)
-    decide = _latest(events, actor="coo", action="decide", resource="chunk", decision="allow")
+    events = audit_events(client)
+    decide = latest_event(events, actor="coo", action="decide", resource="chunk", decision="allow")
     assert decide is not None
     assert decide["payload"]["requested"] == "read"
-    rows = _latest(events, actor="coo", action="query", resource="chunk")
+    rows = latest_event(events, actor="coo", action="query", resource="chunk")
     assert rows is not None
     assert rows["payload"]["rows"] == 0
 
@@ -81,13 +81,15 @@ def test_caller_without_data_scope_is_denied_before_any_row_read(client) -> None
     assert response.status_code == 404
     assert response.json() == {"detail": "not found"}
 
-    events = _audit(client)
-    decide = _latest(events, actor="group.it", action="decide", resource="chunk", decision="deny")
+    events = audit_events(client)
+    decide = latest_event(
+        events, actor="group.it", action="decide", resource="chunk", decision="deny"
+    )
     assert decide is not None
     reasons = decide["payload"]["reasons"]
     assert "data_scope 'none' does not permit data actions" in reasons
     assert any("not granted by role 'sysadmin'" in reason for reason in reasons)
-    assert _latest(events, actor="group.it", action="query", resource="chunk") is None
+    assert latest_event(events, actor="group.it", action="query", resource="chunk") is None
 
 
 def test_a_caller_missing_the_compartment_gets_404(client) -> None:
@@ -119,14 +121,16 @@ def test_unknown_and_malformed_ids_answer_404_not_500(client) -> None:
 
 
 def test_viewer_reads_are_audited(client) -> None:
-    baseline = max(event["seq"] for event in _audit(client))
+    baseline = max(event["seq"] for event in audit_events(client))
     assert _read(client, "owner", "DOC-016", CHUNK_016).status_code == 200
 
-    events = [event for event in _audit(client) if event["seq"] > baseline]
-    decide = _latest(events, actor="owner", action="decide", resource="chunk", decision="allow")
+    events = [event for event in audit_events(client) if event["seq"] > baseline]
+    decide = latest_event(
+        events, actor="owner", action="decide", resource="chunk", decision="allow"
+    )
     assert decide is not None
     assert decide["payload"]["requested"] == "read"
-    rows = _latest(events, actor="owner", action="query", resource="chunk")
+    rows = latest_event(events, actor="owner", action="query", resource="chunk")
     assert rows is not None
     assert rows["payload"]["rows"] == 1
     assert decide["seq"] < rows["seq"]

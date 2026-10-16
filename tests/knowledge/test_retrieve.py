@@ -7,43 +7,16 @@ query — relevance never overrides authorization (Principle Zero)."""
 
 from __future__ import annotations
 
-from app.authz.context import AccessContext, permissions_for_role
 from app.authz.scope import Scope
 from app.db import clear_rls_context
-from app.ids import entity_id as _id
 from app.knowledge.retrieve import retrieve_chunks
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-
-# (role, unit_path, clearance_rank, compartments)
-USERS = {
-    "owner": ("commander", "/eib-group/", 3, ("UAS-OPS", "FORENSICS")),
-    "coo": ("training", "/eib-group/stratoc/site-4/", 1, ()),
-}
-
-
-def _context(username: str) -> AccessContext:
-    role, unit_path, rank, compartments = USERS[username]
-    return AccessContext(
-        user_id=_id(f"user:{username}"),
-        username=username,
-        display_name=username,
-        role=role,
-        unit_id=_id(f"unit:{unit_path}"),
-        unit_path=unit_path,
-        clearance_code=None,
-        clearance_rank=rank,
-        compartments=frozenset(compartments),
-        data_scope="standard",
-        permissions=permissions_for_role(role),
-        session_id=f"retrieve:{username}",
-        token_id="test",
-        auth_method="dev",
-    )
+from support.contexts import access_context
 
 
 def _refs(engine: Engine, username: str, question: str) -> list[str]:
-    ctx = _context(username)
+    ctx = access_context(username)
     with engine.connect() as conn:
         scope = Scope(ctx, conn)
         return [chunk.document_ref for chunk in retrieve_chunks(scope, question, query_vector=None)]
@@ -79,7 +52,7 @@ def test_retrieval_needs_the_scopes_rls_context_as_well_as_its_filter(
 ) -> None:
     """The row filter alone is not enough: with the scope's RLS context cleared,
     the database itself returns nothing, so both layers always apply together."""
-    ctx = _context("owner")
+    ctx = access_context("owner")
     with app_engine.connect() as conn:
         scope = Scope(ctx, conn)
         assert retrieve_chunks(scope, "maintenance", query_vector=None)

@@ -1,15 +1,14 @@
 """POST /auth/login and GET /me: authentication and identity through the real HTTP stack.
 
 Every assertion compares against the hand-authored SPEC 7.4 contexts in
-test_rls_only (CONTEXTS/ROLES) — the same oracle the RLS-only and
+tests/support/contexts.py (CONTEXTS/ROLES) — the same oracle the RLS-only and
 filter-only layers use — so a divergence anywhere in login -> token ->
 AccessContext -> response shows up as a failure here.
 """
 
 import pytest
-from app.seed import DEMO_PASSWORD
-from test_filter_only import ROLES
-from test_rls_only import CONTEXTS, USERNAMES
+from support.contexts import CONTEXTS, ROLES, USERNAMES
+from support.http import auth_header, login
 
 # SPEC 7.1 permissions per organizational role, hand-authored here so the
 # /me response is checked against an independent oracle, not against
@@ -22,16 +21,6 @@ EXPECTED_PERMISSIONS: dict[str, list[str]] = {
     "sysadmin": ["manage", "read_audit"],
     "auditor": ["read_audit"],
 }
-
-
-def login(client, username: str, password: str = DEMO_PASSWORD):
-    return client.post("/api/v1/auth/login", json={"username": username, "password": password})
-
-
-def auth_header(client, username: str) -> dict[str, str]:
-    response = login(client, username)
-    assert response.status_code == 200, response.text
-    return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
 @pytest.mark.parametrize("username", USERNAMES)

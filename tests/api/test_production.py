@@ -11,9 +11,9 @@ import pytest
 from app.data_queries.errors import ToolParamError
 from app.data_queries.routing import route_question
 from app.data_queries.tools import TOOLS
-from scoped import run_tool, scoped
-from test_assistant_endpoints import _ask
-from test_connected_data import _ctx
+from support.contexts import ctx_for
+from support.http import ask
+from support.scoped import run_tool, scoped
 
 SERIAL_COLUMNS = [
     "id",
@@ -42,43 +42,43 @@ def _rows(body: dict) -> list[dict]:
 
 
 def test_serial_trace_owner_sees_run_qc_and_delivery(client, explain_calls) -> None:  # noqa: F811
-    body = _ask(client, "owner", "Trace serial BRC-0041").json()
+    body = ask(client, "owner", "Trace serial BRC-0041").json()
     assert body["result_table"]["columns"] == SERIAL_COLUMNS
     (row,) = _rows(body)
     assert row["id"] == "REC-087"
     assert (row["run_ref"], row["qc_status"]) == ("PR-BR-014", "released")
     assert (row["delivered_to"], row["delivery_ref"]) == ("Client Agency A", "DL-101")
-    poctova = _rows(_ask(client, "owner", "Trace serial PCT-ARM-0007").json())
+    poctova = _rows(ask(client, "owner", "Trace serial PCT-ARM-0007").json())
     assert [r["id"] for r in poctova] == ["REC-091"]
     assert poctova[0]["delivered_to"] == "Client Agency C"
 
 
 def test_hidden_serial_looks_like_a_missing_one(client, explain_calls) -> None:  # noqa: F811
     # PCT-ARM-0007 exists but is outside briech.lead's unit; BRC-9999 does not exist.
-    hidden = _ask(client, "briech.lead", "Trace serial PCT-ARM-0007").json()
-    missing = _ask(client, "briech.lead", "Trace serial BRC-9999").json()
+    hidden = ask(client, "briech.lead", "Trace serial PCT-ARM-0007").json()
+    missing = ask(client, "briech.lead", "Trace serial BRC-9999").json()
     assert hidden["refused"] is False and missing["refused"] is False
     assert _rows(hidden) == [] and _rows(missing) == []
     for user in ("coo", "logistics.head"):
-        assert _rows(_ask(client, user, "Trace serial BRC-0041").json()) == []
+        assert _rows(ask(client, user, "Trace serial BRC-0041").json()) == []
 
 
 def test_briech_lead_cannot_see_serials_delivered_to_other_clients(client, explain_calls) -> None:  # noqa: F811
     for serial, expected in (("BRC-0041", 1), ("BRC-0043", 1), ("BRC-0051", 1)):
-        assert len(_rows(_ask(client, "briech.lead", f"Trace serial {serial}").json())) == expected
+        assert len(_rows(ask(client, "briech.lead", f"Trace serial {serial}").json())) == expected
 
 
 def test_qc_holds_by_user(client, explain_calls) -> None:  # noqa: F811
-    owner = _ask(client, "owner", "Which production runs are on QC hold?").json()
+    owner = ask(client, "owner", "Which production runs are on QC hold?").json()
     assert owner["result_table"]["columns"] == HOLD_COLUMNS
     rows = {r["id"]: r for r in _rows(owner)}
     assert set(rows) == {"REC-084", "REC-086"}
     assert rows["REC-084"]["hold_reason"] == "gimbal bracket torque out of tolerance"
     assert rows["REC-084"]["serials_traced"] == 1  # only BRC-0051 is traced to PR-BR-015
-    lead = _rows(_ask(client, "briech.lead", "Show production holds").json())
+    lead = _rows(ask(client, "briech.lead", "Show production holds").json())
     assert [r["id"] for r in lead] == ["REC-084"]
     for user in ("coo", "logistics.head"):
-        assert _rows(_ask(client, user, "Show production holds").json()) == []
+        assert _rows(ask(client, user, "Show production holds").json()) == []
 
 
 @pytest.mark.parametrize(
@@ -96,7 +96,7 @@ def test_qc_holds_by_user(client, explain_calls) -> None:  # noqa: F811
     ],
 )
 def test_bad_params_are_refused_with_a_denied_audit_event(client, app_engine, tool, params) -> None:
-    ctx = _ctx(client, app_engine, "briech.lead")
+    ctx = ctx_for(client, app_engine, "briech.lead")
     outcome, _ = run_tool(app_engine, ctx, tool, params)
     assert outcome.refused and outcome.result is None
     with pytest.raises(ToolParamError), scoped(app_engine, ctx) as scope:

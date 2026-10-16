@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 from app.ai_gateway import AIGateway, LLMResponseCache, ProviderUnavailableError
 from app.ai_gateway.base import ChatMessage, LLMRequest, LLMResult
-from test_assistant_endpoints import _ask
+from support.http import ask
 
 REPO = Path(__file__).resolve().parents[2]
 # FTS-only retrieval ANDs every word, so the rehearsal uses a short knowledge query.
@@ -94,7 +94,7 @@ def test_record_then_cache_only_answers_every_pair(client, pipeline) -> None:
     state, cache, fake = pipeline
 
     for pair in pairs:
-        assert _ask(client, pair.user, pair.question).status_code == 200, pair
+        assert ask(client, pair.user, pair.question).status_code == 200, pair
     recorded = json.loads(cache.path.read_text(encoding="utf-8"))
     assert state["gateway"].recorded_count >= 1 and recorded
     assert any("EVIDENCE" in v["request"]["messages"][-1][1] for v in recorded.values())
@@ -104,7 +104,7 @@ def test_record_then_cache_only_answers_every_pair(client, pipeline) -> None:
     calls_before = fake.calls
     state["gateway"] = AIGateway(fake, cache=cache, cache_only=True)
     for pair in pairs:
-        response = _ask(client, pair.user, pair.question)
+        response = ask(client, pair.user, pair.question)
         assert response.status_code == 200, (pair, response.text)
         assert response.json()["answer"].strip()
     assert fake.calls == calls_before
@@ -114,7 +114,7 @@ def test_record_then_cache_only_answers_every_pair(client, pipeline) -> None:
 def test_cache_only_miss_is_provider_unavailable_not_a_made_up_answer(client, pipeline) -> None:
     state, cache, fake = pipeline
     state["gateway"] = AIGateway(fake, cache=cache, cache_only=True)
-    response = _ask(client, "owner", SHORT_KNOWLEDGE_QUESTION)
+    response = ask(client, "owner", SHORT_KNOWLEDGE_QUESTION)
     assert response.status_code == 503
     assert fake.calls == 0
     with pytest.raises(ProviderUnavailableError):
@@ -125,7 +125,7 @@ def test_recorded_prompts_hold_only_what_the_user_may_see(client, pipeline) -> N
     """Principle Zero in the cache: a recorded request is the exact prompt sent to the
     model, so it must never contain a source the asking user is not cleared for."""
     state, cache, fake = pipeline
-    assert _ask(client, "coo", SHORT_KNOWLEDGE_QUESTION).status_code == 200
+    assert ask(client, "coo", SHORT_KNOWLEDGE_QUESTION).status_code == 200
     recorded = json.loads(cache.path.read_text(encoding="utf-8"))
     assert recorded
     for entry in recorded.values():

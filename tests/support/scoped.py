@@ -1,4 +1,4 @@
-"""Test helpers: run data-access code on an authorized Scope outside a route."""
+"""Run data-access code on an authorized Scope outside a route."""
 
 from __future__ import annotations
 

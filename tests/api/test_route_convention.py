@@ -13,7 +13,7 @@ Two deliberate exceptions, both called out in the step report:
 
 from app.main import create_app
 from starlette.middleware.cors import CORSMiddleware
-from test_auth_endpoints import login
+from support.http import login
 
 
 def test_every_business_path_is_under_api_v1(client) -> None:

@@ -15,7 +15,7 @@ from app.authz.tokens import DevTokenValidator, TokenError
 from app.config import Settings
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-from test_rls_only import CONTEXTS, USERNAMES
+from support.contexts import CONTEXTS, USERNAMES
 
 
 def _validator(settings: Settings) -> DevTokenValidator:

@@ -8,9 +8,10 @@ stock line. One Site 4 fault report is Secret, so the derived finding inherits S
 from __future__ import annotations
 
 import pytest
-from test_assistant_endpoints import _ask, _audit, _latest
-from test_auth_endpoints import auth_header
-from test_data_pathway import _ctx
+from support.audit import audit_events, latest_event
+from support.contexts import ctx_for
+from support.http import ask, auth_header, get
+from support.scoped import scoped
 
 RUN = "/api/v1/correlation/run"
 FINDINGS = "/api/v1/correlation/findings"
@@ -26,10 +27,6 @@ RECENT_FAULTS = {"REC-030", "REC-031", "REC-032", "REC-033", "REC-034", "REC-035
 
 def _run(client, user: str = "owner"):
     return client.post(RUN, headers=auth_header(client, user))
-
-
-def _get(client, user: str, path: str = FINDINGS):
-    return client.get(path, headers=auth_header(client, user))
 
 
 def _by_id(response) -> dict[str, dict]:
@@ -82,13 +79,14 @@ def test_run_is_commander_only_and_idempotent(client) -> None:
     first = _run(client).json()["findings"]
     second = _run(client).json()["findings"]
     assert {f["id"] for f in first} == {f["id"] for f in second} == EVERY_FINDING
-    assert len(_get(client, "owner").json()) == len(EVERY_FINDING)  # updated, not duplicated
+    # Updated, not duplicated.
+    assert len(get(client, "owner", FINDINGS).json()) == len(EVERY_FINDING)
 
 
 def test_owner_sees_the_finding_with_openable_evidence(client) -> None:
     _run(client)
-    assert {f["id"] for f in _get(client, "owner").json()} == EVERY_FINDING
-    detail = _get(client, "owner", f"{FINDINGS}/{FINDING}")
+    assert {f["id"] for f in get(client, "owner", FINDINGS).json()} == EVERY_FINDING
+    detail = get(client, "owner", f"{FINDINGS}/{FINDING}")
     assert detail.status_code == 200
     for ref in detail.json()["evidence_ids"]:
         record = client.get(f"/api/v1/records/{ref}", headers=auth_header(client, "owner"))
@@ -98,24 +96,24 @@ def test_owner_sees_the_finding_with_openable_evidence(client) -> None:
 @pytest.mark.parametrize("user", ["coo", "logistics.head", "briech.lead"])
 def test_finding_is_invisible_below_secret(client, user: str) -> None:
     _run(client)
-    visible = {f["id"] for f in _get(client, user).json()}
+    visible = {f["id"] for f in get(client, user, FINDINGS).json()}
     assert FINDING not in visible and CUSTODY not in visible
     if user != "briech.lead":
         assert visible == set()  # the Briech lead alone may see the Briech QC finding
-    hidden = _get(client, user, f"{FINDINGS}/{FINDING}")
-    missing = _get(client, user, f"{FINDINGS}/FND-NOPE")
+    hidden = get(client, user, f"{FINDINGS}/{FINDING}")
+    missing = get(client, user, f"{FINDINGS}/FND-NOPE")
     assert hidden.status_code == missing.status_code == 404
     assert hidden.json() == missing.json()
 
 
 def test_no_data_roles_get_403_on_the_list(client) -> None:
-    assert _get(client, "group.it").status_code == 403
-    assert _get(client, "group.audit").status_code == 403
+    assert get(client, "group.it", FINDINGS).status_code == 403
+    assert get(client, "group.audit", FINDINGS).status_code == 403
 
 
 def test_assistant_answers_about_visible_findings(client, explain_calls) -> None:  # noqa: F811
     _run(client)
-    body = _ask(client, "owner", QUESTION).json()
+    body = ask(client, "owner", QUESTION).json()
     assert FINDING in {r["id"] for r in body["result_table"]["rows"]}
     assert body["found"] is True and explain_calls[-1] == "correlation_findings"
     convs = {
@@ -130,7 +128,7 @@ def test_assistant_answers_about_visible_findings(client, explain_calls) -> None
 
 def test_assistant_reveals_nothing_to_coo(client, explain_calls) -> None:  # noqa: F811
     _run(client)
-    response = _ask(client, "coo", QUESTION)
+    response = ask(client, "coo", QUESTION)
     body = response.json()
     assert response.status_code == 200
     assert body["result_table"] is None or body["result_table"]["rows"] == []
@@ -141,30 +139,30 @@ def test_assistant_reveals_nothing_to_coo(client, explain_calls) -> None:  # noq
 
 def test_manipulation_does_not_reveal_it_and_logs_a_notable_event(client, explain_calls) -> None:  # noqa: F811
     _run(client)
-    response = _ask(client, "coo", MANIPULATION)
+    response = ask(client, "coo", MANIPULATION)
     body = response.json()
     assert body["refused"] is True
     assert body["result_table"] is None or body["result_table"]["rows"] == []
     for needle in (FINDING.lower(), "maintainer", "rec-036", "rising"):
         assert needle not in response.text.lower(), needle
-    notable = _latest(_audit(client), actor="coo", action="notable")
+    notable = latest_event(audit_events(client), actor="coo", action="notable")
     assert notable is not None
 
 
 def test_run_and_reads_are_audited(client) -> None:
     _run(client)
-    _get(client, "owner")
+    get(client, "owner", FINDINGS)
     _run(client, "coo")  # denied
-    events = _audit(client)
-    run = _latest(events, actor="owner", action="correlation_run")
+    events = audit_events(client)
+    run = latest_event(events, actor="owner", action="correlation_run")
     drafted = {f["id"]: f for f in run["payload"]["findings"]}
     assert set(drafted) == EVERY_FINDING
     assert drafted[FINDING]["classification"] == "secret"
     assert "REC-036" in drafted[FINDING]["evidence"]
     assert drafted[FINDING]["stored"] is True
-    deny = _latest(events, actor="coo", action="decide", resource="finding")
+    deny = latest_event(events, actor="coo", action="decide", resource="finding")
     assert deny["payload"]["decision"] == "deny"
-    read = _latest(events, actor="owner", action="query", resource="finding")
+    read = latest_event(events, actor="owner", action="query", resource="finding")
     assert set(read["payload"]["item_ids"]) == EVERY_FINDING
 
 
@@ -172,10 +170,9 @@ def test_rls_refuses_a_finding_above_the_runners_label(app_engine, client) -> No
     """The database, not the job, stops a low-cleared writer storing a Secret finding."""
     from app.correlation.store import save_findings
     from app.correlation.types import FindingDraft
-    from scoped import scoped
     from sqlalchemy.exc import DBAPIError
 
-    ctx = _ctx(client, app_engine, "coo")
+    ctx = ctx_for(client, app_engine, "coo")
     draft = FindingDraft(
         key="FND-TEST-ABOVE-CLEARANCE",
         analysis="test",
@@ -200,7 +197,6 @@ def test_a_key_held_by_a_hidden_finding_stores_nothing_and_raises_nothing(
     left exactly as it was."""
     from app.correlation.store import save_findings
     from app.correlation.types import FindingDraft
-    from scoped import scoped
     from sqlalchemy import text
 
     _run(client)  # owner stores FINDING as Secret
@@ -213,7 +209,7 @@ def test_a_key_held_by_a_hidden_finding_stores_nothing_and_raises_nothing(
 
     before = stored_row()
     assert before.classification_code == "secret"
-    ctx = _ctx(client, app_engine, "coo")  # clearance 1, unit Site 4
+    ctx = ctx_for(client, app_engine, "coo")  # clearance 1, unit Site 4
     draft = FindingDraft(
         key=FINDING,
         analysis="rising_faults",
@@ -235,11 +231,11 @@ def test_run_audits_the_decision_before_its_tool_queries_and_commits_after(clien
     """The run's evidence queries follow the decide event that allowed them, the findings
     it returns are audited as a read, and the findings are committed only once the batch
     (ending in correlation_run) is written."""
-    tip = max(event["seq"] for event in _audit(client))
+    tip = max(event["seq"] for event in audit_events(client))
     returned = [f["id"] for f in _run(client).json()["findings"]]
     events = [
         e["payload"]
-        for e in sorted(_audit(client), key=lambda e: e["seq"])
+        for e in sorted(audit_events(client), key=lambda e: e["seq"])
         if e["seq"] > tip and e["payload"]["actor"] == "owner" and e["payload"]["action"] != "login"
     ]
     mine = [e["action"] for e in events]
@@ -259,10 +255,10 @@ def test_assistant_reads_findings_only_under_the_read_finding_decision(
     from app.authz import context
 
     _run(client)
-    before = max((e["seq"] for e in _audit(client)), default=-1)
-    allowed = _ask(client, "owner", QUESTION)
+    before = max((e["seq"] for e in audit_events(client)), default=-1)
+    allowed = ask(client, "owner", QUESTION)
     assert allowed.status_code == 200, allowed.text
-    new = [e["payload"] for e in _audit(client) if e["seq"] > before]
+    new = [e["payload"] for e in audit_events(client) if e["seq"] > before]
     decided = {(p["resource"], p["requested"]) for p in new if p["action"] == "decide"}
     assert ("finding", "read") in decided
 
@@ -270,12 +266,12 @@ def test_assistant_reads_findings_only_under_the_read_finding_decision(
         context.ROLE_PERMISSIONS, "commander", context.ROLE_PERMISSIONS["commander"] - {"read"}
     )
     calls = len(explain_calls)
-    before = max((e["seq"] for e in _audit(client)), default=-1)
-    response = _ask(client, "owner", QUESTION)
+    before = max((e["seq"] for e in audit_events(client)), default=-1)
+    response = ask(client, "owner", QUESTION)
     assert response.status_code == 403
     assert len(explain_calls) == calls
 
-    new = [e["payload"] for e in _audit(client) if e["seq"] > before]
+    new = [e["payload"] for e in audit_events(client) if e["seq"] > before]
     mine = [p for p in new if p.get("actor") == "owner"]
     assert "data_query" not in {p["action"] for p in mine}
     denied = [p for p in mine if p["action"] == "decide" and p["decision"] == "deny"]
@@ -306,11 +302,11 @@ def test_qc_hold_overdue_delivery_finding_for_poctova(client) -> None:
 def test_custody_and_qc_findings_are_hidden_from_everyone_not_cleared(client) -> None:
     _run(client)
     for user in ("coo", "logistics.head"):
-        text = _get(client, user).text
+        text = get(client, user, FINDINGS).text
         assert CUSTODY not in text and QC_POCTOVA not in text and "Bala" not in text, user
-        missing = _get(client, user, f"{FINDINGS}/FND-NOPE")
+        missing = get(client, user, f"{FINDINGS}/FND-NOPE")
         for hidden_id in (CUSTODY, QC_POCTOVA):
-            hidden = _get(client, user, f"{FINDINGS}/{hidden_id}")
+            hidden = get(client, user, f"{FINDINGS}/{hidden_id}")
             assert hidden.status_code == missing.status_code == 404, (user, hidden_id)
-    briech = {f["id"] for f in _get(client, "briech.lead").json()}
+    briech = {f["id"] for f in get(client, "briech.lead", FINDINGS).json()}
     assert CUSTODY not in briech and QC_POCTOVA not in briech  # other client, other division

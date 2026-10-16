@@ -10,8 +10,7 @@ from dataclasses import replace
 import pytest
 from app.authz.context import permissions_for_role
 from app.authz.policy import LocalPolicy
-from test_filter_only import access_context
-from test_rls_only import USERNAMES
+from support.contexts import USERNAMES, access_context
 
 POLICY = LocalPolicy()
 

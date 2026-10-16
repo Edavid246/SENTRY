@@ -9,24 +9,15 @@ the owner sees any of it; for everyone else it is absent, and a hidden case answ
 from __future__ import annotations
 
 import pytest
-from test_auth_endpoints import auth_header
+from support.http import get
+from support.responses import section_refs, sections_by_key
 
 API = "/api/v1"
 CASES = ["FR-2026-009", "FR-2026-014", "FR-2026-017"]
 
 
-def _get(client, username: str, path: str):
-    return client.get(f"{API}/{path}", headers=auth_header(client, username))
-
-
 def _sections(client, username: str) -> dict[str, dict]:
-    response = _get(client, username, "divisions/giga")
-    assert response.status_code == 200, response.text
-    return {s["key"]: s for s in response.json()["sections"]}
-
-
-def _refs(section: dict) -> list[str]:
-    return [r["ref"] for r in section["rows"]]
+    return sections_by_key(get(client, username, f"{API}/divisions/giga"))
 
 
 def test_giga_sections_for_the_owner(client) -> None:
@@ -39,9 +30,9 @@ def test_giga_sections_for_the_owner(client) -> None:
         "certifications",
     ]
     # open cases first, then closed; the two cases with a custody break are flagged
-    assert _refs(sections["cases"]) == ["REC-007", "REC-098", "REC-099"]
+    assert section_refs(sections["cases"]) == ["REC-007", "REC-098", "REC-099"]
     assert [r["flagged"] for r in sections["cases"]["rows"]] == [True, True, False]
-    assert _refs(sections["evidence"]) == [
+    assert section_refs(sections["evidence"]) == [
         "REC-104",  # EV-009-01
         "REC-061",  # EV-014-01
         "REC-100",
@@ -49,7 +40,7 @@ def test_giga_sections_for_the_owner(client) -> None:
         "REC-102",  # EV-017-01 carries the break
         "REC-103",
     ]
-    assert _refs(sections["custody-breaks"]) == ["REC-108", "REC-112"]  # by date
+    assert section_refs(sections["custody-breaks"]) == ["REC-108", "REC-112"]  # by date
     assert sections["custody-breaks"]["rows"][0]["href"] == "/cases/FR-2026-014"
     assert sections["custody-breaks"]["rows"][1]["href"] == "/cases/FR-2026-017"
     assert sections["cases"]["rows"][1]["href"] == "/cases/FR-2026-017"
@@ -64,14 +55,14 @@ def test_forensic_sections_inherit_the_highest_label(client) -> None:
 
 
 def test_the_giga_card_counts_custody_breaks(client) -> None:
-    cards = {c["key"]: c for c in _get(client, "owner", "home/summary").json()["divisions"]}
+    cards = {c["key"]: c for c in get(client, "owner", f"{API}/home/summary").json()["divisions"]}
     parts = {p["what"]: p["count"] for p in cards["giga"]["alert"]["parts"]}
     parts.pop("findings open", None)  # present only once some test has run the correlation job
     assert parts == {"deliveries overdue": 1, "custody breaks": 2}
 
 
 def test_case_view_with_the_planted_break(client) -> None:
-    body = _get(client, "owner", "cases/FR-2026-017").json()
+    body = get(client, "owner", f"{API}/cases/FR-2026-017").json()
     assert (body["ref"], body["state"], body["breaks"]) == ("REC-098", "open", 1)
     assert [e["evidence_ref"] for e in body["evidence"]] == ["EV-017-01", "EV-017-02"]
     broken, clean = body["evidence"]
@@ -83,10 +74,10 @@ def test_case_view_with_the_planted_break(client) -> None:
 
 
 def test_case_view_is_a_derived_item_and_inherits_labels(client) -> None:
-    secret = _get(client, "owner", "cases/FR-2026-014").json()
+    secret = get(client, "owner", f"{API}/cases/FR-2026-014").json()
     assert (secret["classification"], secret["compartments"]) == ("secret", ["FORENSICS"])
     assert secret["breaks"] == 1  # EV-014-02 reaches the lab from a courier who never held it
-    confidential = _get(client, "owner", "cases/FR-2026-009").json()
+    confidential = get(client, "owner", f"{API}/cases/FR-2026-009").json()
     assert confidential["classification"] == "confidential"
     # the trail is date-ordered: seized, to the lab, then handed back
     steps = confidential["evidence"][0]["steps"]
@@ -99,18 +90,18 @@ def test_case_view_is_a_derived_item_and_inherits_labels(client) -> None:
 
 @pytest.mark.parametrize("username", ["briech.lead", "logistics.head", "coo"])
 def test_a_hidden_case_reads_like_a_missing_one(client, username: str) -> None:
-    hidden = _get(client, username, "cases/FR-2026-014")
-    missing = _get(client, username, "cases/FR-2099-999")
+    hidden = get(client, username, f"{API}/cases/FR-2026-014")
+    missing = get(client, username, f"{API}/cases/FR-2099-999")
     assert hidden.status_code == missing.status_code == 404
     assert hidden.json() == missing.json()
 
 
 def test_a_malformed_case_ref_is_not_found(client) -> None:
-    assert _get(client, "owner", "cases/not-a-case").status_code == 404
+    assert get(client, "owner", f"{API}/cases/not-a-case").status_code == 404
 
 
 def test_other_roles_see_no_forensic_rows(client) -> None:
-    assert _get(client, "briech.lead", "divisions/giga").status_code == 404
+    assert get(client, "briech.lead", f"{API}/divisions/giga").status_code == 404
 
 
 def test_every_forensic_record_carries_its_cases_label() -> None:

@@ -5,9 +5,10 @@ exactly as production runs it. Same expected.py oracle as the lower layers.
 """
 
 import pytest
-from expected import GOLD_DOCUMENTS, GOLD_RECORDS
-from test_auth_endpoints import auth_header
-from test_rls_only import USERNAMES
+from authz.expected import GOLD_DOCUMENTS, GOLD_RECORDS
+from support.audit import audit_events, latest_event
+from support.contexts import USERNAMES
+from support.http import auth_header
 
 # Users whose decide() denies data actions entirely: lists answer 403, detail 404.
 NO_DATA_USERS = frozenset({"group.it", "group.audit"})
@@ -89,7 +90,6 @@ def test_documents_without_token_uses_generic_401(client) -> None:
 
 
 def test_record_detail_visible_and_hidden(client) -> None:
-    from test_auth_endpoints import auth_header
 
     owner = client.get("/api/v1/records/REC-023", headers=auth_header(client, "owner"))
     assert owner.status_code == 200
@@ -107,13 +107,13 @@ def test_record_detail_visible_and_hidden(client) -> None:
 
 
 def test_record_detail_no_data_roles_and_audit(client) -> None:
-    from test_assistant_endpoints import _audit, _latest
-    from test_auth_endpoints import auth_header
 
     assert (
         client.get("/api/v1/records/REC-011", headers=auth_header(client, "group.it")).status_code
         == 404
     )
     client.get("/api/v1/records/REC-011", headers=auth_header(client, "logistics.head"))
-    event = _latest(_audit(client), actor="logistics.head", action="query", resource="record")
+    event = latest_event(
+        audit_events(client), actor="logistics.head", action="query", resource="record"
+    )
     assert event["payload"]["rows"] == 1

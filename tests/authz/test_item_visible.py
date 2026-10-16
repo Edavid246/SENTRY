@@ -7,11 +7,10 @@ demo user against the independent oracle in expected.py.
 
 import pytest
 from app.authz.policy import LocalPolicy
-from expected import GOLD_RECORDS
+from authz.expected import GOLD_RECORDS
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-from test_filter_only import access_context
-from test_rls_only import USERNAMES
+from support.contexts import USERNAMES, access_context
 
 POLICY = LocalPolicy()
 

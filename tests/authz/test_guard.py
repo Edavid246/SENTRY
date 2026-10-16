@@ -11,7 +11,7 @@ import pytest
 from app.api import guard
 from app.authz import scope as scope_module
 from fastapi import HTTPException
-from test_filter_only import access_context
+from support.contexts import access_context
 
 
 class RecordingConn:

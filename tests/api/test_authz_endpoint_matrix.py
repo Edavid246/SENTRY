@@ -19,8 +19,8 @@ Cases are FORENSICS-compartmented and Giga-owned: only the owner is cleared for 
 from __future__ import annotations
 
 import pytest
-from expected import GOLD_RECORDS
-from test_auth_endpoints import auth_header
+from authz.expected import GOLD_RECORDS
+from support.http import get
 
 API = "/api/v1"
 ALL = ["owner", "logistics.head", "coo", "briech.lead", "group.it", "group.audit"]
@@ -55,24 +55,22 @@ CLEARANCE = {
 }
 
 
-def _get(client, username: str, path: str):
-    return client.get(f"{API}/{path}", headers=auth_header(client, username))
-
-
 @pytest.mark.parametrize("division", DIVISIONS)
 @pytest.mark.parametrize("username", ALL)
 def test_division_status_matrix(client, username: str, division: str) -> None:
     expected = 200 if division in VISIBLE_DIVISIONS[username] else 404
-    assert _get(client, username, f"divisions/{division}").status_code == expected
-    assert _get(client, username, f"reports/{division}").status_code == expected
-    assert _get(client, username, f"reports/{division}/export?format=pdf").status_code == expected
+    assert get(client, username, f"{API}/divisions/{division}").status_code == expected
+    assert get(client, username, f"{API}/reports/{division}").status_code == expected
+    assert (
+        get(client, username, f"{API}/reports/{division}/export?format=pdf").status_code == expected
+    )
 
 
 @pytest.mark.parametrize("case_ref", CASES)
 @pytest.mark.parametrize("username", ALL)
 def test_case_status_matrix(client, username: str, case_ref: str) -> None:
     expected = 200 if username == "owner" else 404
-    assert _get(client, username, f"cases/{case_ref}").status_code == expected
+    assert get(client, username, f"{API}/cases/{case_ref}").status_code == expected
 
 
 @pytest.mark.parametrize("username", sorted(CAN_READ))
@@ -80,9 +78,9 @@ def test_every_returned_record_is_in_the_gold_visibility_set(client, username: s
     gold = GOLD_RECORDS[username]
     seen: set[str] = set()
     for division in VISIBLE_DIVISIONS[username]:
-        page = _get(client, username, f"divisions/{division}").json()
+        page = get(client, username, f"{API}/divisions/{division}").json()
         seen |= {r["ref"] for s in page["sections"] for r in s["rows"]}
-        report = _get(client, username, f"reports/{division}").json()
+        report = get(client, username, f"{API}/reports/{division}").json()
         seen |= set(report["refs"])
     assert seen, "the endpoints returned no records at all"
     assert seen <= gold, sorted(seen - gold)
@@ -91,7 +89,7 @@ def test_every_returned_record_is_in_the_gold_visibility_set(client, username: s
 @pytest.mark.parametrize("username", sorted(CAN_READ))
 def test_a_report_is_never_marked_above_its_callers_clearance(client, username: str) -> None:
     for division in VISIBLE_DIVISIONS[username]:
-        report = _get(client, username, f"reports/{division}").json()
+        report = get(client, username, f"{API}/reports/{division}").json()
         assert ORDER.index(report["classification"]) <= ORDER.index(CLEARANCE[username])
         for section in report["sections"]:
             if section["marking"]:
@@ -102,7 +100,7 @@ def test_a_report_is_never_marked_above_its_callers_clearance(client, username: 
 def test_the_owners_case_records_are_all_in_the_gold_set(client) -> None:
     gold = GOLD_RECORDS["owner"]
     for case_ref in CASES:
-        case = _get(client, "owner", f"cases/{case_ref}").json()
+        case = get(client, "owner", f"{API}/cases/{case_ref}").json()
         refs = {case["ref"]} | {e["ref"] for e in case["evidence"]}
         refs |= {s["ref"] for e in case["evidence"] for s in e["steps"]}
         assert refs <= gold, sorted(refs - gold)
@@ -113,7 +111,7 @@ def test_a_denied_caller_gets_the_same_404_as_for_a_missing_page(client, usernam
     """A role with no read gets the same body as a missing page, never a hint it exists."""
     if username in CAN_READ:
         pytest.skip("only denied roles")
-    denied = _get(client, username, "reports/poctova")
-    missing = _get(client, username, "reports/nonesuch")
+    denied = get(client, username, f"{API}/reports/poctova")
+    missing = get(client, username, f"{API}/reports/nonesuch")
     assert denied.status_code == missing.status_code == 404
     assert denied.json() == missing.json()

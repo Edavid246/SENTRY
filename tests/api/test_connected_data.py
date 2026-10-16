@@ -17,12 +17,13 @@ sets are stable on any day.
 from __future__ import annotations
 
 import pytest
-from app.authz.tokens import DevTokenValidator
 from app.data_queries.errors import ToolParamError
 from app.data_queries.routing import route_question
-from scoped import run_tool, scoped
-from test_assistant_endpoints import _ask
-from test_auth_endpoints import auth_header
+from support.audit import audit_events
+from support.contexts import ctx_for
+from support.http import ask, auth_header
+from support.responses import feature_refs, result_ids
+from support.scoped import run_tool, scoped
 
 CANCELLED_QUESTION = "How many UAS missions were cancelled this week, and where did they fly?"
 DETECTION_QUESTION = "Summarize detections near DEP-B4 in the last 48 hours"
@@ -49,40 +50,30 @@ DETECTION_COLUMNS = [
 ]
 
 
-def _ids(body: dict) -> set[str]:
-    return {row["id"] for row in body["result_table"]["rows"]}
-
-
-def _ctx(client, app_engine, username: str):
-    token = auth_header(client, username)["Authorization"].split(" ", 1)[1]
-    with app_engine.connect() as conn:
-        return DevTokenValidator().validate(token, conn=conn)
-
-
 # --- UAS missions -----------------------------------------------------------
 
 
 def test_cancelled_missions_this_week_by_user(client, explain_calls) -> None:
-    owner = _ask(client, "owner", CANCELLED_QUESTION).json()
-    briech_lead = _ask(client, "briech.lead", CANCELLED_QUESTION).json()
+    owner = ask(client, "owner", CANCELLED_QUESTION).json()
+    briech_lead = ask(client, "briech.lead", CANCELLED_QUESTION).json()
     # 056 and 057 are Confidential UAS-OPS; 060 is Secret (Owner only); 059 is 40 days old
     assert owner["result_table"]["columns"] == MISSION_COLUMNS
-    assert _ids(owner) == {"REC-056", "REC-057", "REC-060"}
-    assert _ids(briech_lead) == {"REC-056", "REC-057"}
+    assert result_ids(owner) == {"REC-056", "REC-057", "REC-060"}
+    assert result_ids(briech_lead) == {"REC-056", "REC-057"}
     assert all(row["status"] == "cancelled" for row in owner["result_table"]["rows"])
     assert explain_calls == ["uas_missions"] * 2
 
 
 @pytest.mark.parametrize("username", ["coo", "logistics.head"])
 def test_users_without_uas_ops_get_no_missions(client, explain_calls, username) -> None:
-    body = _ask(client, username, CANCELLED_QUESTION).json()
+    body = ask(client, username, CANCELLED_QUESTION).json()
     assert body["result_table"]["rows"] == []
     assert body["refused"] is False
     assert "Gimbal" not in body["answer"] and "gimbal" not in body["answer"]
 
 
 def test_missions_default_window_is_thirty_days(client, app_engine) -> None:
-    ctx = _ctx(client, app_engine, "owner")
+    ctx = ctx_for(client, app_engine, "owner")
     outcome, _ = run_tool(app_engine, ctx, "uas_missions", {})
     assert {row["id"] for row in outcome.result.rows} == {
         "REC-055",
@@ -99,21 +90,21 @@ def test_missions_default_window_is_thirty_days(client, app_engine) -> None:
 
 
 def test_detections_scoped_by_clearance_unit_and_compartment(client, explain_calls) -> None:
-    ask = lambda user: _ids(_ask(client, user, ALL_DETECTIONS_QUESTION).json())  # noqa: E731
+    visible = lambda user: result_ids(ask(client, user, ALL_DETECTIONS_QUESTION).json())  # noqa: E731
     # 050 is 70 h old; 053 is UAS-OPS; 054 is Confidential (above COO's Restricted)
-    assert ask("owner") == {"REC-048", "REC-049", "REC-051", "REC-052", "REC-053", "REC-054"}
-    assert ask("logistics.head") == {"REC-048", "REC-049", "REC-051", "REC-052", "REC-054"}
-    assert ask("coo") == {"REC-048", "REC-049"}
-    assert ask("briech.lead") == {"REC-053"}
+    assert visible("owner") == {"REC-048", "REC-049", "REC-051", "REC-052", "REC-053", "REC-054"}
+    assert visible("logistics.head") == {"REC-048", "REC-049", "REC-051", "REC-052", "REC-054"}
+    assert visible("coo") == {"REC-048", "REC-049"}
+    assert visible("briech.lead") == {"REC-053"}
 
 
 def test_detections_near_a_site_and_window(client, explain_calls) -> None:
-    body = _ask(client, "owner", DETECTION_QUESTION).json()
+    body = ask(client, "owner", DETECTION_QUESTION).json()
     assert body["result_table"]["columns"] == DETECTION_COLUMNS
-    assert _ids(body) == {"REC-048", "REC-049", "REC-054"}  # DEP-B4, newest first
+    assert result_ids(body) == {"REC-048", "REC-049", "REC-054"}  # DEP-B4, newest first
     assert [row["id"] for row in body["result_table"]["rows"]] == ["REC-054", "REC-048", "REC-049"]
-    longer = _ask(client, "owner", "Show detections near DEP-B4 in the last 100 hours").json()
-    assert _ids(longer) == {"REC-048", "REC-049", "REC-050", "REC-054"}
+    longer = ask(client, "owner", "Show detections near DEP-B4 in the last 100 hours").json()
+    assert result_ids(longer) == {"REC-048", "REC-049", "REC-050", "REC-054"}
 
 
 # --- safe refusals ----------------------------------------------------------
@@ -135,7 +126,7 @@ def test_detections_near_a_site_and_window(client, explain_calls) -> None:
     ],
 )
 def test_bad_params_are_refused_with_a_denied_audit_event(client, app_engine, tool, params) -> None:
-    ctx = _ctx(client, app_engine, "coo")
+    ctx = ctx_for(client, app_engine, "coo")
     outcome, _ = run_tool(app_engine, ctx, tool, params)
     assert outcome.refused and outcome.result is None
     with pytest.raises(ToolParamError):
@@ -188,18 +179,14 @@ def _map(client, username: str, **params):
     return client.get(MAP_PATH, params=params, headers=auth_header(client, username))
 
 
-def _refs(response) -> set[str]:
-    return {f["properties"]["ref"] for f in response.json()["features"]}
-
-
 def test_map_features_equal_the_oracle_per_user(client) -> None:
-    assert _refs(_map(client, "owner")) == {
+    assert feature_refs(_map(client, "owner")) == {
         *("REC-046", "REC-047"),  # sensors
         *("REC-048", "REC-049", "REC-051", "REC-052", "REC-053", "REC-054"),  # detections <= 48 h
         *("REC-055", "REC-056", "REC-057", "REC-058", "REC-060"),  # missions <= 30 days
     }
-    assert _refs(_map(client, "coo")) == {"REC-046", "REC-048", "REC-049"}
-    assert _refs(_map(client, "briech.lead")) == {
+    assert feature_refs(_map(client, "coo")) == {"REC-046", "REC-048", "REC-049"}
+    assert feature_refs(_map(client, "briech.lead")) == {
         *("REC-053", "REC-055", "REC-056", "REC-057", "REC-058")  # no Secret 060
     }
 
@@ -229,12 +216,11 @@ def test_map_requires_authentication_and_validates_window(client) -> None:
 
 
 def test_map_read_is_audited_with_the_returned_ids_only(client) -> None:
-    from test_assistant_endpoints import _audit
 
     _map(client, "coo")
     events = [
         e
-        for e in sorted(_audit(client), key=lambda e: e["seq"])
+        for e in sorted(audit_events(client), key=lambda e: e["seq"])
         if e["payload"].get("resource") == "connected_map" and e["payload"]["actor"] == "coo"
     ]
     query = [e for e in events if e["payload"]["action"] == "query"][-1]["payload"]
@@ -296,12 +282,11 @@ def test_replay_requires_authentication_and_valid_timestamps(client) -> None:
 
 
 def test_replay_audit_lists_only_delivered_ids(client) -> None:
-    from test_assistant_endpoints import _audit
 
     _replay(client, "coo")
     events = [
         e
-        for e in sorted(_audit(client), key=lambda e: e["seq"])
+        for e in sorted(audit_events(client), key=lambda e: e["seq"])
         if e["payload"].get("resource") == "connected_replay"
         and e["payload"]["actor"] == "coo"
         and e["payload"]["action"] == "query"

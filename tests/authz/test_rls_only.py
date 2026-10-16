@@ -1,8 +1,8 @@
 """RLS-only authorization layer: raw SQL as gateway_app, no application code.
 
-For each demo user the test builds the SPEC 7.4 access context by hand
-(hard-coded here — not read from the seeded users table, and no Policy or
-filter module is involved; that arrives in step 5), sets it with
+For each demo user the test takes the hand-authored SPEC 7.4 access context
+(tests/support/contexts.py — not read from the seeded users table, and no Policy
+or filter module is involved; that arrives in step 5), sets it with
 set_rls_context, and compares raw-SQL results against the independent
 oracle in expected.py.
 
@@ -14,51 +14,10 @@ from uuid import NAMESPACE_URL, uuid5
 
 import pytest
 from app.db import set_rls_context
-from expected import GOLD_DOCUMENTS, GOLD_KEYWORD_CHUNK_COUNTS, GOLD_RECORDS, KEYWORD
+from authz.expected import GOLD_DOCUMENTS, GOLD_KEYWORD_CHUNK_COUNTS, GOLD_RECORDS, KEYWORD
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-
-# SPEC 7.4 demo users — access context hand-authored, independent of app.seed.
-CONTEXTS: dict[str, dict] = {
-    "owner": {
-        "clearance_rank": 3,
-        "compartments": ["UAS-OPS", "FORENSICS", "CLIENT-A", "CLIENT-B", "CLIENT-C", "CLIENT-D"],
-        "unit_path": "/eib-group/",
-        "data_scope": "standard",
-    },
-    "logistics.head": {
-        "clearance_rank": 2,
-        "compartments": [],
-        "unit_path": "/eib-group/stratoc/",
-        "data_scope": "standard",
-    },
-    "coo": {
-        "clearance_rank": 1,
-        "compartments": [],
-        "unit_path": "/eib-group/stratoc/site-4/",
-        "data_scope": "standard",
-    },
-    "briech.lead": {
-        "clearance_rank": 2,
-        "compartments": ["UAS-OPS", "CLIENT-A"],
-        "unit_path": "/eib-group/briech/",
-        "data_scope": "standard",
-    },
-    "group.it": {
-        "clearance_rank": -1,
-        "compartments": [],
-        "unit_path": "/group-it/",
-        "data_scope": "none",
-    },
-    "group.audit": {
-        "clearance_rank": 1,
-        "compartments": [],
-        "unit_path": "/group-audit/",
-        "data_scope": "audit",
-    },
-}
-
-USERNAMES = sorted(CONTEXTS)
+from support.contexts import CONTEXTS, USERNAMES
 
 
 def _context(username: str) -> dict:

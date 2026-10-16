@@ -34,8 +34,8 @@ from typing import Any
 
 import pytest
 from app.ai_gateway import LLMResponseCache
-from fakes import FakeLLM
-from test_auth_endpoints import auth_header
+from support.fakes import FakeLLM
+from support.http import auth_header
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 QUESTIONS = REPO_ROOT / "data" / "demo_questions.json"

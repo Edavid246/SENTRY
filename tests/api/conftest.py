@@ -40,13 +40,13 @@ def client(settings, seeded, audit_test_env):
 def models(client):
     """Install a model at the seam: `models(llm=None, embed=None) -> ModelPort`.
 
-    Defaults: a FakeLLM (tests/api/fakes.py) and no embedder, so retrieval runs
+    Defaults: a FakeLLM (tests/support/fakes.py) and no embedder, so retrieval runs
     keyword-only (no model weights, no network, no keys). Removed after the test.
     """
     from app.ai_gateway.port import ModelPort
     from app.api.deps import get_models
     from app.main import app
-    from fakes import FakeLLM
+    from support.fakes import FakeLLM
 
     def install(llm=None, embed=None) -> ModelPort:
         port = ModelPort(
@@ -63,7 +63,7 @@ def models(client):
 @pytest.fixture
 def explain_calls(models) -> list:
     """Install a FakeLLM; the returned list records which tools the model was asked to explain."""
-    from fakes import FakeLLM
+    from support.fakes import FakeLLM
 
     llm = FakeLLM()
     models(llm)

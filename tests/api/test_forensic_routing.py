@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 from app.data_queries.routing import route_question
-from test_assistant_endpoints import _ask
+from support.http import ask
 
 
 @pytest.mark.parametrize(
@@ -67,14 +67,14 @@ def test_a_case_number_filters_the_case_list() -> None:
 
 
 def test_the_case_tool_returns_only_the_requested_case(client, explain_calls) -> None:
-    every = _ask(client, "owner", "Show me the forensic cases").json()["result_table"]["rows"]
-    one = _ask(client, "owner", "Show case FR-2026-017").json()["result_table"]["rows"]
+    every = ask(client, "owner", "Show me the forensic cases").json()["result_table"]["rows"]
+    one = ask(client, "owner", "Show case FR-2026-017").json()["result_table"]["rows"]
     assert len(every) > 1
     assert [row["case_ref"] for row in one] == ["FR-2026-017"]
 
 
 def test_the_owner_gets_the_planted_break_through_the_assistant(client, explain_calls) -> None:
-    response = _ask(client, "owner", "Which evidence has a custody break?")
+    response = ask(client, "owner", "Which evidence has a custody break?")
     assert response.status_code == 200
     body = response.json()
     assert [row["id"] for row in body["result_table"]["rows"]] == ["REC-108", "REC-112"]
@@ -95,14 +95,14 @@ def test_a_caller_without_forensics_gets_an_empty_table(client, explain_calls, u
         "Show me the forensic cases",
         "List the evidence items",
     ):
-        response = _ask(client, username, question)
+        response = ask(client, username, question)
         assert response.status_code == 200
         assert response.json()["result_table"]["rows"] == []
     assert explain_calls == []  # no rows, no model call
 
 
 def test_a_malformed_evidence_ref_is_refused(client, explain_calls) -> None:
-    response = _ask(client, "owner", "Show the custody trail for EV-17-1")
+    response = ask(client, "owner", "Show the custody trail for EV-17-1")
     assert response.status_code == 200
     # not an evidence number, so the router does not send it to custody_trail
     assert (

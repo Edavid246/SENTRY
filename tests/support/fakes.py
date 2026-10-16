@@ -1,8 +1,9 @@
-"""A fake model for the API tests: answers each pathway's prompt like a well-behaved model.
+"""Fake models for the API tests, installed at the model seam.
 
-It is installed at the model seam (`app.api.deps.get_models`, see the `models`
-fixture in conftest.py), so the real pathway code runs around it: the evidence
-builder, the citation guard, the explanation and report assembly.
+`FakeLLM` answers each pathway's prompt like a well-behaved model. It is installed at
+`app.api.deps.get_models` (see the `models` fixture in tests/api/conftest.py), so the real
+pathway code runs around it: the evidence builder, the citation guard, the explanation and
+report assembly. `Capture` only records the requests, for tests about the prompt itself.
 """
 
 from __future__ import annotations
@@ -66,3 +67,14 @@ class FakeLLM:
         chunk = _CHUNK_RE.search(prompt)
         cite = f" [{chunk.group(1)}: demo, page 1]" if chunk else ""
         return f"Stub answer for: {question}{cite}"
+
+
+class Capture:
+    """Records every request and answers each with the same fixed text."""
+
+    def __init__(self) -> None:
+        self.requests: list[LLMRequest] = []
+
+    def complete(self, request: LLMRequest) -> LLMResult:
+        self.requests.append(request)
+        return LLMResult(text="explained", provider="p", model="m")

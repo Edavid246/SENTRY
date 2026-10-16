@@ -10,23 +10,14 @@ from __future__ import annotations
 
 import pytest
 from app.ai_gateway import LLMResponseCache
-from app.ai_gateway.base import LLMResult
 from app.audit.chain import verify_report
 from app.config import Settings, get_settings
 from pydantic import ValidationError
 from sqlalchemy import text
-from test_assistant_endpoints import _ask
+from support.fakes import Capture
+from support.http import ask
 
 QUESTION = "Show me the equipment currently awaiting maintenance"
-
-
-class Capture:
-    def __init__(self) -> None:
-        self.requests: list = []
-
-    def complete(self, request):
-        self.requests.append(request)
-        return LLMResult(text="explained", provider="p", model="m")
 
 
 @pytest.fixture
@@ -66,13 +57,13 @@ def test_prefill_events_are_tagged_and_prompts_are_not_affected(
 ) -> None:
     _set_source(monkeypatch, None)
     start = _tip(owner_engine)
-    assert _ask(client, "owner", QUESTION).status_code == 200
+    assert ask(client, "owner", QUESTION).status_code == 200
     plain_events = _events_after(owner_engine, start)
     assert plain_events and all("source" not in event for event in plain_events)
 
     _set_source(monkeypatch, "prefill")
     start = _tip(owner_engine)
-    assert _ask(client, "owner", QUESTION).status_code == 200
+    assert ask(client, "owner", QUESTION).status_code == 200
     tagged_events = _events_after(owner_engine, start)
     assert tagged_events and all(event.get("source") == "prefill" for event in tagged_events)
 

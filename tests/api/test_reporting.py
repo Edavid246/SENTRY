@@ -13,8 +13,8 @@ import re
 import pytest
 from app.ai_gateway.base import LLMResult, ProviderUnavailableError
 from app.data_queries.routing import route_question, route_report
-from test_assistant_endpoints import _ask, _audit, _latest
-from test_auth_endpoints import auth_header
+from support.audit import audit_events, latest_event
+from support.http import ask, auth_header
 
 REPORT_QUESTION = "Prepare a summary of training activity for this command over the last quarter."
 
@@ -51,7 +51,7 @@ def gateway(models) -> StubGateway:
 
 
 def _report(client, username: str, question: str = REPORT_QUESTION):
-    response = _ask(client, username, question)
+    response = ask(client, username, question)
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -103,25 +103,25 @@ def test_a_fabricated_chunk_citation_blocks_the_draft(client, models) -> None:
 def test_model_outage_is_a_503_and_nothing_is_invented(client, models) -> None:
     stub = StubGateway(fail=True)
     models(stub)
-    assert _ask(client, "owner", REPORT_QUESTION).status_code == 503
+    assert ask(client, "owner", REPORT_QUESTION).status_code == 503
 
 
 @pytest.mark.parametrize("username", ["group.it", "group.audit"])
 def test_roles_without_data_access_are_refused(client, gateway, username) -> None:
-    assert _ask(client, username, REPORT_QUESTION).status_code == 403
+    assert ask(client, username, REPORT_QUESTION).status_code == 403
     assert gateway.prompts == []
 
 
 def test_report_is_audited_with_its_provenance(client, gateway) -> None:
     body = _report(client, "coo")
-    events = _audit(client)
-    answer = _latest(events, actor="coo", action="answer", pathway="report")
+    events = audit_events(client)
+    answer = latest_event(events, actor="coo", action="answer", pathway="report")
     payload = answer["payload"]
     assert payload["record_ids"] == ["REC-002"]
     assert payload["classification"] == body["report"]["classification_code"]
     assert payload["provider"] == "stub" and payload["blocked"] is False
     assert set(payload["citations"]) <= set(payload["chunk_ids"])
-    retrieval = _latest(events, actor="coo", action="retrieve")
+    retrieval = latest_event(events, actor="coo", action="retrieve")
     assert retrieval["seq"] < answer["seq"]
     assert "REC-044" not in str(payload)
 
@@ -160,11 +160,11 @@ def test_report_needs_retrieve_decided_before_any_chunk_is_read(
         "commander",
         context.ROLE_PERMISSIONS["commander"] - {"retrieve"},
     )
-    before = max((e["seq"] for e in _audit(client)), default=-1)
-    assert _ask(client, "owner", REPORT_QUESTION).status_code == 403
+    before = max((e["seq"] for e in audit_events(client)), default=-1)
+    assert ask(client, "owner", REPORT_QUESTION).status_code == 403
     assert gateway.prompts == []
 
-    new = [e["payload"] for e in _audit(client) if e["seq"] > before]
+    new = [e["payload"] for e in audit_events(client) if e["seq"] > before]
     mine = [p for p in new if p.get("actor") == "owner"]
     assert not {"retrieve", "query", "answer"} & {p["action"] for p in mine}
     denied = [p for p in mine if p["action"] == "decide" and p["decision"] == "deny"]

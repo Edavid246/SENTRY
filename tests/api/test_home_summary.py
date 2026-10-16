@@ -7,8 +7,8 @@ data endpoint.
 
 from __future__ import annotations
 
-from test_assistant_endpoints import _audit, _latest
-from test_auth_endpoints import auth_header
+from support.audit import audit_events, latest_event
+from support.http import auth_header, run_correlation
 
 PATH = "/api/v1/home/summary"
 ALL_FIVE = ["briech", "stratoc", "giga", "poctova", "field-ops"]
@@ -24,13 +24,6 @@ def _cards(client, username: str) -> dict[str, dict]:
     return {d["key"]: d for d in response.json()["divisions"]}
 
 
-def _run_correlation(client) -> None:
-    assert (
-        client.post("/api/v1/correlation/run", headers=auth_header(client, "owner")).status_code
-        == 200
-    )
-
-
 def test_owner_sees_all_five_cards_in_order(client) -> None:
     assert list(_cards(client, "owner")) == ALL_FIVE
 
@@ -43,7 +36,7 @@ def test_card_shape(client) -> None:
 
 
 def test_owner_alert_counts_come_from_the_typed_tools(client) -> None:
-    _run_correlation(client)
+    run_correlation(client)
     cards = _cards(client, "owner")
     counts = {
         key: {p["what"]: p["count"] for p in card["alert"]["parts"]} for key, card in cards.items()
@@ -90,7 +83,7 @@ def test_restricted_callers_get_smaller_counts_and_lower_labels(client) -> None:
 
 
 def test_site_level_user_never_sees_the_secret_finding_in_any_count(client) -> None:
-    _run_correlation(client)
+    run_correlation(client)
     card = _cards(client, "coo")["field-ops"]
     assert all(p["what"] != "findings open" for p in card["alert"]["parts"])
     assert card["alert"]["classification"] == "restricted"
@@ -108,10 +101,10 @@ def test_unauthenticated_is_refused(client) -> None:
 def test_read_and_denial_are_audited(client) -> None:
     assert _home(client, "briech.lead").status_code == 200
     assert _home(client, "group.it").status_code == 403
-    events = _audit(client)
-    decide = _latest(events, actor="briech.lead", action="decide", resource="dashboard")
-    query = _latest(events, actor="briech.lead", action="query", resource="dashboard")
+    events = audit_events(client)
+    decide = latest_event(events, actor="briech.lead", action="decide", resource="dashboard")
+    query = latest_event(events, actor="briech.lead", action="query", resource="dashboard")
     assert decide["payload"]["decision"] == "allow"
     assert query["payload"]["rows"] == 6 and len(query["payload"]["item_ids"]) == 6
-    deny = _latest(events, actor="group.it", action="decide", resource="dashboard")
+    deny = latest_event(events, actor="group.it", action="decide", resource="dashboard")
     assert deny["payload"]["decision"] == "deny"
