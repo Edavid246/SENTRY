@@ -332,6 +332,9 @@ end-of-step report. Never silently log it.
   which use the SQL filter only.
 - **Production needs:** one policy decision point (OPA partial evaluation) for every
   surface, and no fixture data in the dashboard.
+- **Resolved 2026-10-16:** the fixtures were deleted on 2026-10-09, and refactor step 1.1
+  removed `item_visible` from the `Policy` interface, `LocalPolicy` and the tests. Every
+  surface now authorizes through the SQL row filter (plus RLS) only.
 
 ### 2026-10-07 — DEMO_DATE pins the business date
 - **Issue:** `DEMO_DATE` (dev profile only, refused otherwise) replaces the live date in

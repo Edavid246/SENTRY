@@ -337,9 +337,9 @@ Tick a step when its commit is pushed; note the commit hash.
 
 - [x] 0.1 (2982ab1) Prompt fingerprint and OpenAPI snapshot tests; baseline re-confirmed (check.sh green:
   622 passed, 5 skipped; UI smoke 66 ok, which is the 71 above less the five checks 7038e4e removed)
-- [x] 0.2 `tests/support/` package; token-cache measurement (751 logins took 84 s of a 320 s
+- [x] 0.2 (91e2208) `tests/support/` package; token-cache measurement (751 logins took 84 s of a 320 s
   run; with the cache: 21 logins, 171 s; 622 passed, 5 skipped both times)
-- [ ] 1.1 Remove unused backend and web code (+ D4)
+- [x] 1.1 Remove unused backend and web code (+ D4)
 - [ ] 1.2 Seed hygiene, stale comments and config, embedding-dim test (+ D9 b-d)
 - [ ] 2.1 `Label` as a `derive` input, `Scope.labels` (+ D1, D8)
 - [ ] 2.2 Unit vocabulary

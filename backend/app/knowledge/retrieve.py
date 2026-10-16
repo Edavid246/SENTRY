@@ -43,14 +43,6 @@ class RetrievedChunk:
     keyword_rank: float | None
     rrf_score: float
 
-    @property
-    def source(self) -> str:
-        if self.vector_similarity is not None and self.keyword_rank is not None:
-            return "hybrid"
-        if self.vector_similarity is not None:
-            return "vector"
-        return "fts"
-
 
 def _vector_literal(vector: list[float]) -> str:
     return "[" + ",".join(f"{value:.7f}" for value in vector) + "]"

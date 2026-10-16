@@ -85,7 +85,6 @@ class Settings(BaseSettings):
     # Knowledge pathway (SPEC §8.2, §9)
     retrieval_top_k: int = 8
     retrieval_min_similarity: float = 0.5
-    assistant_evidence_only: bool = True
     assistant_insufficient_message: str = "not found in approved sources"
 
     # Audit tamper evidence (SPEC 14.2): checkpoint file (layer 1) and the

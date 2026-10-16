@@ -13,7 +13,6 @@ the lesson from the step-3 RLS migration (no operator between varchar[]
 and text[]).
 """
 
-from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -50,15 +49,6 @@ class Policy(Protocol):
     def decide(self, ctx: AccessContext, action: str, resource: str) -> Decision: ...
 
     def row_filter(self, ctx: AccessContext, resource: str) -> RowFilter: ...
-
-    def item_visible(
-        self,
-        ctx: AccessContext,
-        *,
-        classification_rank: int,
-        compartments: Collection[str],
-        unit_path: str,
-    ) -> bool: ...
 
 
 def get_policy() -> Policy:
@@ -106,26 +96,6 @@ class LocalPolicy:
             "unit_path": ctx.unit_path,
         }
         return RowFilter(where_sql=where_sql, params=params)
-
-    def item_visible(
-        self,
-        ctx: AccessContext,
-        *,
-        classification_rank: int,
-        compartments: Collection[str],
-        unit_path: str,
-    ) -> bool:
-        """The SPEC 7.1 rule for an item that is not a database row (e.g. fixtures).
-
-        Same four clauses as `row_filter`; tests/authz/test_item_visible.py checks
-        the two agree on every seeded record for every demo user.
-        """
-        return (
-            ctx.data_scope == "standard"
-            and ctx.clearance_rank >= classification_rank
-            and set(compartments) <= set(ctx.compartments)
-            and unit_path.startswith(ctx.unit_path)
-        )
 
 
 _POLICY: Policy = LocalPolicy()

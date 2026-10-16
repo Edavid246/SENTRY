@@ -21,16 +21,13 @@ from app.data_queries.tools import (
     production,
     uas,
 )
-from app.data_queries.tools.base import TOOLS, ToolFn, ToolResult
-from app.data_queries.tools.compliance import expired_certifications
+from app.data_queries.tools.base import TOOLS, ToolResult
 
 __all__ = [
     "TOOLS",
-    "ToolFn",
     "ToolResult",
     "commercial",
     "compliance",
-    "expired_certifications",
     "findings",
     "forensics",
     "production",

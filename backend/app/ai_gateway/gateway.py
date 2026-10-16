@@ -63,14 +63,6 @@ class AIGateway:
         self._sleep = sleep
         self._clock = clock
 
-    @property
-    def llm(self) -> LLMProvider:
-        return self._llm
-
-    @property
-    def cache(self) -> LLMResponseCache | None:
-        return self._cache
-
     def complete(self, request: LLMRequest) -> LLMResult:
         from app.config import get_settings
 

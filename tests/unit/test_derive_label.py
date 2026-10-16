@@ -46,11 +46,6 @@ def test_empty_item_takes_the_lowest_configured_level_when_allowed() -> None:
     assert Labels({"official": 5, "sensitive": 9}).derive([], empty_ok=True).code == "official"
 
 
-def test_rank_is_none_outside_the_scheme() -> None:
-    assert LABELS.rank("secret") == 3
-    assert LABELS.rank("top-secret") is None
-
-
 def test_display_uses_the_ui_name_and_never_prints_none() -> None:
     labels = Labels({"secret": 3, "open": 1}, {"secret": "Government-sensitive", "open": None})  # type: ignore[dict-item]
     assert labels.display("secret") == "GOVERNMENT-SENSITIVE"

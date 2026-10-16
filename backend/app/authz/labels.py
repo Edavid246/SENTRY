@@ -58,10 +58,6 @@ class Labels:
         """The level's name as the UI and documents show it, upper case (the code if unnamed)."""
         return (self._names.get(code) or code).upper()
 
-    def rank(self, code: str) -> int | None:
-        """Rank of a level, or None for a code outside the scheme."""
-        return self._ranks.get(code)
-
     def derive(self, inputs: Iterable[Labelled], *, empty_ok: bool = False) -> Label:
         items = list(inputs)
         if not items:
