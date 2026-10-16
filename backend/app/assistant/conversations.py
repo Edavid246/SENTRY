@@ -40,7 +40,7 @@ class Conversation:
 
 
 @dataclass(frozen=True, slots=True)
-class Message:
+class StoredMessage:
     role: str
     content: str
     created_at: datetime
@@ -85,7 +85,7 @@ def list_conversations(
     return [_conversation(row) for row in rows]
 
 
-def list_messages(scope: Scope, conversation_id: UUID) -> list[Message]:
+def list_messages(scope: Scope, conversation_id: UUID) -> list[StoredMessage]:
     """A conversation's turns the caller may see, oldest first (question before answer)."""
     row_filter = scope.filter("message")
     rows = scope.conn.execute(
@@ -96,7 +96,7 @@ def list_messages(scope: Scope, conversation_id: UUID) -> list[Message]:
         ),
         {"id": conversation_id, **row_filter.params},
     ).all()
-    return [Message(str(r.role), str(r.content), r.created_at) for r in rows]
+    return [StoredMessage(str(r.role), str(r.content), r.created_at) for r in rows]
 
 
 def open_conversation(scope: Scope, requested: UUID | None) -> tuple[UUID, bool]:

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 
+import app.assistant.models  # noqa: F401
 import app.audit.models  # noqa: F401
 import app.authz.models  # noqa: F401
 import app.connectors.models  # noqa: F401

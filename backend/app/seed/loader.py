@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from argon2 import PasswordHasher
 from sqlalchemy import create_engine, delete
 
+from app.assistant.models import Conversation, Message
 from app.audit.models import AuditEvent
 from app.authz.models import (
     ClassificationLevel,
@@ -24,7 +25,7 @@ from app.config import get_settings
 from app.connectors.models import CanonicalRecord, SourceSystem
 from app.correlation.models import Finding
 from app.ids import entity_id, source_id, unit_id
-from app.knowledge.models import Chunk, Conversation, Document, Message
+from app.knowledge.models import Chunk, Document
 from app.seed.identity import (
     ARCHIVED_USERS,
     CLASSIFICATION_LEVELS,
