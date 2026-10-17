@@ -12,11 +12,12 @@ import { BASEMAP_BOUNDS, basemapStyle, registerBasemap } from "@/lib/basemap";
 import { STATES } from "@/lib/states";
 import { recordHref } from "@/lib/links";
 import { fmtTs } from "@/lib/format";
+import { palette } from "@/lib/palette";
 
 const COLOURS: Record<MapKind, string> = {
-  sensor: "#8fa89d",
-  detection: "#efa93a",
-  mission: "#5fae86",
+  sensor: palette.sage,
+  detection: palette.amber.DEFAULT,
+  mission: palette.ok,
 };
 // One replay tick advances the clock by 30 simulated minutes (the 48 h window takes ~1.5 min).
 const REPLAY_STEP_MS = 30 * 60 * 1000;
@@ -159,7 +160,7 @@ export default function MapPage() {
               paint: {
                 "circle-radius": ["case", ["==", ["get", "kind"], "sensor"], 7, 6],
                 "circle-color": ["match", ["get", "kind"], "sensor", COLOURS.sensor, COLOURS.detection],
-                "circle-stroke-color": "#cfdcd5",
+                "circle-stroke-color": palette.ink,
                 "circle-stroke-width": 1,
               },
             },

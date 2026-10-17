@@ -1,26 +1,15 @@
 import type { Config } from "tailwindcss";
+import { gridGround, palette } from "./src/lib/palette";
 
-// Palette sampled from the reference screens (inspo-images/): blue-black ground,
-// sage-grey type, teal-grey rules, one amber accent. All values live here once.
+// Colours live in src/lib/palette.ts.
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   // hover: styles only where a pointer can hover; on touch a tapped item would stay "hovered".
   future: { hoverOnlyWhenSupported: true },
   theme: {
     extend: {
-      colors: {
-        ground: "#091017",
-        surface: "#0d161e",
-        raised: "#111d26",
-        rule: "#22343b",
-        ink: "#cfdcd5",
-        sage: "#8fa89d",
-        mute: "#5f776f",
-        amber: "#efa93a",
-        ok: "#5fae86",
-        warn: "#e0a43c",
-        bad: "#e0524d",
-      },
+      colors: palette,
+      backgroundImage: { "grid-ground": gridGround },
       fontFamily: {
         mono: ['"JetBrains Mono"', "ui-monospace", "Consolas", "monospace"],
       },

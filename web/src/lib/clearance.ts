@@ -8,7 +8,7 @@ export interface ClearanceStyle {
 const MAP: Record<string, ClearanceStyle> = {
   unclassified: { label: "OPEN", className: "border-ok text-ok" },
   restricted: { label: "INTERNAL", className: "border-amber text-amber" },
-  confidential: { label: "CONFIDENTIAL", className: "border-[#e2823a] text-[#e2823a]" },
+  confidential: { label: "CONFIDENTIAL", className: "border-confidential text-confidential" },
   secret: { label: "GOVERNMENT-SENSITIVE", className: "border-bad text-bad" },
 };
 

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { homePath } from "@/lib/home";
 import { resetEntrances, stagger } from "@/lib/motion";
+import { palette } from "@/lib/palette";
 import { useSession } from "@/lib/session";
 import { Clock } from "@/components/Clock";
 import { Emblem } from "@/components/Emblem";
@@ -22,7 +23,7 @@ function Crosshair({ className }: { className: string }) {
       width="14"
       height="14"
       viewBox="0 0 14 14"
-      stroke="#22343b"
+      stroke={palette.rule}
       strokeWidth="1.5"
       className={`absolute ${className}`}
       aria-hidden="true"
