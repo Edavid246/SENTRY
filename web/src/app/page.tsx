@@ -70,7 +70,7 @@ export default function LoginPage() {
         <div className="flex items-center gap-4">
           <Emblem size={32} className="text-on-accent" />
           <div className="leading-tight">
-            <div className="text-[1rem] font-bold tracking-[0.12em]">DEFENCE GATEWAY</div>
+            <div className="text-[1rem] font-bold tracking-[0.12em]">EIB DEFENCE GATEWAY</div>
             <div className="text-[0.85rem] tracking-[0.12em] text-on-accent/80">SECURE ASSISTANT</div>
           </div>
         </div>
@@ -94,7 +94,7 @@ export default function LoginPage() {
             <div className="flex items-center gap-5 border-b border-rule px-8 py-6">
               <Emblem size={52} className="text-accent" />
               <div>
-                <h1 className="text-[1.3rem] font-medium tracking-[0.1em]">DEFENCE GATEWAY</h1>
+                <h1 className="text-[1.3rem] font-medium tracking-[0.1em]">EIB DEFENCE GATEWAY</h1>
                 <p className="text-[0.95rem] tracking-[0.1em] text-soft">SECURE ASSISTANT</p>
               </div>
             </div>

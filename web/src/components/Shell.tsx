@@ -62,7 +62,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-3 px-4 py-3 md:gap-4 md:px-6">
           <Emblem size={34} className="text-on-accent" />
           <div className="leading-tight">
-            <div className="text-[0.9rem] font-bold tracking-[0.12em] md:text-[1rem]">DEFENCE GATEWAY</div>
+            <div className="text-[0.9rem] font-bold tracking-[0.12em] md:text-[1rem]">EIB DEFENCE GATEWAY</div>
             <div className="text-[0.75rem] tracking-[0.12em] text-on-accent/80 md:text-[0.8rem]">SECURE ASSISTANT</div>
           </div>
           {/* Phone: the identity strip opens on demand. */}

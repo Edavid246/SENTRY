@@ -3,7 +3,7 @@ import { SessionProvider } from "@/lib/session";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Defence Gateway — demo",
+  title: "EIB Defence Gateway — demo",
   description: "Independent prototype. All data is fictitious.",
 };
 
