@@ -18,7 +18,7 @@ function Segment({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col justify-center gap-1.5 border-t border-on-accent/25 px-4 py-3 md:border-l md:border-t-0 md:px-6">
+    <div className="flex flex-col justify-center gap-1 border-t border-on-accent/25 px-4 py-3 md:border-l md:border-t-0 md:px-6 md:py-2">
       <div className="flex items-center gap-2 text-on-accent/80">
         {icon}
         <span className="label text-on-accent/80">{label}</span>
@@ -58,9 +58,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen flex-col">
       {/* Identity strip, after the reference: person | unit | session */}
       {/* The masthead: the one solid red surface, white type on it. */}
-      <header className="flex shrink-0 flex-col bg-accent text-on-accent md:min-h-[88px] [&_:focus-visible]:outline-on-accent md:flex-row md:items-stretch">
-        <div className="flex items-center gap-3 px-4 py-3 md:gap-4 md:px-6">
-          <Emblem size={34} className="text-on-accent" />
+      <header className="flex shrink-0 flex-col bg-accent text-on-accent md:min-h-[64px] [&_:focus-visible]:outline-on-accent md:flex-row md:items-stretch">
+        <div className="flex items-center gap-3 px-4 py-3 md:gap-4 md:px-6 md:py-2">
+          <Emblem size={30} className="text-on-accent" />
           <div className="leading-tight">
             <div className="text-[0.9rem] font-bold tracking-[0.12em] md:text-[1rem]">EIB DEFENCE GATEWAY</div>
             <div className="text-[0.75rem] tracking-[0.12em] text-on-accent/80 md:text-[0.8rem]">SECURE ASSISTANT</div>
@@ -82,11 +82,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
           id="identity-strip"
           className={`${menuOpen ? "flex" : "hidden"} min-w-0 flex-col md:flex md:flex-1 md:flex-row md:items-stretch`}
         >
-          <div className="flex flex-col justify-center border-t border-on-accent/25 px-4 py-3 md:border-l md:border-t-0 md:px-6">
+          <div className="flex flex-col justify-center border-t border-on-accent/25 px-4 py-3 md:border-l md:border-t-0 md:px-6 md:py-2">
             <div className="text-[0.8rem] uppercase tracking-[0.12em] text-on-accent/80">
               {me.role.replace("_", " ")}
             </div>
-            <div data-testid="user-name" className="text-[1.15rem] font-medium tracking-[0.06em]">
+            <div data-testid="user-name" className="text-[1.15rem] font-medium tracking-[0.06em] md:text-[1.05rem]">
               {me.display_name}
             </div>
           </div>
@@ -120,10 +120,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col-reverse md:flex-row">
+      {/* Main nav: a tab row under the masthead; on a phone, a bottom bar within thumb reach. */}
+      <div className="flex min-h-0 flex-1 flex-col-reverse md:flex-col">
         <nav
           aria-label="Main"
-          className="flex shrink-0 border-t border-rule bg-surface md:w-52 md:flex-col md:border-r md:border-t-0 md:py-3"
+          className="flex shrink-0 border-t border-rule bg-surface md:gap-1 md:border-b md:border-t-0 md:px-4"
         >
           {nav.map((n) => {
             const active = pathname.startsWith(n.href) || (n.also?.some((prefix) => pathname.startsWith(prefix)) ?? false);
@@ -132,9 +133,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 key={n.href}
                 href={n.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 border-t-[3px] px-1 py-2 text-[0.7rem] uppercase tracking-[0.08em] md:flex-none md:flex-row md:justify-start md:gap-3 md:border-l-[3px] md:border-t-0 md:px-5 md:py-3 md:text-[0.9rem] md:tracking-[0.12em] ${
+                className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-1 border-t-[3px] px-1 py-2 text-[0.7rem] uppercase tracking-[0.08em] md:-mb-px md:flex-none md:flex-row md:gap-2.5 md:border-b-[3px] md:border-t-0 md:px-4 md:py-3 md:text-[0.85rem] md:tracking-[0.12em] ${
                   active
-                    ? "border-accent bg-raised text-accent"
+                    ? "border-accent bg-raised text-accent md:bg-transparent"
                     : "border-transparent text-soft hover:text-ink"
                 }`}
               >

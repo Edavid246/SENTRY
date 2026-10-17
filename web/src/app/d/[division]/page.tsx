@@ -74,7 +74,7 @@ export default function DivisionPage() {
                     aria-current={d.key === current.key ? "page" : undefined}
                     className={`border-b-2 pb-0.5 ${
                       d.key === current.key
-                        ? "border-accent text-accent"
+                        ? "border-ink font-medium text-ink"
                         : "border-transparent text-soft hover:text-ink"
                     }`}
                   >
