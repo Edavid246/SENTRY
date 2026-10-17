@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError, type CaseView } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
+import { Page } from "@/components/Page";
 import { Marking } from "@/components/Marking";
 import { recordHref } from "@/lib/links";
 
@@ -86,76 +87,74 @@ export default function CasePage() {
 
   return (
     <Shell>
-      <div className="h-full overflow-y-auto p-6 md:p-10">
-        <div className="mx-auto max-w-5xl">
-          <Link href="/d/giga" className="text-[0.9rem] text-soft hover:text-ink">
-            ← Giga Forensics
-          </Link>
-          {!view && state === "loading" && <p className="mt-8 text-soft">Loading…</p>}
-          {!view && state === "missing" && (
-            <div data-testid="case-not-found" className="mt-8">
-              <h1 className="text-[1.6rem] font-medium">Not found</h1>
-              <p className="mt-2 text-soft">There is no such case, or it is not available to you.</p>
-            </div>
-          )}
-          {!view && state === "failed" && (
-            <p role="alert" className="mt-8 border border-rule p-4 text-[0.9rem]">
-              The case could not be loaded.
-            </p>
-          )}
-          {view && (
-            <>
-              <header className="mt-6 border border-rule bg-surface p-6">
-                <p className="text-[0.85rem] text-soft">{view.case_ref}</p>
-                <h1 data-testid="case-title" className="mt-1 text-[1.8rem] font-medium leading-tight">
-                  {view.title}
-                </h1>
-                <p className="mt-3 text-[0.9rem]">
-                  {view.breaks > 0 ? (
-                    <>
-                      <span className="font-bold text-gold">{view.breaks}</span> custody{" "}
-                      {view.breaks === 1 ? "break" : "breaks"} to explain
-                    </>
-                  ) : (
-                    <span className="text-soft">Every chain of custody is unbroken.</span>
-                  )}
-                </p>
-                <dl className="mt-5 flex flex-wrap gap-x-10 gap-y-3">
-                  {[
-                    ["Status", view.state],
-                    ["Opened", view.opened],
-                    ["Lead examiner", view.lead_examiner],
-                    ["Evidence items", String(view.evidence.length)],
-                  ].map(([label, value]) => (
-                    <div key={label}>
-                      <dt className="text-[0.8rem] text-mute">{label}</dt>
-                      <dd className="mt-0.5 text-[1.05rem]">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-                <div className="mt-5 flex flex-wrap items-center gap-1.5">
-                  <Marking code={view.classification} compartments={view.compartments} />
-                  <Link href={recordHref(view.ref)} className="ml-3 text-[0.85rem] text-soft hover:text-ink hover:underline">
-                    Case record {view.ref}
-                  </Link>
-                  <Link href="/audit" className="ml-3 text-[0.85rem] text-soft hover:text-ink hover:underline">
-                    Audit log
-                  </Link>
-                </div>
-              </header>
-              <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-2">
-                {view.evidence.map((item) => (
-                  <Custody key={item.ref} item={item} />
-                ))}
-              </div>
-              <p className="mt-6 max-w-[62ch] text-[0.8rem] text-mute">
-                Demo data. The assistant only reports what the records say; deciding what a break means
-                is a person&apos;s job.
+      <Page>
+        <Link href="/d/giga" className="text-[0.9rem] text-soft hover:text-ink">
+          ← Giga Forensics
+        </Link>
+        {!view && state === "loading" && <p className="mt-8 text-soft">Loading…</p>}
+        {!view && state === "missing" && (
+          <div data-testid="case-not-found" className="mt-8">
+            <h1 className="text-[1.6rem] font-medium">Not found</h1>
+            <p className="mt-2 text-soft">There is no such case, or it is not available to you.</p>
+          </div>
+        )}
+        {!view && state === "failed" && (
+          <p role="alert" className="mt-8 border border-rule p-4 text-[0.9rem]">
+            The case could not be loaded.
+          </p>
+        )}
+        {view && (
+          <>
+            <header className="mt-6 border border-rule bg-surface p-6">
+              <p className="text-[0.85rem] text-soft">{view.case_ref}</p>
+              <h1 data-testid="case-title" className="mt-1 text-[1.8rem] font-medium leading-tight">
+                {view.title}
+              </h1>
+              <p className="mt-3 text-[0.9rem]">
+                {view.breaks > 0 ? (
+                  <>
+                    <span className="font-bold text-gold">{view.breaks}</span> custody{" "}
+                    {view.breaks === 1 ? "break" : "breaks"} to explain
+                  </>
+                ) : (
+                  <span className="text-soft">Every chain of custody is unbroken.</span>
+                )}
               </p>
-            </>
-          )}
-        </div>
-      </div>
+              <dl className="mt-5 flex flex-wrap gap-x-10 gap-y-3">
+                {[
+                  ["Status", view.state],
+                  ["Opened", view.opened],
+                  ["Lead examiner", view.lead_examiner],
+                  ["Evidence items", String(view.evidence.length)],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-[0.8rem] text-mute">{label}</dt>
+                    <dd className="mt-0.5 text-[1.05rem]">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="mt-5 flex flex-wrap items-center gap-1.5">
+                <Marking code={view.classification} compartments={view.compartments} />
+                <Link href={recordHref(view.ref)} className="ml-3 text-[0.85rem] text-soft hover:text-ink hover:underline">
+                  Case record {view.ref}
+                </Link>
+                <Link href="/audit" className="ml-3 text-[0.85rem] text-soft hover:text-ink hover:underline">
+                  Audit log
+                </Link>
+              </div>
+            </header>
+            <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-2">
+              {view.evidence.map((item) => (
+                <Custody key={item.ref} item={item} />
+              ))}
+            </div>
+            <p className="mt-6 max-w-[62ch] text-[0.8rem] text-mute">
+              Demo data. The assistant only reports what the records say; deciding what a break means
+              is a person&apos;s job.
+            </p>
+          </>
+        )}
+      </Page>
     </Shell>
   );
 }

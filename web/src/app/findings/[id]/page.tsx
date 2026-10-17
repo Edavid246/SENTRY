@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError, type Finding } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
+import { Page } from "@/components/Page";
 import { Marking } from "@/components/Marking";
 import { BackLink } from "@/components/BackLink";
 import { displayValue } from "@/lib/format";
@@ -34,7 +35,7 @@ export default function FindingPage() {
 
   return (
     <Shell>
-      <div className="h-full overflow-y-auto p-6">
+      <Page width="read">
         <BackLink fallback="/findings" />
         {error && (
           <p role="alert" data-testid="finding-error" className="mt-4 border border-rule p-4">
@@ -43,7 +44,7 @@ export default function FindingPage() {
         )}
         {!finding && !error && <p className="mt-4 text-soft">Loading…</p>}
         {finding && (
-          <div data-testid="finding-detail" className="mt-4 max-w-4xl border border-rule bg-surface">
+          <div data-testid="finding-detail" className="mt-4 border border-rule bg-surface">
             <div className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-3">
               <span className="border border-bad px-2 py-0.5 text-[0.7rem] uppercase tracking-[0.1em] text-bad">
                 {finding.severity}
@@ -94,7 +95,7 @@ export default function FindingPage() {
             </div>
           </div>
         )}
-      </div>
+      </Page>
     </Shell>
   );
 }

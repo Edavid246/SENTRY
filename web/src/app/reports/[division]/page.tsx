@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError, downloadReport, type DivisionReport } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
+import { Page } from "@/components/Page";
 import { Marking } from "@/components/Marking";
 import { recordHref } from "@/lib/links";
 
@@ -43,140 +44,138 @@ export default function ReportPage() {
 
   return (
     <Shell>
-      <div className="h-full overflow-y-auto p-6 md:p-10">
-        <div className="mx-auto max-w-4xl">
-          <Link href={`/d/${division}`} className="text-[0.9rem] text-soft hover:text-ink">
-            ← Back to the division
-          </Link>
-          {!report && state === "loading" && <p className="mt-8 text-soft">Loading…</p>}
-          {!report && state === "missing" && (
-            <div data-testid="report-not-found" className="mt-8">
-              <h1 className="text-[1.6rem] font-medium">Not found</h1>
-              <p className="mt-2 text-soft">There is no such division, or it is not available to you.</p>
-            </div>
-          )}
-          {!report && state === "failed" && (
-            <p role="alert" className="mt-8 border border-rule p-4 text-[0.9rem]">
-              The report could not be prepared.
-            </p>
-          )}
-          {report && (
-            <>
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
-                <h1 data-testid="report-title" className="text-[1.8rem] font-medium leading-tight">
-                  {report.title}
-                </h1>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    data-testid="export-pdf"
-                    onClick={() => save("pdf")}
-                    disabled={busy !== null}
-                    className="btn-accent"
-                  >
-                    {busy === "pdf" ? "Exporting…" : "Export PDF"}
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="export-docx"
-                    onClick={() => save("docx")}
-                    disabled={busy !== null}
-                    className="btn"
-                  >
-                    {busy === "docx" ? "Exporting…" : "Export Word"}
-                  </button>
-                </div>
-              </div>
-              <p aria-live="polite" className="mt-2 min-h-[1.25rem] text-[0.85rem] text-soft">
-                {message}
-              </p>
-
-              <article className="mt-4 border border-rule bg-surface">
-                <p
-                  data-testid="report-banner"
-                  className="border-b border-gold px-6 py-3 text-[0.85rem] font-bold text-gold"
+      <Page width="read">
+        <Link href={`/d/${division}`} className="text-[0.9rem] text-soft hover:text-ink">
+          ← Back to the division
+        </Link>
+        {!report && state === "loading" && <p className="mt-8 text-soft">Loading…</p>}
+        {!report && state === "missing" && (
+          <div data-testid="report-not-found" className="mt-8">
+            <h1 className="text-[1.6rem] font-medium">Not found</h1>
+            <p className="mt-2 text-soft">There is no such division, or it is not available to you.</p>
+          </div>
+        )}
+        {!report && state === "failed" && (
+          <p role="alert" className="mt-8 border border-rule p-4 text-[0.9rem]">
+            The report could not be prepared.
+          </p>
+        )}
+        {report && (
+          <>
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+              <h1 data-testid="report-title" className="text-[1.8rem] font-medium leading-tight">
+                {report.title}
+              </h1>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  data-testid="export-pdf"
+                  onClick={() => save("pdf")}
+                  disabled={busy !== null}
+                  className="btn-accent"
                 >
-                  {report.banner}
-                </p>
-                <div className="space-y-6 p-6">
-                  <header>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Marking code={report.classification} compartments={report.compartments} />
-                    </div>
-                    <p className="mt-3 text-[0.95rem] text-soft">{report.tagline}</p>
-                    <p className="mt-1 text-[0.8rem] text-mute">
-                      Generated {report.generated_at} for {report.prepared_for}
-                    </p>
-                    {report.facts.length > 0 && (
-                      <dl className="mt-4 flex flex-wrap gap-x-10 gap-y-3">
-                        {report.facts.map(([label, value]) => (
-                          <div key={label}>
-                            <dt className="text-[0.8rem] text-mute">{label}</dt>
-                            <dd className="mt-0.5 text-[1rem]">{value}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    )}
-                  </header>
+                  {busy === "pdf" ? "Exporting…" : "Export PDF"}
+                </button>
+                <button
+                  type="button"
+                  data-testid="export-docx"
+                  onClick={() => save("docx")}
+                  disabled={busy !== null}
+                  className="btn"
+                >
+                  {busy === "docx" ? "Exporting…" : "Export Word"}
+                </button>
+              </div>
+            </div>
+            <p aria-live="polite" className="mt-2 min-h-[1.25rem] text-[0.85rem] text-soft">
+              {message}
+            </p>
 
-                  <section>
-                    <h2 className="text-[1.05rem] font-medium">Summary</h2>
-                    <ul data-testid="report-summary" className="mt-2 space-y-1 text-[0.9rem]">
-                      {report.summary.map((line) => (
-                        <li key={line}>{line}</li>
+            <article className="mt-4 border border-rule bg-surface">
+              <p
+                data-testid="report-banner"
+                className="border-b border-gold px-6 py-3 text-[0.85rem] font-bold text-gold"
+              >
+                {report.banner}
+              </p>
+              <div className="space-y-6 p-6">
+                <header>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Marking code={report.classification} compartments={report.compartments} />
+                  </div>
+                  <p className="mt-3 text-[0.95rem] text-soft">{report.tagline}</p>
+                  <p className="mt-1 text-[0.8rem] text-mute">
+                    Generated {report.generated_at} for {report.prepared_for}
+                  </p>
+                  {report.facts.length > 0 && (
+                    <dl className="mt-4 flex flex-wrap gap-x-10 gap-y-3">
+                      {report.facts.map(([label, value]) => (
+                        <div key={label}>
+                          <dt className="text-[0.8rem] text-mute">{label}</dt>
+                          <dd className="mt-0.5 text-[1rem]">{value}</dd>
+                        </div>
                       ))}
-                    </ul>
-                  </section>
+                    </dl>
+                  )}
+                </header>
 
-                  {report.sections.map((section) => (
-                    <section key={section.title} data-testid="report-section">
-                      <h2 className="text-[1.05rem] font-medium">{section.title}</h2>
-                      {section.rows.length === 0 ? (
-                        <p className="mt-2 text-[0.85rem] text-mute">{section.empty_text}</p>
-                      ) : (
-                        <ul className="mt-2 border-t border-rule">
-                          {section.rows.map((row) => (
-                            <li
-                              key={row.ref}
-                              className={`border-b border-l-[3px] border-b-rule py-2.5 pl-4 pr-1 ${
-                                row.flagged ? "border-l-gold" : "border-l-transparent"
-                              }`}
-                            >
-                              <div className="flex items-baseline justify-between gap-4">
-                                <span className={`text-[0.95rem] ${row.flagged ? "text-gold" : ""}`}>
-                                  {row.label}
-                                </span>
-                                <Link
-                                  href={recordHref(row.ref)}
-                                  className="shrink-0 text-[0.75rem] tabular-nums text-mute hover:text-ink hover:underline"
-                                >
-                                  {row.ref}
-                                </Link>
-                              </div>
-                              <p className="mt-0.5 text-[0.85rem] leading-relaxed text-soft">{row.detail}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {section.marking && (
-                        <p className="mt-1.5 text-[0.75rem] text-mute">Section marking: {section.marking}</p>
-                      )}
-                    </section>
-                  ))}
+                <section>
+                  <h2 className="text-[1.05rem] font-medium">Summary</h2>
+                  <ul data-testid="report-summary" className="mt-2 space-y-1 text-[0.9rem]">
+                    {report.summary.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </section>
 
-                  <section>
-                    <h2 className="text-[1.05rem] font-medium">Sources</h2>
-                    <p className="mt-2 break-words text-[0.8rem] leading-relaxed text-mute">
-                      Records: {report.refs.join(", ") || "none"}
-                    </p>
+                {report.sections.map((section) => (
+                  <section key={section.title} data-testid="report-section">
+                    <h2 className="text-[1.05rem] font-medium">{section.title}</h2>
+                    {section.rows.length === 0 ? (
+                      <p className="mt-2 text-[0.85rem] text-mute">{section.empty_text}</p>
+                    ) : (
+                      <ul className="mt-2 border-t border-rule">
+                        {section.rows.map((row) => (
+                          <li
+                            key={row.ref}
+                            className={`border-b border-l-[3px] border-b-rule py-2.5 pl-4 pr-1 ${
+                              row.flagged ? "border-l-gold" : "border-l-transparent"
+                            }`}
+                          >
+                            <div className="flex items-baseline justify-between gap-4">
+                              <span className={`text-[0.95rem] ${row.flagged ? "text-gold" : ""}`}>
+                                {row.label}
+                              </span>
+                              <Link
+                                href={recordHref(row.ref)}
+                                className="shrink-0 text-[0.75rem] tabular-nums text-mute hover:text-ink hover:underline"
+                              >
+                                {row.ref}
+                              </Link>
+                            </div>
+                            <p className="mt-0.5 text-[0.85rem] leading-relaxed text-soft">{row.detail}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {section.marking && (
+                      <p className="mt-1.5 text-[0.75rem] text-mute">Section marking: {section.marking}</p>
+                    )}
                   </section>
-                  <p className="text-[0.8rem] text-mute">{report.notice}</p>
-                </div>
-              </article>
-            </>
-          )}
-        </div>
-      </div>
+                ))}
+
+                <section>
+                  <h2 className="text-[1.05rem] font-medium">Sources</h2>
+                  <p className="mt-2 break-words text-[0.8rem] leading-relaxed text-mute">
+                    Records: {report.refs.join(", ") || "none"}
+                  </p>
+                </section>
+                <p className="text-[0.8rem] text-mute">{report.notice}</p>
+              </div>
+            </article>
+          </>
+        )}
+      </Page>
     </Shell>
   );
 }

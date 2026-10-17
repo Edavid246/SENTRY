@@ -7,6 +7,7 @@ import { api, ApiError, type HomeDivision, type HomeSummary } from "@/lib/api";
 import { stagger, useFirstEntrance } from "@/lib/motion";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
+import { Page } from "@/components/Page";
 import { Marking } from "@/components/Marking";
 import { DivisionGlyph } from "@/components/DivisionGlyph";
 
@@ -105,34 +106,32 @@ export default function HomePage() {
 
   return (
     <Shell>
-      <div className="h-full overflow-y-auto p-6 md:p-10">
-        <div className="mx-auto max-w-5xl">
-          <div className={entrance ? "enter" : undefined}>
-            <h1 data-testid="home-title" className="text-[2rem] font-medium tracking-[0.02em]">
-              {me?.unit_breadcrumb[0]?.name ?? "Group"}
-            </h1>
-            <p className="mt-1 text-[0.95rem] text-soft">
-              Open a division to see what is happening there.
-            </p>
-          </div>
-          {error && (
-            <p role="alert" className="mt-8 border border-rule p-4 text-[0.9rem]">
-              {error}
-            </p>
-          )}
-          {!summary && !error && <p className="mt-8 text-soft">Loading…</p>}
-          {summary && (
-            <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2">
-              {divisions.map((d, i) => (
-                <DivisionCard key={d.key} division={d} delay={entrance ? 100 + i * 60 : undefined} />
-              ))}
-              {field && (
-                <DivisionCard division={field} wide delay={entrance ? 100 + divisions.length * 60 : undefined} />
-              )}
-            </div>
-          )}
+      <Page>
+        <div className={entrance ? "enter" : undefined}>
+          <h1 data-testid="home-title" className="text-[2rem] font-medium tracking-[0.02em]">
+            {me?.unit_breadcrumb[0]?.name ?? "Group"}
+          </h1>
+          <p className="mt-1 text-[0.95rem] text-soft">
+            Open a division to see what is happening there.
+          </p>
         </div>
-      </div>
+        {error && (
+          <p role="alert" className="mt-8 border border-rule p-4 text-[0.9rem]">
+            {error}
+          </p>
+        )}
+        {!summary && !error && <p className="mt-8 text-soft">Loading…</p>}
+        {summary && (
+          <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {divisions.map((d, i) => (
+              <DivisionCard key={d.key} division={d} delay={entrance ? 100 + i * 60 : undefined} />
+            ))}
+            {field && (
+              <DivisionCard division={field} wide delay={entrance ? 100 + divisions.length * 60 : undefined} />
+            )}
+          </div>
+        )}
+      </Page>
     </Shell>
   );
 }

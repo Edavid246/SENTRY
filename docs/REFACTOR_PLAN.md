@@ -385,7 +385,8 @@ Tick a step when its commit is pushed; note the commit hash.
   formatters compared value by value (650 passed; smoke 66 ok)
 - [x] 4.2 (77e8db2) `<Marking>` in `components/Marking.tsx`, a fragment (same DOM) replacing the ten
   badge-plus-tags copies; no badge without a classification, as DivisionSections did (650 passed; smoke 66 ok)
-- [ ] 4.3 `useLoad()`, `<NotFound>`, `<Page>`, `<Brand>` (+ D9 a)
+- [ ] 4.3 `useLoad()`, `<NotFound>`, `<Page>`, `<Brand>` (+ D9 a) — `<Page>` landed early (2026-10-17) with the full-width layout change; `useLoad()`,
+  `<NotFound>`, `<Brand>` and D9(a) still to do
 - [x] 4.4 (d3125f0) Palette (done before 4.3, at the user's request, ahead of the red-and-white re-theme):
   `lib/palette.ts` feeds `tailwind.config.ts`, `globals.css` (via `theme()`), the map and the login
   page. Checked by building the Tailwind CSS before and after: every colour value identical. Smoke

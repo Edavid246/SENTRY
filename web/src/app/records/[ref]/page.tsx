@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError, type RecordDetail } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
+import { Page } from "@/components/Page";
 import { Marking } from "@/components/Marking";
 import { BackLink } from "@/components/BackLink";
 import { displayValue } from "@/lib/format";
@@ -32,7 +33,7 @@ export default function RecordPage() {
 
   return (
     <Shell>
-      <div className="h-full overflow-y-auto p-6">
+      <Page width="read">
         <BackLink fallback="/home" />
         <h1 className="mt-3 font-mono text-[1.3rem]">{ref}</h1>
         {error && (
@@ -42,7 +43,7 @@ export default function RecordPage() {
         )}
         {!record && !error && <p className="mt-4 text-soft">Loading…</p>}
         {record && (
-          <div data-testid="record-detail" className="mt-4 max-w-3xl border border-rule bg-surface">
+          <div data-testid="record-detail" className="mt-4 border border-rule bg-surface">
             <div className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-3">
               <span className="label">{record.entity_type}</span>
               <Marking code={record.classification_code} compartments={record.compartments} />
@@ -66,7 +67,7 @@ export default function RecordPage() {
             </div>
           </div>
         )}
-      </div>
+      </Page>
     </Shell>
   );
 }

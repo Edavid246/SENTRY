@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type Finding } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Shell } from "@/components/Shell";
+import { Page } from "@/components/Page";
 import { Marking } from "@/components/Marking";
 import { fmtTs } from "@/lib/format";
 import { recordHref } from "@/lib/links";
@@ -39,7 +40,7 @@ export default function FindingsPage() {
 
   return (
     <Shell>
-      <div className="h-full overflow-y-auto p-6">
+      <Page>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="label">Findings</h1>
@@ -66,7 +67,7 @@ export default function FindingsPage() {
           </p>
         )}
         {findings && findings.length > 0 && (
-          <ul data-testid="findings-list" className="max-w-4xl divide-y divide-rule border border-rule bg-surface">
+          <ul data-testid="findings-list" className="divide-y divide-rule border border-rule bg-surface">
             {findings.map((f) => (
               <li key={f.id} data-testid={`item-${f.id}`} className="px-4 py-4">
                 <div className="flex flex-wrap items-center gap-2">
@@ -85,13 +86,13 @@ export default function FindingsPage() {
                 >
                   {f.title}
                 </Link>
-                <p className="mt-1 text-[0.85rem] text-soft">{f.summary}</p>
+                <p className="mt-1 max-w-[100ch] text-[0.85rem] text-soft">{f.summary}</p>
                 <p className="mt-1 text-[0.75rem] text-mute">{f.evidence_ids.length} records of evidence</p>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </Page>
     </Shell>
   );
 }
