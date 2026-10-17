@@ -50,12 +50,12 @@ export default function DivisionPage() {
               {error}
             </p>
           )}
-          {!home && !error && <p className="text-sage">Loading…</p>}
+          {!home && !error && <p className="text-soft">Loading…</p>}
           {home && !current && (
             // A division you cannot see reads exactly like one that does not exist.
             <div data-testid="division-not-found">
               <h1 className="text-[1.6rem] font-medium">Not found</h1>
-              <p className="mt-2 text-sage">There is no such division, or it is not available to you.</p>
+              <p className="mt-2 text-soft">There is no such division, or it is not available to you.</p>
               <Link href="/home" className="btn mt-6 inline-block">
                 Back to the group
               </Link>
@@ -64,7 +64,7 @@ export default function DivisionPage() {
           {home && current && (
             <>
               <nav aria-label="Divisions" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[0.9rem]">
-                <Link href="/home" data-testid="back-to-group" className="text-sage hover:text-ink">
+                <Link href="/home" data-testid="back-to-group" className="text-soft hover:text-ink">
                   ← {me?.unit_breadcrumb[0]?.name ?? "Group"}
                 </Link>
                 {home.divisions.map((d) => (
@@ -74,13 +74,13 @@ export default function DivisionPage() {
                     aria-current={d.key === current.key ? "page" : undefined}
                     className={`border-b-2 pb-0.5 ${
                       d.key === current.key
-                        ? "border-amber text-amber"
-                        : "border-transparent text-sage hover:text-ink"
+                        ? "border-accent text-accent"
+                        : "border-transparent text-soft hover:text-ink"
                     }`}
                   >
                     {d.name}
                     {d.alert && d.key !== current.key && (
-                      <span className="ml-1.5 text-amber">{d.alert.count}</span>
+                      <span className="ml-1.5 text-gold">{d.alert.count}</span>
                     )}
                   </Link>
                 ))}
@@ -101,15 +101,15 @@ export default function DivisionPage() {
                     </Link>
                   )}
                 </div>
-                <p className="relative mt-1 text-[0.95rem] text-sage">{current.tagline}</p>
+                <p className="relative mt-1 text-[0.95rem] text-soft">{current.tagline}</p>
                 <p className="relative mt-4 text-[0.9rem]">
                   {current.alert ? (
                     <>
-                      <span className="font-bold text-amber">{current.alert.count}</span> need attention:{" "}
+                      <span className="font-bold text-gold">{current.alert.count}</span> need attention:{" "}
                       {current.alert.parts.map((p) => `${p.count} ${p.what}`).join(", ")}
                     </>
                   ) : (
-                    <span className="text-sage">Nothing needs attention here.</span>
+                    <span className="text-soft">Nothing needs attention here.</span>
                   )}
                 </p>
                 {view && view.facts.length > 0 && (
@@ -131,10 +131,10 @@ export default function DivisionPage() {
                     <Link
                       href="/map"
                       data-testid="open-map"
-                      className="flex items-center justify-between gap-4 border border-rule bg-surface px-4 py-3 text-[0.95rem] hover:border-amber xl:col-span-2"
+                      className="flex items-center justify-between gap-4 border border-rule bg-surface px-4 py-3 text-[0.95rem] hover:border-accent xl:col-span-2"
                     >
                       <span>Open the map: sensors, detections and mission areas</span>
-                      <span aria-hidden className="text-amber">→</span>
+                      <span aria-hidden className="text-accent">→</span>
                     </Link>
                   )}
                   {view.sections.map((section) =>
@@ -165,10 +165,10 @@ export default function DivisionPage() {
                     <Link
                       href="/d/field-ops"
                       data-testid="open-field-ops"
-                      className="flex items-center justify-between gap-4 border border-rule bg-surface px-4 py-3 text-[0.95rem] hover:border-amber xl:col-span-2"
+                      className="flex items-center justify-between gap-4 border border-rule bg-surface px-4 py-3 text-[0.95rem] hover:border-accent xl:col-span-2"
                     >
                       <span>Field Operations: the sites and people Stratoc supports</span>
-                      <span aria-hidden className="text-amber">→</span>
+                      <span aria-hidden className="text-accent">→</span>
                     </Link>
                   )}
                 </div>

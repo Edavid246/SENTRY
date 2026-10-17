@@ -13,7 +13,7 @@ type Evidence = CaseView["evidence"][number];
 
 // One evidence item and its chain of custody, oldest first. Each hand-over is a point on a
 // vertical line. A break is a hand-over whose recorded holder is not whoever last received the
-// item; it sits on an amber point with the name that was expected, so the gap reads at a glance.
+// item; it sits on an gold point with the name that was expected, so the gap reads at a glance.
 function Custody({ item }: { item: Evidence }) {
   const broken = item.steps.filter((s) => s.expected_holder).length;
   return (
@@ -24,7 +24,7 @@ function Custody({ item }: { item: Evidence }) {
             {item.evidence_ref} · {item.item}
           </Link>
         </h3>
-        <span className="text-[0.85rem] text-sage">
+        <span className="text-[0.85rem] text-soft">
           {item.kind} · {item.status}
         </span>
       </header>
@@ -38,19 +38,19 @@ function Custody({ item }: { item: Evidence }) {
               )}
               <span
                 aria-hidden
-                className={`absolute left-0 top-1.5 h-[11px] w-[11px] ${gap ? "bg-amber" : "border border-sage bg-ground"}`}
+                className={`absolute left-0 top-1.5 h-[11px] w-[11px] ${gap ? "bg-gold" : "border border-soft bg-ground"}`}
               />
               <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-                <Link href={recordHref(step.ref)} className={`text-[0.95rem] hover:underline ${gap ? "text-amber" : ""}`}>
+                <Link href={recordHref(step.ref)} className={`text-[0.95rem] hover:underline ${gap ? "text-gold" : ""}`}>
                   {step.action}
                 </Link>
                 <span className="text-[0.8rem] tabular-nums text-mute">{step.event_date}</span>
               </div>
-              <p className="mt-0.5 text-[0.85rem] text-sage">
+              <p className="mt-0.5 text-[0.85rem] text-soft">
                 {step.from_holder} → {step.to_holder}
               </p>
               {gap && (
-                <p className="mt-1 text-[0.85rem] text-amber">
+                <p className="mt-1 text-[0.85rem] text-gold">
                   Break: the last holder on record was {step.expected_holder}, not {step.from_holder}.
                 </p>
               )}
@@ -63,7 +63,7 @@ function Custody({ item }: { item: Evidence }) {
           sha256 {item.sha256.slice(0, 16)}…
         </span>
         <span>{item.steps.length} custody events</span>
-        {broken > 0 && <span className="text-amber">{broken} break</span>}
+        {broken > 0 && <span className="text-gold">{broken} break</span>}
       </footer>
     </section>
   );
@@ -88,14 +88,14 @@ export default function CasePage() {
     <Shell>
       <div className="h-full overflow-y-auto p-6 md:p-10">
         <div className="mx-auto max-w-5xl">
-          <Link href="/d/giga" className="text-[0.9rem] text-sage hover:text-ink">
+          <Link href="/d/giga" className="text-[0.9rem] text-soft hover:text-ink">
             ← Giga Forensics
           </Link>
-          {!view && state === "loading" && <p className="mt-8 text-sage">Loading…</p>}
+          {!view && state === "loading" && <p className="mt-8 text-soft">Loading…</p>}
           {!view && state === "missing" && (
             <div data-testid="case-not-found" className="mt-8">
               <h1 className="text-[1.6rem] font-medium">Not found</h1>
-              <p className="mt-2 text-sage">There is no such case, or it is not available to you.</p>
+              <p className="mt-2 text-soft">There is no such case, or it is not available to you.</p>
             </div>
           )}
           {!view && state === "failed" && (
@@ -106,18 +106,18 @@ export default function CasePage() {
           {view && (
             <>
               <header className="mt-6 border border-rule bg-surface p-6">
-                <p className="text-[0.85rem] text-sage">{view.case_ref}</p>
+                <p className="text-[0.85rem] text-soft">{view.case_ref}</p>
                 <h1 data-testid="case-title" className="mt-1 text-[1.8rem] font-medium leading-tight">
                   {view.title}
                 </h1>
                 <p className="mt-3 text-[0.9rem]">
                   {view.breaks > 0 ? (
                     <>
-                      <span className="font-bold text-amber">{view.breaks}</span> custody{" "}
+                      <span className="font-bold text-gold">{view.breaks}</span> custody{" "}
                       {view.breaks === 1 ? "break" : "breaks"} to explain
                     </>
                   ) : (
-                    <span className="text-sage">Every chain of custody is unbroken.</span>
+                    <span className="text-soft">Every chain of custody is unbroken.</span>
                   )}
                 </p>
                 <dl className="mt-5 flex flex-wrap gap-x-10 gap-y-3">
@@ -135,10 +135,10 @@ export default function CasePage() {
                 </dl>
                 <div className="mt-5 flex flex-wrap items-center gap-1.5">
                   <Marking code={view.classification} compartments={view.compartments} />
-                  <Link href={recordHref(view.ref)} className="ml-3 text-[0.85rem] text-sage hover:text-ink hover:underline">
+                  <Link href={recordHref(view.ref)} className="ml-3 text-[0.85rem] text-soft hover:text-ink hover:underline">
                     Case record {view.ref}
                   </Link>
-                  <Link href="/audit" className="ml-3 text-[0.85rem] text-sage hover:text-ink hover:underline">
+                  <Link href="/audit" className="ml-3 text-[0.85rem] text-soft hover:text-ink hover:underline">
                     Audit log
                   </Link>
                 </div>

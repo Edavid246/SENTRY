@@ -15,8 +15,8 @@ import { fmtTs } from "@/lib/format";
 import { palette } from "@/lib/palette";
 
 const COLOURS: Record<MapKind, string> = {
-  sensor: palette.sage,
-  detection: palette.amber.DEFAULT,
+  sensor: palette.soft,
+  detection: palette.accent.DEFAULT,
   mission: palette.ok,
 };
 // One replay tick advances the clock by 30 simulated minutes (the 48 h window takes ~1.5 min).
@@ -160,7 +160,7 @@ export default function MapPage() {
               paint: {
                 "circle-radius": ["case", ["==", ["get", "kind"], "sensor"], 7, 6],
                 "circle-color": ["match", ["get", "kind"], "sensor", COLOURS.sensor, COLOURS.detection],
-                "circle-stroke-color": palette.ink,
+                "circle-stroke-color": palette.ground,
                 "circle-stroke-width": 1,
               },
             },
@@ -217,7 +217,7 @@ export default function MapPage() {
         <div className="relative h-[55%] min-w-0 shrink-0 md:h-auto md:flex-1">
           <div ref={container} data-testid="map-canvas" data-ready={ready}
             style={{ position: "absolute", inset: 0 }} />
-          <div className="absolute left-3 top-3 border border-rule bg-surface/90 px-3 py-1 text-[0.75rem] tracking-[0.12em] text-sage">
+          <div className="absolute left-3 top-3 border border-rule bg-surface/90 px-3 py-1 text-[0.75rem] tracking-[0.12em] text-soft">
             SYNTHETIC DATA · OFFLINE BASEMAP (NO EXTERNAL TILES)
           </div>
           {error && (
@@ -260,7 +260,7 @@ export default function MapPage() {
               {replay ? "Stop replay" : "Replay detections"}
             </button>
             {replay && (
-              <span data-testid="replay-clock" className="font-mono text-[0.75rem] text-amber">
+              <span data-testid="replay-clock" className="font-mono text-[0.75rem] text-accent">
                 {fmtTs(replay.clock)} WAT · {replay.events.length}
               </span>
             )}
@@ -329,7 +329,7 @@ export default function MapPage() {
                   onClick={() => setSelected(f.properties.ref)}
                   data-testid={`map-item-${f.properties.ref}`}
                   className={`flex w-full items-center gap-2 border-l-[3px] px-2 py-1 text-left text-[0.8rem] ${
-                    f.properties.ref === selected ? "border-amber bg-raised" : "border-transparent hover:bg-raised"
+                    f.properties.ref === selected ? "border-accent bg-raised" : "border-transparent hover:bg-raised"
                   }`}
                 >
                   <span className="inline-block h-2 w-2 shrink-0" style={{ background: COLOURS[f.properties.kind] }} />
@@ -340,7 +340,7 @@ export default function MapPage() {
             ))}
           </ul>
           {data && data.features.length === 0 && !error && (
-            <p data-testid="map-empty" className="mt-4 text-sage">
+            <p data-testid="map-empty" className="mt-4 text-soft">
               Nothing to show for your access level.
             </p>
           )}

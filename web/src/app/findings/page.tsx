@@ -43,7 +43,7 @@ export default function FindingsPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="label">Findings</h1>
-            <p className="mt-1 max-w-2xl text-[0.85rem] text-sage">
+            <p className="mt-1 max-w-2xl text-[0.85rem] text-soft">
               Patterns the system found by connecting separate records. A finding carries the highest
               classification of the records behind it, and each one links to its evidence.
             </p>
@@ -59,9 +59,9 @@ export default function FindingsPage() {
             {error}
           </p>
         )}
-        {!findings && !error && <p className="text-sage">Loading…</p>}
+        {!findings && !error && <p className="text-soft">Loading…</p>}
         {findings && findings.length === 0 && (
-          <p data-testid="no-findings" className="border border-rule p-4 text-sage">
+          <p data-testid="no-findings" className="border border-rule p-4 text-soft">
             No findings yet. Run the correlation to look for patterns.
           </p>
         )}
@@ -81,11 +81,11 @@ export default function FindingsPage() {
                 <Link
                   href={recordHref(f.id)}
                   data-testid="finding-link"
-                  className="mt-2 block text-[1rem] text-amber hover:underline"
+                  className="mt-2 block text-[1rem] text-accent hover:underline"
                 >
                   {f.title}
                 </Link>
-                <p className="mt-1 text-[0.85rem] text-sage">{f.summary}</p>
+                <p className="mt-1 text-[0.85rem] text-soft">{f.summary}</p>
                 <p className="mt-1 text-[0.75rem] text-mute">{f.evidence_ids.length} records of evidence</p>
               </li>
             ))}

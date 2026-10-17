@@ -30,8 +30,8 @@ export function CitationBadge({
       title={citation.document_title}
       className={`mx-0.5 inline-block border px-1.5 py-px align-baseline text-[0.8rem] ${
         active
-          ? "border-amber bg-amber/10 text-amber"
-          : "border-sage/60 text-sage hover:border-amber hover:text-amber"
+          ? "border-accent bg-accent/10 text-accent"
+          : "border-soft/60 text-soft hover:border-accent hover:text-accent"
       }`}
     >
       [{citationLabel(citation)}]
@@ -73,7 +73,7 @@ export function CitedAnswer({
     <div>
       <p className="whitespace-pre-wrap leading-relaxed">{parts}</p>
       {rest.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center gap-1 text-[0.8rem] text-sage">
+        <div className="mt-3 flex flex-wrap items-center gap-1 text-[0.8rem] text-soft">
           <span>Sources</span>
           {rest.map((c) => (
             <CitationBadge key={c.chunk_id} citation={c} active={c.chunk_id === activeChunkId} onOpen={onOpen} />

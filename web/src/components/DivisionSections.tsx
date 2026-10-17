@@ -7,7 +7,7 @@ import { Marking } from "./Marking";
 import { recordHref } from "@/lib/links";
 
 // How much of a service interval has been flown. The tick marks the last tenth, where an
-// aircraft should already be booked in; the fill turns amber once it passes the tick.
+// aircraft should already be booked in; the fill turns gold once it passes the tick.
 function ServiceGauge({ fraction }: { fraction: number }) {
   const pct = Math.round(Math.max(0, Math.min(1, fraction)) * 100);
   return (
@@ -20,14 +20,14 @@ function ServiceGauge({ fraction }: { fraction: number }) {
       data-testid="service-gauge"
       className="relative mt-2 h-2 border border-rule bg-ground"
     >
-      <div className={`h-full ${pct >= 90 ? "bg-amber" : "bg-sage"}`} style={{ width: `${pct}%` }} />
+      <div className={`h-full ${pct >= 90 ? "bg-gold" : "bg-soft"}`} style={{ width: `${pct}%` }} />
       <span aria-hidden className="absolute inset-y-[-3px] left-[90%] w-px bg-ink opacity-60" />
     </div>
   );
 }
 
 // One section of a dashboard: the rows of a typed tool, each linking to its record (and from
-// there to the evidence panel). A flagged row carries an amber rule down its left edge, so the
+// there to the evidence panel). A flagged row carries an gold rule down its left edge, so the
 // ones needing attention can be found by running an eye down the page, not by reading colour.
 export function SectionCard({
   section,
@@ -43,7 +43,7 @@ export function SectionCard({
     <section
       id={section.key}
       data-testid={`section-${section.key}`}
-      className={`scroll-mt-4 border bg-surface ${lead ? "border-amber xl:col-span-2" : "border-rule"}`}
+      className={`scroll-mt-4 border bg-surface ${lead ? "border-gold xl:col-span-2" : "border-rule"}`}
     >
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 border-b border-rule px-5 py-3.5">
         <h2 className="text-[1rem] font-medium">{section.title}</h2>
@@ -52,11 +52,11 @@ export function SectionCard({
           {rows.length === 0 ? (
             <span className="text-mute">none</span>
           ) : flagged > 0 ? (
-            <span className="text-amber">
+            <span className="text-gold">
               {flagged} of {rows.length} need attention
             </span>
           ) : (
-            <span className="text-sage">{rows.length} in order</span>
+            <span className="text-soft">{rows.length} in order</span>
           )}
         </span>
       </header>
@@ -68,20 +68,20 @@ export function SectionCard({
             <li
               key={row.ref}
               className={`border-b border-l-[3px] border-b-rule px-5 py-3.5 last:border-b-0 ${
-                row.flagged ? "border-l-amber bg-raised" : "border-l-transparent"
+                row.flagged ? "border-l-gold bg-raised" : "border-l-transparent"
               }`}
             >
               <div className="flex items-baseline justify-between gap-4">
                 <Link
                   href={row.href}
                   data-testid="row-link"
-                  className={`min-w-0 hover:underline ${lead ? "text-[1.2rem] font-medium" : "text-[0.95rem]"} ${row.flagged ? "text-amber" : ""}`}
+                  className={`min-w-0 hover:underline ${lead ? "text-[1.2rem] font-medium" : "text-[0.95rem]"} ${row.flagged ? "text-gold" : ""}`}
                 >
                   {row.label}
                 </Link>
                 <span className="shrink-0 text-[0.75rem] tabular-nums text-mute">{row.ref}</span>
               </div>
-              <p className="mt-1 text-[0.85rem] leading-relaxed text-sage">{row.detail}</p>
+              <p className="mt-1 text-[0.85rem] leading-relaxed text-soft">{row.detail}</p>
               {row.meter != null && <ServiceGauge fraction={row.meter} />}
             </li>
           ))}
@@ -158,7 +158,7 @@ export function SerialLookup({ division }: { division: string }) {
                   >
                     {row.label}
                   </Link>
-                  <p className="mt-1 text-[0.85rem] text-sage">{row.detail}</p>
+                  <p className="mt-1 text-[0.85rem] text-soft">{row.detail}</p>
                 </li>
               ))}
             </ul>

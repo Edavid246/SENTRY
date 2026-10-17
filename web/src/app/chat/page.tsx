@@ -84,7 +84,7 @@ function Thread({
         {canAsk ? (
           <div className="mx-auto w-full max-w-[760px]">
             <h1 className="text-[1.25rem] font-medium tracking-[0.06em]">Ask about approved sources</h1>
-            <p className="mt-2 text-sage">
+            <p className="mt-2 text-soft">
               You only see answers built from material you are cleared for. Every question is logged.
             </p>
             <div className="mt-6 flex flex-col gap-2">
@@ -93,7 +93,7 @@ function Thread({
                   key={q}
                   type="button"
                   onClick={() => onStarter(q)}
-                  className="border border-rule bg-surface px-4 py-3 text-left text-[0.95rem] hover:border-amber"
+                  className="border border-rule bg-surface px-4 py-3 text-left text-[0.95rem] hover:border-accent"
                 >
                   {q}
                 </button>
@@ -103,10 +103,10 @@ function Thread({
         ) : (
           <div className="mx-auto max-w-[620px] text-center">
             <h1 className="text-[1.25rem] font-medium">This role has no assistant access</h1>
-            <p className="mt-2 text-sage">
+            <p className="mt-2 text-soft">
               Your account can review the audit log only.{" "}
               {canAudit && (
-                <Link href="/audit" className="text-amber underline">
+                <Link href="/audit" className="text-accent underline">
                   Open the audit log
                 </Link>
               )}
@@ -129,7 +129,7 @@ function Thread({
             <div className="flex items-center justify-between border-b border-rule px-4 py-1.5">
               <span className="label">{m.role === "user" ? "You" : "Assistant"}</span>
               {m.meta?.degraded && (
-                <span data-testid="degraded-note" className="text-[0.75rem] text-sage">
+                <span data-testid="degraded-note" className="text-[0.75rem] text-soft">
                   Keyword search only
                 </span>
               )}
@@ -138,7 +138,7 @@ function Thread({
               {m.meta?.report && (
                 <div
                   data-testid="draft-banner"
-                  className="mb-3 flex flex-wrap items-center gap-2 border border-amber bg-amber/10 px-3 py-2 text-[0.85rem] font-medium uppercase tracking-[0.1em] text-amber"
+                  className="mb-3 flex flex-wrap items-center gap-2 border border-gold bg-gold/10 px-3 py-2 text-[0.85rem] font-medium uppercase tracking-[0.1em] text-gold"
                 >
                   Draft for human review
                   <Marking code={m.meta.report.classification_code} compartments={m.meta.report.compartments} />
@@ -179,7 +179,7 @@ function Thread({
                 <div className="mt-3 text-[0.75rem] text-mute">
                   Audit event{" "}
                   {canAudit ? (
-                    <Link href={`/audit?event_id=${m.meta.auditEventId}`} className="underline hover:text-amber">
+                    <Link href={`/audit?event_id=${m.meta.auditEventId}`} className="underline hover:text-accent">
                       {m.meta.auditEventId.slice(0, 8)}
                     </Link>
                   ) : (
@@ -362,7 +362,7 @@ export default function ChatPage() {
                     }}
                     aria-current={active ? "true" : undefined}
                     className={`block w-full border-l-[3px] px-4 py-2.5 text-left text-[0.85rem] ${
-                      active ? "border-amber bg-raised text-amber" : "border-transparent hover:bg-raised"
+                      active ? "border-accent bg-raised text-accent" : "border-transparent hover:bg-raised"
                     }`}
                   >
                     <span className="line-clamp-2">{c.title}</span>
@@ -421,7 +421,7 @@ export default function ChatPage() {
                 placeholder={canAsk ? "Ask a question. Enter to send, Shift+Enter for a new line." : "Assistant not available for this role"}
                 className="field resize-none"
               />
-              <button type="submit" disabled={!canAsk || pending || !input.trim()} className="btn-amber flex items-center gap-2 pe-3.5">
+              <button type="submit" disabled={!canAsk || pending || !input.trim()} className="btn-accent flex items-center gap-2 pe-3.5">
                 Send
                 <IconArrow size={16} weight="bold" />
               </button>

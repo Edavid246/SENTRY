@@ -16,11 +16,11 @@
     letter-spacing: 0.01em;
   }
   ::selection {
-    background: theme("colors.amber.DEFAULT");
-    color: theme("colors.ground");
+    background: theme("colors.accent.DEFAULT");
+    color: theme("colors.on-accent");
   }
   :focus-visible {
-    outline: 2px solid theme("colors.amber.DEFAULT");
+    outline: 2px solid theme("colors.accent.DEFAULT");
     outline-offset: 2px;
   }
   /* thin, flat scrollbars to match the reference screens */
@@ -36,16 +36,16 @@
     background-image: theme("backgroundImage.grid-ground");
   }
   .label {
-    @apply text-[0.8rem] uppercase tracking-[0.12em] text-sage;
+    @apply text-[0.8rem] uppercase tracking-[0.12em] text-soft;
   }
   .field {
     @apply w-full border border-rule bg-ground px-3 py-2.5 text-ink placeholder:text-mute;
   }
   .btn {
-    @apply border border-rule bg-surface px-4 py-2 text-[0.85rem] uppercase tracking-[0.12em] text-ink hover:border-sage disabled:cursor-not-allowed disabled:text-mute disabled:hover:border-rule;
+    @apply border border-rule bg-surface px-4 py-2 text-[0.85rem] uppercase tracking-[0.12em] text-ink hover:border-soft disabled:cursor-not-allowed disabled:text-mute disabled:hover:border-rule;
   }
-  .btn-amber {
-    @apply border border-amber bg-amber px-4 py-2.5 text-[0.9rem] font-bold uppercase tracking-[0.16em] text-ground hover:bg-amber-hover disabled:cursor-not-allowed disabled:border-rule disabled:bg-raised disabled:text-mute;
+  .btn-accent {
+    @apply border border-accent bg-accent px-4 py-2.5 text-[0.9rem] font-bold uppercase tracking-[0.16em] text-on-accent hover:bg-accent-hover disabled:cursor-not-allowed disabled:border-rule disabled:bg-raised disabled:text-mute;
   }
   .tag {
     @apply inline-block border border-rule px-2 py-0.5 text-[0.75rem] uppercase tracking-[0.1em] text-ink;
@@ -53,7 +53,7 @@
 
   /* Press feedback. `scale` is its own property, so it never fights a transform utility. */
   .btn,
-  .btn-amber {
+  .btn-accent {
     transition-property: scale, border-color, background-color, color;
     transition-duration: 150ms;
     transition-timing-function: theme("transitionTimingFunction.out"), ease, ease, ease;
@@ -61,7 +61,7 @@
   }
   @media (prefers-reduced-motion: no-preference) {
     .btn:not(:disabled):active,
-    .btn-amber:not(:disabled):active {
+    .btn-accent:not(:disabled):active {
       scale: 0.96;
     }
   }
@@ -98,7 +98,7 @@
     @apply relative h-0.5 overflow-hidden bg-rule;
   }
   .scan::after {
-    @apply absolute inset-y-0 left-0 w-[30%] bg-amber;
+    @apply absolute inset-y-0 left-0 w-[30%] bg-accent;
     content: "";
     translate: -100% 0;
     animation: scan 1.6s linear infinite;
@@ -152,5 +152,5 @@
   @apply bg-surface/90 text-mute;
 }
 .maplibregl-ctrl-attrib a {
-  @apply text-sage;
+  @apply text-soft;
 }

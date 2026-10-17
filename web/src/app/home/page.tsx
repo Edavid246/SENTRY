@@ -20,8 +20,8 @@ function DivisionCard({ division, wide, delay }: { division: HomeDivision; wide?
       data-testid={`division-${division.key}`}
       data-alert={alert ? alert.count : 0}
       style={delay != null ? stagger(delay) : undefined}
-      className={`group relative flex min-h-[210px] overflow-hidden border border-l-[3px] border-rule bg-surface p-7 transition-colors hover:border-sage hover:bg-raised ${
-        alert ? "border-l-amber" : "border-l-transparent"
+      className={`group relative flex min-h-[210px] overflow-hidden border border-l-[3px] border-rule bg-surface p-7 transition-colors hover:border-soft hover:bg-raised ${
+        alert ? "border-l-gold" : "border-l-transparent"
       } ${wide ? "md:col-span-2 md:min-h-[150px]" : ""} ${delay != null ? "enter" : ""}`}
     >
       <DivisionGlyph
@@ -34,22 +34,22 @@ function DivisionCard({ division, wide, delay }: { division: HomeDivision; wide?
             <h2 className="text-[1.7rem] font-medium leading-tight tracking-[0.01em]">
               {division.name}
             </h2>
-            <p className="mt-1.5 max-w-[34ch] text-[0.9rem] leading-relaxed text-sage">{division.tagline}</p>
+            <p className="mt-1.5 max-w-[34ch] text-[0.9rem] leading-relaxed text-soft">{division.tagline}</p>
           </div>
           {alert && (
             <div className="text-right">
               <div
                 data-testid={`alert-${division.key}`}
-                className="font-mono text-[3.4rem] font-bold leading-none text-amber"
+                className="font-mono text-[3.4rem] font-bold leading-none text-gold"
               >
                 {alert.count}
               </div>
-              <div className="mt-1 text-[0.8rem] text-sage">need attention</div>
+              <div className="mt-1 text-[0.8rem] text-soft">need attention</div>
             </div>
           )}
         </div>
         {!alert && (
-          <p className="flex items-center gap-2 text-[0.85rem] text-sage">
+          <p className="flex items-center gap-2 text-[0.85rem] text-soft">
             <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-ok" />
             Nothing needs attention
           </p>
@@ -59,7 +59,7 @@ function DivisionCard({ division, wide, delay }: { division: HomeDivision; wide?
             <ul className="text-[0.85rem] leading-relaxed text-ink">
               {alert.parts.map((p) => (
                 <li key={p.what}>
-                  <span className="font-bold text-amber">{p.count}</span> {p.what}
+                  <span className="font-bold text-gold">{p.count}</span> {p.what}
                 </li>
               ))}
             </ul>
@@ -111,7 +111,7 @@ export default function HomePage() {
             <h1 data-testid="home-title" className="text-[2rem] font-medium tracking-[0.02em]">
               {me?.unit_breadcrumb[0]?.name ?? "Group"}
             </h1>
-            <p className="mt-1 text-[0.95rem] text-sage">
+            <p className="mt-1 text-[0.95rem] text-soft">
               Open a division to see what is happening there.
             </p>
           </div>
@@ -120,7 +120,7 @@ export default function HomePage() {
               {error}
             </p>
           )}
-          {!summary && !error && <p className="mt-8 text-sage">Loading…</p>}
+          {!summary && !error && <p className="mt-8 text-soft">Loading…</p>}
           {summary && (
             <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2">
               {divisions.map((d, i) => (

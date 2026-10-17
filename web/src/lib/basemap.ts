@@ -4,6 +4,7 @@
 import type { LayerSpecification, StyleSpecification } from "maplibre-gl";
 import { layers, namedFlavor } from "@protomaps/basemaps";
 import { PMTiles, Protocol, type RangeResponse, type Source } from "pmtiles";
+import { palette } from "./palette";
 
 const ARCHIVE = "/basemap/demo-area.pmtiles";
 const KEY = "demo-area";
@@ -59,34 +60,38 @@ export function basemapStyle(): Pick<StyleSpecification, "glyphs" | "sprite" | "
   };
 }
 
-// Protomaps "dark", recoloured to the app palette. The demo area is rural and sparsely
-// mapped, so roads and labels get more contrast than the stock flavor gives them; the
-// overlay colours (sensors, detections, missions) stay the brightest things on the map.
+// Protomaps "light", recoloured to the app palette: warm grey land, grey roads, near-black
+// labels. The demo area is rural and sparsely mapped, so roads and labels get more contrast than
+// the stock flavor gives them; the overlay colours (sensors, detections, missions) stay the
+// strongest marks on the map. The POI and one-way icons still come from the offline dark sprite
+// set (public/basemap/README.md); the extract has very few of them.
 const FLAVOR = {
-  ...namedFlavor("dark"),
-  background: "#091017",
-  earth: "#0f1a20",
-  water: "#173543",
-  wood_a: "#122219",
-  wood_b: "#122219",
-  scrub_a: "#131f1a",
-  scrub_b: "#131f1a",
-  buildings: "#1f2d33",
-  boundaries: "#3c5058",
-  railway: "#36474c",
-  other: "#2a3a3f",
-  minor_service: "#2f4146",
-  minor_a: "#3a4f53",
-  minor_b: "#3a4f53",
-  link: "#4a6063",
-  major: "#4f6668",
-  highway: "#5f7774",
-  roads_label_minor: "#7d918a",
-  roads_label_minor_halo: "#091017",
-  roads_label_major: "#8fa89d",
-  roads_label_major_halo: "#091017",
-  subplace_label: "#8fa89d",
-  subplace_label_halo: "#091017",
-  city_label: "#b7c7bf",
-  city_label_halo: "#091017",
+  ...namedFlavor("light"),
+  background: "#e9e4e2",
+  earth: "#efebe9",
+  water: "#c9d8de",
+  wood_a: "#dfe6da",
+  wood_b: "#dfe6da",
+  scrub_a: "#e4e8de",
+  scrub_b: "#e4e8de",
+  buildings: "#ddd5d3",
+  boundaries: "#a99e9c",
+  railway: "#b3a8a6",
+  other: "#e6e0de",
+  // Roads are grey lines rather than white: the area's thin rural tracks vanish as white on
+  // light land.
+  minor_service: "#c9bfbd",
+  minor_a: "#bdb2b0",
+  minor_b: "#bdb2b0",
+  link: "#a99e9c",
+  major: "#a99e9c",
+  highway: "#968a88",
+  roads_label_minor: palette.mute,
+  roads_label_minor_halo: palette.ground,
+  roads_label_major: palette.soft,
+  roads_label_major_halo: palette.ground,
+  subplace_label: palette.soft,
+  subplace_label_halo: palette.ground,
+  city_label: palette.ink,
+  city_label_halo: palette.ground,
 };

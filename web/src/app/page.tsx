@@ -23,7 +23,7 @@ function Crosshair({ className }: { className: string }) {
       width="14"
       height="14"
       viewBox="0 0 14 14"
-      stroke={palette.rule}
+      stroke={palette.mute}
       strokeWidth="1.5"
       className={`absolute ${className}`}
       aria-hidden="true"
@@ -66,15 +66,15 @@ export default function LoginPage() {
 
   return (
     <div className="grid-ground relative flex min-h-screen flex-col">
-      <header className="flex items-start justify-between px-9 pt-7">
+      <header className="flex items-center justify-between bg-accent px-9 py-5 text-on-accent">
         <div className="flex items-center gap-4">
-          <Emblem size={32} />
+          <Emblem size={32} className="text-on-accent" />
           <div className="leading-tight">
-            <div className="text-[1rem] tracking-[0.12em]">DEFENCE GATEWAY</div>
-            <div className="text-[0.85rem] tracking-[0.12em] text-sage">SECURE ASSISTANT</div>
+            <div className="text-[1rem] font-bold tracking-[0.12em]">DEFENCE GATEWAY</div>
+            <div className="text-[0.85rem] tracking-[0.12em] text-on-accent/80">SECURE ASSISTANT</div>
           </div>
         </div>
-        <div className="text-right text-[0.8rem] leading-relaxed text-sage">
+        <div className="text-right text-[0.8rem] leading-relaxed text-on-accent/80">
           <div>DEMO BUILD</div>
           <div>
             <Clock />
@@ -92,10 +92,10 @@ export default function LoginPage() {
           {/* Sign-in is rare, so it gets the one staged entrance: card and title, form, footer. */}
           <div className="enter border border-rule bg-surface">
             <div className="flex items-center gap-5 border-b border-rule px-8 py-6">
-              <Emblem size={52} />
+              <Emblem size={52} className="text-accent" />
               <div>
                 <h1 className="text-[1.3rem] font-medium tracking-[0.1em]">DEFENCE GATEWAY</h1>
-                <p className="text-[0.95rem] tracking-[0.1em] text-sage">SECURE ASSISTANT</p>
+                <p className="text-[0.95rem] tracking-[0.1em] text-soft">SECURE ASSISTANT</p>
               </div>
             </div>
 
@@ -105,7 +105,7 @@ export default function LoginPage() {
                   Username
                 </label>
                 <div className="relative">
-                  <IconUser size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-sage" />
+                  <IconUser size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-soft" />
                   <input
                     id="username"
                     name="username"
@@ -125,7 +125,7 @@ export default function LoginPage() {
                   Password
                 </label>
                 <div className="relative">
-                  <IconLock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-sage" />
+                  <IconLock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-soft" />
                   <input
                     id="password"
                     name="password"
@@ -141,7 +141,7 @@ export default function LoginPage() {
                     type="button"
                     onClick={() => setReveal((r) => !r)}
                     aria-label={reveal ? "Hide password" : "Show password"}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-sage hover:text-ink"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-soft hover:text-ink"
                   >
                     {/* Both icons stay mounted in one cell and cross-fade. */}
                     <span className="grid place-items-center">
@@ -165,7 +165,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={busy || !username || !password}
-                className="btn-amber flex items-center justify-center gap-3 pe-3.5"
+                className="btn-accent flex items-center justify-center gap-3 pe-3.5"
               >
                 {busy ? "Signing in" : "Log in"}
                 <IconArrow size={18} weight="bold" />
@@ -173,7 +173,7 @@ export default function LoginPage() {
             </form>
 
             <div
-              className="enter border-t border-rule px-8 py-4 text-center text-[0.75rem] tracking-[0.14em] text-sage"
+              className="enter border-t border-rule px-8 py-4 text-center text-[0.75rem] tracking-[0.14em] text-soft"
               style={stagger(200)}
             >
               ACCESS-CONTROLLED <span className="mx-3 text-mute">/</span> AUDITABLE

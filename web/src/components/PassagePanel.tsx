@@ -20,17 +20,17 @@ export function PassagePanel({ state, onClose }: { state: PanelState; onClose: (
       <div className="flex items-center justify-between border-b border-rule px-5 py-3">
         <div>
           <div className="label">Cited passage</div>
-          <div className="text-[0.9rem] text-amber">{citationLabel(state.citation)}</div>
+          <div className="text-[0.9rem] text-accent">{citationLabel(state.citation)}</div>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close passage" className="text-sage hover:text-ink">
+        <button type="button" onClick={onClose} aria-label="Close passage" className="text-soft hover:text-ink">
           <IconClose size={20} />
         </button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
-        {state.status === "loading" && <p className="text-sage">Loading passage…</p>}
+        {state.status === "loading" && <p className="text-soft">Loading passage…</p>}
         {state.status === "missing" && (
-          <p className="text-sage">This passage is not available to your clearance.</p>
+          <p className="text-soft">This passage is not available to your clearance.</p>
         )}
         {state.status === "ok" && (
           <>
@@ -39,11 +39,11 @@ export function PassagePanel({ state, onClose }: { state: PanelState; onClose: (
               <Marking code={state.chunk.classification_code} compartments={state.chunk.compartments} />
             </div>
             <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[0.85rem]">
-              <dt className="text-sage">Document</dt>
+              <dt className="text-soft">Document</dt>
               <dd>{state.chunk.document_ref || "—"}</dd>
-              <dt className="text-sage">Page</dt>
+              <dt className="text-soft">Page</dt>
               <dd>{state.chunk.page ?? "—"}</dd>
-              <dt className="text-sage">Section</dt>
+              <dt className="text-soft">Section</dt>
               <dd>{state.chunk.section ?? "—"}</dd>
             </dl>
             <blockquote className="mt-4 whitespace-pre-wrap border-l-2 border-rule pl-4 leading-relaxed">

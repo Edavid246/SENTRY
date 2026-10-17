@@ -41,7 +41,7 @@ export default function FindingPage() {
             {error}
           </p>
         )}
-        {!finding && !error && <p className="mt-4 text-sage">Loading…</p>}
+        {!finding && !error && <p className="mt-4 text-soft">Loading…</p>}
         {finding && (
           <div data-testid="finding-detail" className="mt-4 max-w-4xl border border-rule bg-surface">
             <div className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-3">
@@ -54,7 +54,7 @@ export default function FindingPage() {
             </div>
             <div className="px-4 py-4">
               <h1 className="text-[1.15rem]">{finding.title}</h1>
-              <p className="mt-2 text-[0.95rem] text-sage">{finding.summary}</p>
+              <p className="mt-2 text-[0.95rem] text-soft">{finding.summary}</p>
               <p className="mt-2 text-[0.75rem] text-mute">
                 Derived item: it carries the highest classification and the union of compartments of
                 its evidence.
@@ -68,7 +68,7 @@ export default function FindingPage() {
                     <Link
                       href={recordHref(ref)}
                       data-testid="evidence-link"
-                      className="tag text-amber hover:underline"
+                      className="tag text-accent hover:underline"
                     >
                       {ref}
                     </Link>

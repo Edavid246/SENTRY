@@ -1,5 +1,5 @@
 // Shield with an eight-point star, drawn inline (no image assets, no CDN).
-export function Emblem({ size = 40 }: { size?: number }) {
+export function Emblem({ size = 40, className = "text-soft" }: { size?: number; className?: string }) {
   return (
     <svg
       width={size}
@@ -10,7 +10,7 @@ export function Emblem({ size = 40 }: { size?: number }) {
       strokeWidth="2"
       strokeLinejoin="round"
       aria-hidden="true"
-      className="text-sage"
+      className={className}
     >
       <path d="M24 2 5 9v17c0 13 8 21 19 26 11-5 19-13 19-26V9L24 2Z" />
       <path d="M24 12l3.2 9.8L37 25l-9.8 3.2L24 38l-3.2-9.8L11 25l9.8-3.2L24 12Z" />

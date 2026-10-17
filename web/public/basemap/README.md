@@ -10,8 +10,9 @@ rules). The pieces:
 | `fonts/Noto Sans {Regular,Medium,Italic}/*.pbf` | Label glyphs, Latin ranges only (0–1023, 7680–7935, 8192–8447) | `protomaps/basemaps-assets` @ `028c18f` |
 | `sprites/dark*` | POI and one-way arrow icons | `protomaps/basemaps-assets` @ `028c18f`, `sprites/v4` |
 
-The style layers come from the `@protomaps/basemaps` npm package (dark flavor), built in
-`web/src/lib/basemap.ts`.
+The style layers come from the `@protomaps/basemaps` npm package (light flavor, recoloured), built in
+`web/src/lib/basemap.ts`. Only the dark sprite set is stored here, so POI and one-way icons are the
+dark set's; the extract has very few of them.
 
 ## Licences
 

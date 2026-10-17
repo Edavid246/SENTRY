@@ -25,7 +25,7 @@ export function ResultTableView({ table }: { table: ResultTable }) {
                     <Link
                       href={recordHref(row[c] as string)}
                       data-testid="record-link"
-                      className="font-mono text-amber hover:underline"
+                      className="font-mono text-accent hover:underline"
                     >
                       {row[c] as string}
                     </Link>

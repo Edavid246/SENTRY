@@ -24,7 +24,7 @@ function DecisionBadge({ value }: { value: string }) {
 function StatusLine({ label, ok, tip }: { label: string; ok: boolean | null; tip?: ChainTip | null }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-rule/60 py-2 last:border-0">
-      <span className="text-sage">{label}</span>
+      <span className="text-soft">{label}</span>
       <span className="text-right">
         <span className={ok === true ? "text-ok" : ok === false ? "text-bad" : "text-mute"}>
           {ok === true ? "OK" : ok === false ? "FAILED" : "Not available"}
@@ -43,7 +43,7 @@ function VerifyModal({ report, onClose }: { report: VerifyReport; onClose: () =>
   }, [onClose]);
 
   return (
-    <div className="enter-backdrop fixed inset-0 z-20 flex items-center justify-center bg-ground/85 p-6">
+    <div className="enter-backdrop fixed inset-0 z-20 flex items-center justify-center bg-ink/50 p-6">
       <div
         role="dialog"
         aria-modal="true"
@@ -55,7 +55,7 @@ function VerifyModal({ report, onClose }: { report: VerifyReport; onClose: () =>
           <h2 id="verify-title" className="text-[1.05rem] font-medium tracking-[0.1em]">
             VERIFY CHAIN
           </h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-sage hover:text-ink">
+          <button type="button" onClick={onClose} aria-label="Close" className="text-soft hover:text-ink">
             <IconClose size={20} />
           </button>
         </div>
@@ -70,18 +70,18 @@ function VerifyModal({ report, onClose }: { report: VerifyReport; onClose: () =>
           </div>
           <div className="mt-4 text-[0.9rem]">
             <div className="flex justify-between border-b border-rule/60 py-2">
-              <span className="text-sage">Valid</span>
+              <span className="text-soft">Valid</span>
               <span data-testid="verify-valid">{String(report.valid)}</span>
             </div>
             <div className="flex justify-between border-b border-rule/60 py-2">
-              <span className="text-sage">Events checked</span>
+              <span className="text-soft">Events checked</span>
               <span data-testid="verify-count">{report.checked_count}</span>
             </div>
             <StatusLine label="Checkpoint file" ok={report.checkpoint_ok} tip={report.checkpoint_tip} />
             <StatusLine label="Git ledger" ok={report.ledger_ok} tip={report.ledger_tip} />
             {report.first_bad_event_id && (
               <div className="flex justify-between gap-4 py-2">
-                <span className="text-sage">First bad event</span>
+                <span className="text-soft">First bad event</span>
                 <Link
                   href={`/audit?event_id=${report.first_bad_event_id}`}
                   onClick={onClose}
@@ -172,7 +172,7 @@ function AuditView() {
       <div className="flex h-full items-center justify-center px-6 text-center">
         <div>
           <h1 className="text-[1.2rem] font-medium">Audit log not available</h1>
-          <p className="mt-2 text-sage">Your role cannot read the audit log.</p>
+          <p className="mt-2 text-soft">Your role cannot read the audit log.</p>
         </div>
       </div>
     );
@@ -183,10 +183,10 @@ function AuditView() {
       <section className="flex min-h-[28rem] min-w-0 flex-1 flex-col border border-rule bg-surface">
         <div className="flex items-center justify-between border-b border-rule px-5 py-3">
           <div className="flex items-center gap-4">
-            <IconLog size={28} weight="medium" className="text-sage" />
+            <IconLog size={28} weight="medium" className="text-soft" />
             <div>
               <h1 className="text-[1.05rem] font-medium tracking-[0.1em]">AUDIT LOG</h1>
-              <p className="text-[0.8rem] text-sage">System activity and access log, newest first</p>
+              <p className="text-[0.8rem] text-soft">System activity and access log, newest first</p>
             </div>
           </div>
           <button type="button" onClick={() => void load()} className="btn">
@@ -221,7 +221,7 @@ function AuditView() {
               {error}
             </p>
           ) : loading ? (
-            <p className="p-6 text-sage">Loading audit events…</p>
+            <p className="p-6 text-soft">Loading audit events…</p>
           ) : (
             <table data-testid="audit-table" className="w-full border-collapse text-left text-[0.85rem]">
               <thead className="sticky top-0 bg-raised">
@@ -251,7 +251,7 @@ function AuditView() {
                 })}
                 {shown.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-6 text-sage">
+                    <td colSpan={7} className="px-4 py-6 text-soft">
                       No events match this actor.
                     </td>
                   </tr>
@@ -260,7 +260,7 @@ function AuditView() {
             </table>
           )}
         </div>
-        <div className="border-t border-rule px-5 py-2 text-[0.8rem] text-sage">
+        <div className="border-t border-rule px-5 py-2 text-[0.8rem] text-soft">
           Showing {shown.length} of the {events.length} most recent events
         </div>
       </section>
@@ -268,30 +268,30 @@ function AuditView() {
       <aside className="flex shrink-0 flex-col gap-4 md:w-[360px]">
         <div className="border border-rule bg-surface p-5">
           <div className="flex items-center gap-3">
-            <IconShieldCheck size={30} weight="medium" className="text-sage" />
+            <IconShieldCheck size={30} weight="medium" className="text-soft" />
             <div>
               <h2 className="text-[1rem] font-medium tracking-[0.1em]">VERIFY CHAIN</h2>
-              <p className="text-[0.8rem] text-sage">Log integrity and chain of custody</p>
+              <p className="text-[0.8rem] text-soft">Log integrity and chain of custody</p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => void verify()}
             disabled={verifying}
-            className="btn-amber mt-5 w-full"
+            className="btn-accent mt-5 w-full"
           >
             {verifying ? "Verifying" : "Verify chain"}
           </button>
           {report && (
-            <p className="mt-3 text-[0.8rem] text-sage">
+            <p className="mt-3 text-[0.8rem] text-soft">
               Last run: {report.valid ? "valid" : "broken"}, {report.checked_count} events.{" "}
-              <button type="button" onClick={() => setModalOpen(true)} className="underline hover:text-amber">
+              <button type="button" onClick={() => setModalOpen(true)} className="underline hover:text-accent">
                 Show details
               </button>
             </p>
           )}
         </div>
-        <div className="border border-rule bg-surface p-5 text-[0.85rem] leading-relaxed text-sage">
+        <div className="border border-rule bg-surface p-5 text-[0.85rem] leading-relaxed text-soft">
           Each event stores the hash of the one before it. Any edit, deletion or reordering breaks the chain, and
           verification names the first event that no longer matches.
         </div>
@@ -316,7 +316,7 @@ function FragmentRow({
   onToggle: () => void;
 }) {
   const decision = displayValue(e.payload.decision);
-  const mark = isBad ? "bg-bad/10 outline outline-1 outline-bad" : isFocus ? "bg-amber/10 outline outline-1 outline-amber" : "";
+  const mark = isBad ? "bg-bad/10 outline outline-1 outline-bad" : isFocus ? "bg-accent/10 outline outline-1 outline-accent" : "";
   return (
     <>
       <tr
@@ -325,7 +325,7 @@ function FragmentRow({
         onClick={onToggle}
         className={`cursor-pointer border-b border-rule/60 hover:bg-raised ${mark}`}
       >
-        <td className="whitespace-nowrap px-4 py-2.5 text-sage">{e.seq}</td>
+        <td className="whitespace-nowrap px-4 py-2.5 text-soft">{e.seq}</td>
         <td className="whitespace-nowrap px-4 py-2.5" title={`Stored (hashed) value: ${e.created_at}`}>
           {fmtTs(e.created_at)}
         </td>
@@ -336,7 +336,7 @@ function FragmentRow({
             <span
               data-testid="audit-source-tag"
               title="Written by the demo cache prefill script, not by a live session"
-              className="ml-2 border border-amber px-1.5 py-0.5 text-[0.65rem] tracking-[0.1em] text-amber"
+              className="ml-2 border border-gold px-1.5 py-0.5 text-[0.65rem] tracking-[0.1em] text-gold"
             >
               {e.payload.source}
             </span>
@@ -346,20 +346,20 @@ function FragmentRow({
         <td className="px-4 py-2.5">
           <DecisionBadge value={decision} />
         </td>
-        <td className="whitespace-nowrap px-4 py-2.5 text-sage">{e.hash.slice(0, 14)}</td>
+        <td className="whitespace-nowrap px-4 py-2.5 text-soft">{e.hash.slice(0, 14)}</td>
       </tr>
       {expanded && (
         <tr className="border-b border-rule/60 bg-ground">
           <td colSpan={7} className="px-4 py-3 text-[0.8rem]">
             <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-              <span className="text-sage">Event</span>
+              <span className="text-soft">Event</span>
               <span className="break-all">{e.event_id}</span>
-              <span className="text-sage">Previous hash</span>
+              <span className="text-soft">Previous hash</span>
               <span className="break-all">{e.prev_hash}</span>
-              <span className="text-sage">Hash</span>
+              <span className="text-soft">Hash</span>
               <span className="break-all">{e.hash}</span>
             </div>
-            <pre className="mt-3 overflow-x-auto whitespace-pre-wrap border border-rule p-3 text-sage">
+            <pre className="mt-3 overflow-x-auto whitespace-pre-wrap border border-rule p-3 text-soft">
               {JSON.stringify(e.payload, null, 2)}
             </pre>
           </td>
@@ -372,7 +372,7 @@ function FragmentRow({
 export default function AuditPage() {
   return (
     <Shell>
-      <Suspense fallback={<p className="p-6 text-sage">Loading…</p>}>
+      <Suspense fallback={<p className="p-6 text-soft">Loading…</p>}>
         <AuditView />
       </Suspense>
     </Shell>

@@ -40,7 +40,7 @@ export default function RecordPage() {
             {error}
           </p>
         )}
-        {!record && !error && <p className="mt-4 text-sage">Loading…</p>}
+        {!record && !error && <p className="mt-4 text-soft">Loading…</p>}
         {record && (
           <div data-testid="record-detail" className="mt-4 max-w-3xl border border-rule bg-surface">
             <div className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-3">
