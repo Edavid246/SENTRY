@@ -11,6 +11,7 @@ import { Marking } from "@/components/Marking";
 import { BASEMAP_BOUNDS, basemapStyle, registerBasemap } from "@/lib/basemap";
 import { STATES } from "@/lib/states";
 import { recordHref } from "@/lib/links";
+import { fmtTs } from "@/lib/format";
 
 const COLOURS: Record<MapKind, string> = {
   sensor: "#8fa89d",
@@ -259,7 +260,7 @@ export default function MapPage() {
             </button>
             {replay && (
               <span data-testid="replay-clock" className="font-mono text-[0.75rem] text-amber">
-                {replay.clock.replace("T", " ").replace("Z", " UTC")} · {replay.events.length}
+                {fmtTs(replay.clock)} WAT · {replay.events.length}
               </span>
             )}
           </div>

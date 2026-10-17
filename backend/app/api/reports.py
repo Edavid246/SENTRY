@@ -22,7 +22,7 @@ from app.api.guard import guarded
 from app.audit.events import event
 from app.authz.context import AccessContext
 from app.authz.labels import Label, Labels
-from app.clock import utc_now_iso
+from app.clock import wat_now_label
 from app.divisions.catalog import DivisionNotFound
 from app.divisions.view import Section, build_division
 from app.reporting.division import (
@@ -96,7 +96,7 @@ def _build(ctx: AccessContext, conn: Connection, key: str, *, export: str | None
             division=division.key,
             name=division.name,
             tagline=division.tagline,
-            generated_at=utc_now_iso()[:16].replace("T", " ") + " UTC",
+            generated_at=wat_now_label(),
             prepared_for=f"{scope.ctx.display_name}, {scope.ctx.unit_path}",
             facts=tuple((f.label, f.value) for f in built.facts),
             sections=tuple(_section(s, labels) for s in sections),

@@ -1,6 +1,15 @@
-/** An ISO timestamp as "YYYY-MM-DD HH:MM:SS" (seconds) or, with `precision` 16, "YYYY-MM-DD HH:MM". */
+/** West Africa Time: UTC+1 all year (Nigeria has no daylight saving). The API stores and sends UTC. */
+const WAT_OFFSET_MS = 60 * 60 * 1000;
+
+/**
+ * A UTC ISO timestamp in WAT as "YYYY-MM-DD HH:MM:SS" (seconds) or, with `precision` 16,
+ * "YYYY-MM-DD HH:MM". A timestamp without a zone is read as UTC, never as browser-local time.
+ */
 export function fmtTs(iso: string, precision: 16 | 19 = 19): string {
-  return iso.slice(0, precision).replace("T", " ");
+  const zoned = /(Z|[+-]\d\d:?\d\d)$/.test(iso) ? iso : `${iso}Z`;
+  const ms = Date.parse(zoned);
+  if (Number.isNaN(ms)) return iso.slice(0, precision).replace("T", " ");
+  return new Date(ms + WAT_OFFSET_MS).toISOString().slice(0, precision).replace("T", " ");
 }
 
 export interface DisplayOptions {

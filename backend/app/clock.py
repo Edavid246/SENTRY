@@ -13,15 +13,28 @@ means the live date. Settings refuse DEMO_DATE outside the dev profile.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta, timezone
 
 UTC_TS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 """Fixed-width UTC timestamp; such strings order correctly as text."""
+
+WAT = timezone(timedelta(hours=1), "WAT")
+"""West Africa Time, UTC+1 all year (no daylight saving). Display only: storage stays UTC."""
 
 
 def utc_now_iso() -> str:
     """The real time now, ISO 8601 in UTC (audit timestamps, `generated_at`)."""
     return datetime.now(UTC).isoformat()
+
+
+def wat_label(moment: datetime) -> str:
+    """An aware datetime as "YYYY-MM-DD HH:MM WAT", for text people read (report exports)."""
+    return moment.astimezone(WAT).strftime("%Y-%m-%d %H:%M WAT")
+
+
+def wat_now_label() -> str:
+    """The real time now as a WAT display label."""
+    return wat_label(datetime.now(UTC))
 
 
 def real_today() -> date:

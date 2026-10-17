@@ -226,7 +226,7 @@ function AuditView() {
             <table data-testid="audit-table" className="w-full border-collapse text-left text-[0.85rem]">
               <thead className="sticky top-0 bg-raised">
                 <tr className="border-b border-rule">
-                  {["Seq", "Timestamp (UTC)", "Actor", "Action", "Resource", "Decision", "Hash"].map((h) => (
+                  {["Seq", "Timestamp (WAT)", "Actor", "Action", "Resource", "Decision", "Hash"].map((h) => (
                     <th key={h} className="label whitespace-nowrap px-4 py-2.5 font-medium">
                       {h}
                     </th>
@@ -326,7 +326,9 @@ function FragmentRow({
         className={`cursor-pointer border-b border-rule/60 hover:bg-raised ${mark}`}
       >
         <td className="whitespace-nowrap px-4 py-2.5 text-sage">{e.seq}</td>
-        <td className="whitespace-nowrap px-4 py-2.5">{fmtTs(e.created_at)}</td>
+        <td className="whitespace-nowrap px-4 py-2.5" title={`Stored (hashed) value: ${e.created_at}`}>
+          {fmtTs(e.created_at)}
+        </td>
         <td className="whitespace-nowrap px-4 py-2.5">{displayValue(e.payload.actor)}</td>
         <td className="whitespace-nowrap px-4 py-2.5 uppercase tracking-[0.06em]">
           {displayValue(e.payload.action)}

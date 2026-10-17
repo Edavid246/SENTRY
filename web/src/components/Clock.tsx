@@ -12,5 +12,5 @@ export function Clock() {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
-  return <span className="tabular-nums">{now ? `${now} (UTC)` : "—"}</span>;
+  return <span className="tabular-nums">{now ? `${now} (WAT)` : "—"}</span>;
 }
